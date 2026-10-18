@@ -1,0 +1,17 @@
+Pantograph Client
+
+This package was extracted from the Mathematics-ai-atp project
+(https://github.com/iCog-Labs-Dev/Mathematics-ai-atp), AC-branch at commit
+e8e4b18e081d6dd84491433b00e8cfa596cdfbee, and is distributed under the same
+GNU General Public License, version 2 (see LICENSE).
+
+src/pantograph_async/resources/repository_client_contract.patch modifies
+sources of the Pantograph Lean REPL, as forked at
+https://github.com/jajos12/Pantograph (base commit
+0dd5d2225e2d093f66a4b6231c1aa35004f2c8f3), originally developed at
+https://github.com/stanford-centaur/Pantograph. Those sources remain under
+their upstream license; this package ships only the patch and does not
+bundle, build, or download a REPL.
+
+The client speaks the wire protocol of that custom REPL. It does not include
+or depend on PyPantograph.

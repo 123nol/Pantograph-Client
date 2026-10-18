@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pantograph-async-client"
+version = "0.1.0"
+description = "Async client for the custom explicit-focused Pantograph Lean REPL"
+readme = "README.md"
+requires-python = ">=3.11"
+license-files = ["LICENSE", "NOTICE"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: POSIX :: Linux",
+    "Framework :: AsyncIO",
+]
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[project.scripts]
+pantograph-client = "pantograph_async.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+pantograph_async = ["py.typed", "resources/*.json", "resources/*.patch"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

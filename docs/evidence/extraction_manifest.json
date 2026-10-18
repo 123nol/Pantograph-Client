@@ -1,0 +1,169 @@
+{
+  "kind": "pantograph-client-extraction-manifest",
+  "source_repository": "https://github.com/iCog-Labs-Dev/Mathematics-ai-atp",
+  "source_commit": "e8e4b18e081d6dd84491433b00e8cfa596cdfbee",
+  "recorded": "2026-10-18",
+  "files": [
+    {
+      "source": "maths_ai/hybrid_reasoner/pantograph_client.py",
+      "source_sha256": "ced998cd5608ca51fb28cff3053628633bb1b159fff63ca55f51b5fe5bb770f2",
+      "destination": "src/pantograph_async/client.py",
+      "destination_sha256": "4c3ed12c285d926b5eddad8d122704e44976657121f456c83fdc616e8b87816a",
+      "change": "relative imports only"
+    },
+    {
+      "source": "maths_ai/hybrid_reasoner/pantograph_env.py",
+      "source_sha256": "046dca2df279e0bc004a7c9c382dfbd723fb2b85af041ff57f275fd4d258adda",
+      "destination": "src/pantograph_async/environment.py",
+      "destination_sha256": "2b3ab222d89d033aed6e6a5fe08d24787ba9cc552f7f3a9603e2bad084aa1473",
+      "change": "relative imports and docstring"
+    },
+    {
+      "source": "maths_ai/hybrid_reasoner/pantograph_launch.py",
+      "source_sha256": "0d36cf45187f7cbbf8b2bbfff4ad53923026cb17db582353315cf17914d4216c",
+      "destination": "src/pantograph_async/launch.py",
+      "destination_sha256": "70b9df05bd79eccfe8f1827454c89c4b48497575c0876cbacce4fce317426241",
+      "change": "relative imports and docstring"
+    },
+    {
+      "source": "maths_ai/hybrid_reasoner/pantograph_protocol.py",
+      "source_sha256": "95a74a7dec23b513f8168f2ad239124db286f77da0db713a4906046409f84a03",
+      "destination": "src/pantograph_async/protocol.py",
+      "destination_sha256": "b171eca2dfdad73e5104e4f634ff2c941bbf56bfa40c21f0287cc442c6237a8b",
+      "change": "application conversions removed; MODEL_SEXP_VERSION owned by the codec"
+    },
+    {
+      "source": "maths_ai/hybrid_reasoner/pantograph_diagnostics.py",
+      "source_sha256": "b2cc469556efa605b5c7e38180a40a0319b674de021f9c985302d8b2055bbdb2",
+      "destination": "src/pantograph_async/probes.py",
+      "destination_sha256": "dc84d395312054503432b8b3be15c6aaf543246297965c56a4b6e601229c4697",
+      "change": "wire probes over execution fields; graph checks stay in the application"
+    },
+    {
+      "source": "maths_ai/hybrid_reasoner/pantograph_diagnostics.py",
+      "source_sha256": "b2cc469556efa605b5c7e38180a40a0319b674de021f9c985302d8b2055bbdb2",
+      "destination": "src/pantograph_async/diagnostics.py",
+      "destination_sha256": "ea6e1eee93be0a1d20dc7790d25b809ad3b4cabdb542eb3237c9d89e835c1000",
+      "change": "portable live gate; no checkout paths or git"
+    },
+    {
+      "source": "maths_ai/gnn_inference/pantograph_backport/contract.json",
+      "source_sha256": "289b56f48008cb5a0741aff651227e58e39ecfeeced2c24d5f8d8284f06de640",
+      "destination": "src/pantograph_async/resources/contract.json",
+      "destination_sha256": "289b56f48008cb5a0741aff651227e58e39ecfeeced2c24d5f8d8284f06de640",
+      "change": "unchanged"
+    },
+    {
+      "source": "maths_ai/gnn_inference/pantograph_backport/repository_client_contract.patch",
+      "source_sha256": "ca9921913281f0c53f11cdde59afe15cf38f70a08f59068cd7b96f3ab1f2d021",
+      "destination": "src/pantograph_async/resources/repository_client_contract.patch",
+      "destination_sha256": "ca9921913281f0c53f11cdde59afe15cf38f70a08f59068cd7b96f3ab1f2d021",
+      "change": "unchanged"
+    },
+    {
+      "source": "maths_ai/gnn_inference/pantograph_backport/repository_client_contract.provenance.json",
+      "source_sha256": "30ea08110a6116c4cf90359d2d081e8508eff84af1f52af593e0ef839972ba81",
+      "destination": "docs/evidence/repository_client_contract.provenance.json",
+      "destination_sha256": "30ea08110a6116c4cf90359d2d081e8508eff84af1f52af593e0ef839972ba81",
+      "change": "unchanged historical evidence"
+    },
+    {
+      "source": "maths_ai/gnn_inference/tests/test_pantograph_client.py",
+      "source_sha256": "1215113fce1af196c556050a54f2d17159d5c706874607f7b94ce0218533e81d",
+      "destination": "tests/test_transport.py",
+      "destination_sha256": "75a0e9b0e5b0f8562f8e950ed9bea38c9ce46a7b86d211d6b6a2b71e56ee3496",
+      "change": "split: launch tests to test_launch.py, import guard to test_installed_distribution.py, helpers to support.py/conftest.py"
+    },
+    {
+      "source": "maths_ai/gnn_inference/tests/test_pantograph_state_scopes.py",
+      "source_sha256": "c6885e3f46167890e1ab629bc1ecca03b3c9deceb820bd08e07e6997e26d728c",
+      "destination": "tests/test_state_scopes.py",
+      "destination_sha256": "512e896fa68d87d4c3198a5b497b46111974a4b1298d718bdf57d820bd66d5dc",
+      "change": "wire field instead of canonical Goal"
+    },
+    {
+      "source": "maths_ai/gnn_inference/tests/test_pantograph_protocol.py",
+      "source_sha256": "320ac9134b18c608f847091fcf8f66239e4d463f316bc264af7b5bdfe6c755fb",
+      "destination": "tests/test_protocol.py",
+      "destination_sha256": "5d4813fe84056793872dbc0d13fc34fdab9b4f999f507d21825bc3f01437a491",
+      "change": "split: Goal/graph assertions stay in the application adapter tests"
+    },
+    {
+      "source": "maths_ai/gnn_inference/tests/test_pantograph_pr1_reconciliation.py",
+      "source_sha256": "6309c315710bd52324ca39507f62e703e147f56c66298cb4d1e81320139f538e",
+      "destination": "tests/test_pr1_reconciliation.py",
+      "destination_sha256": "18d4ec52f27d754af6dd594008ed3084c5c3829c08690653fd4576fe5a330354",
+      "change": "contract loaded through the package"
+    },
+    {
+      "source": "maths_ai/gnn_inference/tests/test_pantograph_env.py",
+      "source_sha256": "10804f5e81908af56cfdb73b7c4019361b513a41c0d608ebcc862625a5366428",
+      "destination": "tests/test_launch.py",
+      "destination_sha256": "e543eeb86f818b88ef2c40b1f15843c3d245ff79f5003624dd05754c2fb45761",
+      "change": "split: generic environment tests; factory tests stay in the application"
+    },
+    {
+      "source": "maths_ai/gnn_inference/tests/fixtures/pantograph/fake_repl.py",
+      "source_sha256": "82fc2d4f393549e69b803c4c01b020288a74a68566a8dd4a9808989825eb786a",
+      "destination": "tests/fixtures/fake_repl.py",
+      "destination_sha256": "82fc2d4f393549e69b803c4c01b020288a74a68566a8dd4a9808989825eb786a",
+      "change": "unchanged"
+    },
+    {
+      "source": "maths_ai/gnn_inference/tests/fixtures/pantograph/future_contract.json",
+      "source_sha256": "95aaf29046cdf75c285ecd48209301bd404437349f46a3d03ed7f6dc5948de28",
+      "destination": "tests/fixtures/future_contract.json",
+      "destination_sha256": "95aaf29046cdf75c285ecd48209301bd404437349f46a3d03ed7f6dc5948de28",
+      "change": "unchanged"
+    },
+    {
+      "source": "maths_ai/gnn_inference/tests/fixtures/pantograph/baseline/baseline.json",
+      "source_sha256": "cf8c32e894647953de89aaf9e31857c572d86872596e2e8e1a947a07f2bb4951",
+      "destination": "tests/fixtures/baseline/baseline.json",
+      "destination_sha256": "cf8c32e894647953de89aaf9e31857c572d86872596e2e8e1a947a07f2bb4951",
+      "change": "unchanged"
+    },
+    {
+      "source": "maths_ai/gnn_inference/tests/fixtures/pantograph/baseline/provenance.json",
+      "source_sha256": "b68dbc5f2bfcb1caac89306151d19776f88688d86b4af9e8eee28bc5e107ae69",
+      "destination": "tests/fixtures/baseline/provenance.json",
+      "destination_sha256": "b68dbc5f2bfcb1caac89306151d19776f88688d86b4af9e8eee28bc5e107ae69",
+      "change": "unchanged"
+    },
+    {
+      "source": "maths_ai/gnn_inference/tests/fixtures/pantograph/upstream_pr1/capture.json",
+      "source_sha256": "ab66cb0eeaf494a52a0cb8cfb9d811e63ba508d7ad9e09f480827ad0eb973c60",
+      "destination": "tests/fixtures/upstream_pr1/capture.json",
+      "destination_sha256": "ab66cb0eeaf494a52a0cb8cfb9d811e63ba508d7ad9e09f480827ad0eb973c60",
+      "change": "unchanged"
+    },
+    {
+      "source": "maths_ai/gnn_inference/tests/fixtures/pantograph/upstream_pr1/provenance.json",
+      "source_sha256": "391e393aecf3bdd5a011e3cf57624e28efe350a0862579bfa298be21334be3ce",
+      "destination": "tests/fixtures/upstream_pr1/provenance.json",
+      "destination_sha256": "391e393aecf3bdd5a011e3cf57624e28efe350a0862579bfa298be21334be3ce",
+      "change": "unchanged"
+    },
+    {
+      "source": "maths_ai/gnn_inference/tests/fixtures/pantograph/historical_revision1/future_contract.json",
+      "source_sha256": "a09a49ae56862538b175eb653796581eed1e17cd4568b76a9c1cdf8dc21483fc",
+      "destination": "tests/fixtures/historical_revision1/future_contract.json",
+      "destination_sha256": "a09a49ae56862538b175eb653796581eed1e17cd4568b76a9c1cdf8dc21483fc",
+      "change": "unchanged"
+    },
+    {
+      "source": "maths_ai/gnn_inference/tests/fixtures/pantograph/stage4_companion/capture.json",
+      "source_sha256": "7403d7a284850b4ce6b916dcd5e45717ec9e770ac0b69a91b455adb3717ac024",
+      "destination": "tests/fixtures/stage4_companion/capture.json",
+      "destination_sha256": "7403d7a284850b4ce6b916dcd5e45717ec9e770ac0b69a91b455adb3717ac024",
+      "change": "unchanged"
+    },
+    {
+      "source": "maths_ai/gnn_inference/tests/fixtures/pantograph/stage4_companion/provenance.json",
+      "source_sha256": "918b6faf68b640b6870bab57d2640e635ad5802ded038aeb9ab445c0a3e69159",
+      "destination": "tests/fixtures/stage4_companion/provenance.json",
+      "destination_sha256": "918b6faf68b640b6870bab57d2640e635ad5802ded038aeb9ab445c0a3e69159",
+      "change": "unchanged"
+    }
+  ]
+}

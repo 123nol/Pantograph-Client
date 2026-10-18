@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: python -m pip install ".[test]"
+      - name: Test
+        run: python -m pytest -q
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build sdist, then the wheel from that sdist
+        run: |
+          python -m pip install build
+          python -m build --sdist --outdir dist .
+          mkdir unpacked
+          tar -xzf dist/*.tar.gz -C unpacked
+          python -m build --wheel --outdir dist unpacked/*
+      - name: Test the installed wheel outside the checkout
+        env:
+          PANTOGRAPH_CLIENT_REQUIRE_INSTALLED: "1"
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install dist/*.whl pytest
+          mkdir "$RUNNER_TEMP/suite"
+          cp -r tests "$RUNNER_TEMP/suite/tests"
+          cd "$RUNNER_TEMP/suite"
+          "$RUNNER_TEMP/venv/bin/python" -I -c "import pantograph_async; print(pantograph_async.__file__)"
+          "$RUNNER_TEMP/venv/bin/python" -m pytest -q -p no:cacheprovider --rootdir . tests
+          "$RUNNER_TEMP/venv/bin/pantograph-client" smoke --help
+
+  live:
+    # Rebuilds the companion REPL from the pinned fork commit and the patch
+    # shipped in the installed package, then runs the actual-REPL gate.
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: python -m pip install ".[test]"
+      - name: Install Lean
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+            | sh -s -- -y --no-modify-path --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Rebuild the companion REPL
+        run: |
+          python - > "$RUNNER_TEMP/companion.env" <<'PY'
+          from pantograph_async import compatibility
+          base = compatibility.companion_base()
+          print(f"URL={base['source_url']}")
+          print(f"BASE={base['base_commit']}")
+          PY
+          . "$RUNNER_TEMP/companion.env"
+          git clone --filter=blob:none --no-checkout "$URL" "$RUNNER_TEMP/Pantograph"
+          cd "$RUNNER_TEMP/Pantograph"
+          git checkout --detach "$BASE"
+          python -c "import sys; from pantograph_async import compatibility; sys.stdout.buffer.write(compatibility.companion_patch())" | git apply -
+          python -c "from pantograph_async import compatibility; compatibility.verify_companion_sources('.')"
+          lake build repl
+      - name: Live gate
+        env:
+          PANTOGRAPH_TEST_SOURCE_ROOT: ${{ runner.temp }}/Pantograph
+          PANTOGRAPH_TEST_REPL: ${{ runner.temp }}/Pantograph/.lake/build/bin/repl
+          PANTOGRAPH_TEST_COMPANION_SOURCE: ${{ runner.temp }}/Pantograph
+        run: |
+          python -m pytest -q --run-pantograph-live \
+            tests/test_client_live.py tests/test_installed_distribution.py
