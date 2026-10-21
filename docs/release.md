@@ -18,8 +18,13 @@ patch releases.
 1. Update `CHANGELOG.md` and the `version` in `pyproject.toml` and
    `compatibility.json`.
 2. `python -m pytest` passes on Python 3.11–3.13 (CI).
-3. The packaging job passes: the wheel built from the sdist is tested outside
-   the checkout with `PANTOGRAPH_CLIENT_REQUIRE_INSTALLED=1`.
+3. The packaging job passes: `scripts/check_sdist.py` finds every tracked file
+   (except `.github/` and Git metadata) in the sdist and only the package in the
+   wheel, and the suite unpacked from the sdist passes outside any source tree
+   against the wheel built from that sdist, with
+   `PANTOGRAPH_CLIENT_REQUIRE_INSTALLED=1`. New development files need no
+   manifest change unless they sit outside `docs/`, `examples/`, `scripts/` and
+   `tests/`.
 4. The live gate passes against a REPL rebuilt from the manifest:
    `pytest tests/test_client_live.py --run-pantograph-live` with
    `PANTOGRAPH_TEST_COMPANION_SOURCE` set.

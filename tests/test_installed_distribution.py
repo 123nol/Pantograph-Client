@@ -1,7 +1,7 @@
 """The installed distribution is complete, isolated, and usable on its own.
 
-In the packaging job this module runs from a copy of the tests outside the
-checkout against a wheel built from the source distribution, with
+In the packaging job this module runs from the tests unpacked from the sdist,
+outside any source tree, against the wheel built from that sdist, with
 PANTOGRAPH_CLIENT_REQUIRE_INSTALLED=1.
 """
 

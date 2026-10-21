@@ -16,3 +16,6 @@ First standalone release, extracted from Mathematics-ai-atp `AC-branch` at
   with digest, codec and patched-source checks.
 - The spawn-cancellation test gets its own startup budget, fixing a race with
   the helper processes.
+- The sdist carries the complete offline suite, fixtures, documentation,
+  evidence and example, checked by `scripts/check_sdist.py` in CI; the wheel
+  stays runtime-only.

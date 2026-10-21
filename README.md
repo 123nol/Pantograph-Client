@@ -165,10 +165,21 @@ The companion checkout itself is a valid `source_root` for these tests, since
 they import `Init` and `Lean` (override with `PANTOGRAPH_TEST_IMPORTS`). Set `PANTOGRAPH_TEST_COMPANION_SOURCE` to a
 patched checkout to also check its files against the recorded digests.
 
-CI builds an sdist, builds the wheel from that sdist, installs it into a clean
-environment, and runs the suite outside the checkout with
-`PANTOGRAPH_CLIENT_REQUIRE_INSTALLED=1`, so imports must come from the installed
-distribution.
+The sdist carries the complete offline suite with its helpers and fixtures,
+the documentation, the extraction evidence, the changelog and the example
+(`MANIFEST.in`); the wheel carries only the package. CI builds the sdist, builds
+the wheel from it, checks both archives with `scripts/check_sdist.py`, then runs
+the tests unpacked from the sdist outside any source tree against the installed
+wheel with `PANTOGRAPH_CLIENT_REQUIRE_INSTALLED=1`, so imports must come from
+the installed distribution. From a downloaded sdist alone:
+
+```bash
+tar -xzf pantograph_async_client-0.1.0.tar.gz
+python -m build --wheel pantograph_async_client-0.1.0
+pip install pantograph_async_client-0.1.0/dist/*.whl pytest
+mkdir suite && cp -r pantograph_async_client-0.1.0/tests suite/ && cd suite
+PANTOGRAPH_CLIENT_REQUIRE_INSTALLED=1 python -m pytest -q --rootdir . tests
+```
 
 ## Releases
 

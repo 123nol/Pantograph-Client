@@ -36,14 +36,16 @@ jobs:
           mkdir unpacked
           tar -xzf dist/*.tar.gz -C unpacked
           python -m build --wheel --outdir dist unpacked/*
-      - name: Test the installed wheel outside the checkout
+      - name: Check the archive contents
+        run: python scripts/check_sdist.py dist/*.tar.gz dist/*.whl
+      - name: Test the installed wheel with the sdist's own suite
         env:
           PANTOGRAPH_CLIENT_REQUIRE_INSTALLED: "1"
         run: |
           python -m venv "$RUNNER_TEMP/venv"
           "$RUNNER_TEMP/venv/bin/pip" install dist/*.whl pytest
           mkdir "$RUNNER_TEMP/suite"
-          cp -r tests "$RUNNER_TEMP/suite/tests"
+          cp -r unpacked/*/tests "$RUNNER_TEMP/suite/tests"
           cd "$RUNNER_TEMP/suite"
           "$RUNNER_TEMP/venv/bin/python" -I -c "import pantograph_async; print(pantograph_async.__file__)"
           "$RUNNER_TEMP/venv/bin/python" -m pytest -q -p no:cacheprovider --rootdir . tests
