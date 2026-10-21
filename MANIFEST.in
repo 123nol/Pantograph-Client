@@ -1,0 +1,8 @@
+# Development resources for the source release. The runtime wheel only
+# carries the package and its package data (see pyproject.toml).
+include README.md CHANGELOG.md LICENSE NOTICE
+graft docs
+graft examples
+graft scripts
+graft tests
+global-exclude *.py[cod]
