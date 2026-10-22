@@ -144,8 +144,16 @@ def main():
                 return 0
             result = {"nGoals": False if scenario == "invalid_schema" else len(states)}
         elif command == "goal.start":
+            # "universe:u,v" elaborates only when exactly those levels are declared.
+            needed = (
+                args["expr"].split(":", 1)[1].split(",")
+                if args["expr"].startswith("universe:")
+                else []
+            )
             if args["expr"] == "reject":
                 result = {"error": "elab", "desc": "bad expression"}
+            elif sorted(args.get("levels", [])) != sorted(needed):
+                result = {"error": "elab", "desc": "unknown universe level"}
             else:
                 if scenario == "reuse_released_zero" and not states:
                     next_id = 0

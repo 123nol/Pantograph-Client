@@ -35,10 +35,18 @@ Startup, under one deadline:
 
 | Command | Request | Success |
 | --- | --- | --- |
-| `goal.start` | `{"expr"}` | `{"stateId", "root"}` |
+| `goal.start` | `{"expr"}`, optional `{"levels"}` | `{"stateId", "root"}` |
 | `goal.tactic` | `{"stateId", "goalId", "tactic"}` | see below |
 | `goal.delete` | `{"stateIds"}` (unique) | `{}` |
 | `stat` | `{}` | `{"nGoals"}` |
+
+`levels` is the REPL's existing universe-parameter list for `goal.start`: the
+server declares each name with `String.toName` before elaborating `expr`. It is
+sent only when nonempty, so a goal without named universes keeps the original
+request bytes. Each entry must be a unique atomic ASCII identifier
+(`[A-Za-z_][A-Za-z0-9_']*`, not `_`, `max` or `imax`); a dotted name would become
+a hierarchical name on the server. Invalid lists are rejected before anything is
+sent. Exposing this field changes no descriptor version.
 
 `goalId` is always sent explicitly. Omission is not unfocused execution.
 Errors are `{"error", "desc"}` with a per-command category set. `goal.start`

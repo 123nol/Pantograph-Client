@@ -1,6 +1,6 @@
 {
   "kind": "pantograph-async-client-compatibility",
-  "client_version": "0.1.0",
+  "client_version": "0.1.1",
   "contract_revision": 2,
   "descriptor": {
     "protocol": "maths-ai-pantograph",

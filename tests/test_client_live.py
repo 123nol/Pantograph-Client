@@ -22,6 +22,7 @@ from dataclasses import replace
 from pantograph_async import (
     PantographClient,
     PantographEnv,
+    PantographGoalRejected,
     PantographProtocolError,
     PantographTacticRejected,
 )
@@ -89,6 +90,38 @@ def test_early_release_and_rejection_keep_the_session_usable(live_env):
                 assert client.is_usable
                 left = await scope.apply_tactic(split, "trivial", goal_index=0)
                 assert len(left.goals) == 1
+            assert (await client.stat()).n_goals == baseline
+        assert client.phase.value == "CLOSED"
+
+    asyncio.run(run())
+
+
+@pytest.mark.pantograph_live
+def test_named_universe_levels_elaborate_only_when_declared(live_env):
+    expression = "∀ (α : Sort u) (β : Type v) (a : α) (b : β), a = a ∧ b = b"
+
+    async def run():
+        async with await PantographClient.create(live_env) as client:
+            baseline = (await client.stat()).n_goals
+            async with client.state_scope() as scope:
+                with pytest.raises(PantographGoalRejected, match="universe"):
+                    await scope.start_goal(expression)
+                with pytest.raises(PantographGoalRejected, match="universe"):
+                    await scope.start_goal(expression, levels=["u"])
+                assert client.is_usable
+                assert (await client.stat()).n_goals == baseline
+                root = await scope.start_goal(expression, levels=["u", "v"])
+                intro = await scope.apply_tactic(root, "intro α β a b")
+                assert [local.user_name for local in intro.goals[0].locals] == [
+                    "α",
+                    "β",
+                    "a",
+                    "b",
+                ]
+                split = await scope.apply_tactic(intro, "constructor")
+                left = await scope.apply_tactic(split, "rfl", goal_index=0)
+                done = await scope.apply_tactic(left, "rfl")
+                assert done.goals == ()
             assert (await client.stat()).n_goals == baseline
         assert client.phase.value == "CLOSED"
 

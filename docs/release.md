@@ -2,7 +2,7 @@
 
 ## Versioning
 
-- The distribution version (`pantograph-async-client`, `0.1.0`) identifies a
+- The distribution version (`pantograph-async-client`, `0.1.1`) identifies a
   library release.
 - The descriptor's protocol, model-expression, transition-validation and message
   versions identify wire semantics.

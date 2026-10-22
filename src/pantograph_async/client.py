@@ -11,7 +11,7 @@ from copy import deepcopy
 from enum import Enum
 import os
 import signal
-from typing import TYPE_CHECKING, Any, Callable, Mapping
+from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence
 from uuid import uuid4
 
 from .launch import PantographLaunchSpec, build_launch_spec
@@ -755,13 +755,21 @@ class PantographStateScope:
         self._live_ids.add(state_id)
         return state
 
-    async def start_goal(self, expression: str) -> StartedGoal:
+    async def start_goal(
+        self, expression: str, *, levels: Sequence[str] = ()
+    ) -> StartedGoal:
+        """Start a goal whose universe parameters are declared by ``levels``."""
         self._check_active()
+        if not isinstance(levels, (list, tuple)):
+            raise PantographProtocolError("levels must be a list or tuple of names.")
+        payload = {"expr": expression}
+        if levels:
+            payload["levels"] = list(levels)
         allocated = []
 
         def prepare():
             self._check_active()
-            return {"expr": expression}
+            return payload
 
         def record(response):
             allocated.append(self._register(response))

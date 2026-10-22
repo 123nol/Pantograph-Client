@@ -8,6 +8,7 @@ Conversions into application goal models belong to the consumer.
 from __future__ import annotations
 
 import json
+import re
 from copy import deepcopy
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -53,6 +54,10 @@ BINDER_ROLES = frozenset(
     }
 )
 GOAL_FRAGMENTS = frozenset({"tactic", "conv", "calc"})
+# goal.start passes each level through String.toName, which splits at dots, so
+# only atomic ASCII names are accepted. Callers map other names to safe aliases.
+LEVEL_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_']*")
+RESERVED_LEVEL_NAMES = frozenset({"_", "max", "imax"})
 SUPPORTED_COMMANDS = frozenset(
     {
         "protocol.describe",
@@ -364,6 +369,15 @@ def _array(value: Any, owner: str) -> list[Any]:
     return value
 
 
+def _level_name(value: Any) -> str:
+    name = _string(value, "universe level", nonempty=True)
+    if not LEVEL_NAME.fullmatch(name) or name in RESERVED_LEVEL_NAMES:
+        raise PantographProtocolError(
+            f"Universe level {name!r} is not an atomic ASCII Lean name."
+        )
+    return name
+
+
 def decode_json_response(line: str | bytes) -> dict[str, Any]:
     """Parse one response object without accepting duplicate keys or NaN."""
 
@@ -416,8 +430,15 @@ def encode_request(command: str, payload: Mapping[str, Any]) -> bytes:
                     f"Option {key} conflicts with the execution contract."
                 )
     elif command == "goal.start":
-        _fields(body, {"expr"})
+        _fields(body, {"expr"}, {"levels"})
         _string(body["expr"], "expr", nonempty=True)
+        if "levels" in body:
+            # No levels is sent by omitting the field, so the request stays canonical.
+            levels = [_level_name(item) for item in _array(body["levels"], "levels")]
+            if not levels or len(set(levels)) != len(levels):
+                raise PantographProtocolError(
+                    "levels must be a nonempty list of unique names."
+                )
     elif command == "goal.tactic":
         _fields(body, {"stateId", "goalId", "tactic"})
         _nat(body["stateId"], "stateId")

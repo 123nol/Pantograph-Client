@@ -119,6 +119,16 @@ def test_request_framing_preserves_unicode_and_escaped_source():
         ("goal.tactic", {"stateId": 0, "goalId": 0, "tactic": None}),
         ("goal.start", {"expr": "True", "copyFrom": "Nat.add_comm"}),
         ("goal.start", {"expr": ""}),
+        ("goal.start", {"expr": "True", "levels": "u"}),
+        ("goal.start", {"expr": "True", "levels": []}),
+        ("goal.start", {"expr": "True", "levels": ["u", "u"]}),
+        ("goal.start", {"expr": "True", "levels": [""]}),
+        ("goal.start", {"expr": "True", "levels": [1]}),
+        ("goal.start", {"expr": "True", "levels": ["Foo.u"]}),
+        ("goal.start", {"expr": "True", "levels": ["u₁"]}),
+        ("goal.start", {"expr": "True", "levels": ["1u"]}),
+        ("goal.start", {"expr": "True", "levels": ["max"]}),
+        ("goal.start", {"expr": "True", "levels": ["_"]}),
         ("goal.delete", {"stateIds": [False]}),
         ("stat", {"unused": 1}),
         ("options.set", {"printExprAST": 1}),
@@ -127,6 +137,15 @@ def test_request_framing_preserves_unicode_and_escaped_source():
 def test_request_shape_is_strict(command, payload):
     with pytest.raises(PantographProtocolError):
         encode_request(command, payload)
+
+
+def test_goal_start_levels_are_sent_only_when_declared():
+    assert encode_request("goal.start", {"expr": "True"}) == (
+        b'goal.start {"expr":"True"}\n'
+    )
+    assert encode_request(
+        "goal.start", {"expr": "Sort u_1 → Type v", "levels": ["u_1", "v", "w'"]}
+    ) == 'goal.start {"expr":"Sort u_1 → Type v","levels":["u_1","v","w\'"]}\n'.encode()
 
 
 def test_request_options_and_deletions():
