@@ -17,6 +17,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Put GNU stdbuf first on PATH
+        # Ubuntu 26.04 runners default to uutils stdbuf, which the launcher rejects
+        # because it does not line-buffer the REPL.
+        run: |
+          if ! stdbuf --version | grep -q "GNU coreutils"; then
+            sudo apt-get update -q
+            sudo apt-get install -y -q gnu-coreutils
+            mkdir -p "$RUNNER_TEMP/gnu"
+            ln -s /usr/bin/gnustdbuf "$RUNNER_TEMP/gnu/stdbuf"
+            echo "$RUNNER_TEMP/gnu" >> "$GITHUB_PATH"
+          fi
       - name: Install
         run: python -m pip install ".[test]"
       - name: Test
@@ -29,6 +40,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Put GNU stdbuf first on PATH
+        # Ubuntu 26.04 runners default to uutils stdbuf, which the launcher rejects
+        # because it does not line-buffer the REPL.
+        run: |
+          if ! stdbuf --version | grep -q "GNU coreutils"; then
+            sudo apt-get update -q
+            sudo apt-get install -y -q gnu-coreutils
+            mkdir -p "$RUNNER_TEMP/gnu"
+            ln -s /usr/bin/gnustdbuf "$RUNNER_TEMP/gnu/stdbuf"
+            echo "$RUNNER_TEMP/gnu" >> "$GITHUB_PATH"
+          fi
       - name: Build sdist, then the wheel from that sdist
         run: |
           python -m pip install build
@@ -61,6 +83,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Put GNU stdbuf first on PATH
+        # Ubuntu 26.04 runners default to uutils stdbuf, which the launcher rejects
+        # because it does not line-buffer the REPL.
+        run: |
+          if ! stdbuf --version | grep -q "GNU coreutils"; then
+            sudo apt-get update -q
+            sudo apt-get install -y -q gnu-coreutils
+            mkdir -p "$RUNNER_TEMP/gnu"
+            ln -s /usr/bin/gnustdbuf "$RUNNER_TEMP/gnu/stdbuf"
+            echo "$RUNNER_TEMP/gnu" >> "$GITHUB_PATH"
+          fi
       - name: Install
         run: python -m pip install ".[test]"
       - name: Install Lean
