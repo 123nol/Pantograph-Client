@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.1 (unreleased)
+
+- `PantographStateScope.start_goal(expression, *, levels=())` sends the REPL's
+  existing `goal.start` `levels` field, so goals over named universe parameters
+  such as `Type u_1` elaborate. The client only transports and validates the
+  names (unique atomic ASCII identifiers, checked before sending); working out
+  which levels an expression needs is the caller's job. The request is unchanged
+  when no levels are given, and no descriptor version changes.
+
 ## 0.1.0 (unreleased)
 
 First standalone release, extracted from Mathematics-ai-atp `AC-branch` at

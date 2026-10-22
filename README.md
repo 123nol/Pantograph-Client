@@ -68,6 +68,10 @@ Key behaviours:
   under one startup deadline. Nothing starts at import time.
 - A state scope owns every state it creates. `release` frees one early, and
   leaving the scope frees the rest in one request.
+- `start_goal(expr, levels=("u", "v"))` declares the universe parameters the
+  expression uses, as Lean's `universe u v` would. Without them a goal such as
+  `∀ (α : Type u), α → α` is rejected with `unknown universe level`. Names must
+  be atomic ASCII identifiers; the caller maps any other name to a safe alias.
 - `apply_tactic(..., goal_index=i)` focuses one goal. Unresolved siblings stay
   in the next state.
 - An ordinary rejected tactic raises `PantographTacticRejected` and leaves the
@@ -174,10 +178,10 @@ wheel with `PANTOGRAPH_CLIENT_REQUIRE_INSTALLED=1`, so imports must come from
 the installed distribution. From a downloaded sdist alone:
 
 ```bash
-tar -xzf pantograph_async_client-0.1.0.tar.gz
-python -m build --wheel pantograph_async_client-0.1.0
-pip install pantograph_async_client-0.1.0/dist/*.whl pytest
-mkdir suite && cp -r pantograph_async_client-0.1.0/tests suite/ && cd suite
+tar -xzf pantograph_async_client-0.1.1.tar.gz
+python -m build --wheel pantograph_async_client-0.1.1
+pip install pantograph_async_client-0.1.1/dist/*.whl pytest
+mkdir suite && cp -r pantograph_async_client-0.1.1/tests suite/ && cd suite
 PANTOGRAPH_CLIENT_REQUIRE_INSTALLED=1 python -m pytest -q --rootdir . tests
 ```
 

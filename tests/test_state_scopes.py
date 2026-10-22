@@ -166,6 +166,55 @@ def test_rejected_goal_has_no_allocation(setup):
     assert_reaped(report)
 
 
+def test_universe_levels_reach_the_server_and_rejections_allocate_nothing(setup):
+    env, report = setup
+
+    async def body():
+        async with await PantographClient.create(env) as client:
+            async with client.state_scope() as scope:
+                with pytest.raises(PantographGoalRejected):
+                    await scope.start_goal("universe:u,v")
+                with pytest.raises(PantographGoalRejected):
+                    await scope.start_goal("universe:u,v", levels=["u"])
+                assert not scope._states and client.is_usable
+                first = await scope.start_goal("universe:u,v", levels=("u", "v"))
+                second = await scope.start_goal("universe:w", levels=["w"])
+                plain = await scope.start_goal("True", levels=())
+                assert len({first.handle, second.handle, plain.handle}) == 3
+                assert (await client.stat()).n_goals == 3
+            assert (await client.stat()).n_goals == 0
+        starts = [row["args"] for row in requests(report, "goal.start")]
+        assert starts == [
+            {"expr": "universe:u,v"},
+            {"expr": "universe:u,v", "levels": ["u"]},
+            {"expr": "universe:u,v", "levels": ["u", "v"]},
+            {"expr": "universe:w", "levels": ["w"]},
+            {"expr": "True"},
+        ]
+
+    run(body)
+    assert_reaped(report)
+
+
+@pytest.mark.parametrize("levels", ["u", ["u", "u"], ["Foo.u"], [""], {"u"}])
+def test_invalid_levels_are_rejected_before_sending(setup, levels):
+    env, report = setup
+
+    async def body():
+        async with await PantographClient.create(env) as client:
+            async with client.state_scope() as scope:
+                with pytest.raises(PantographProtocolError):
+                    await scope.start_goal("True", levels=levels)
+                assert client.is_usable and not scope._states
+                await scope.start_goal("True")
+        assert [row["args"] for row in requests(report, "goal.start")] == [
+            {"expr": "True"}
+        ]
+
+    run(body)
+    assert_reaped(report)
+
+
 @pytest.mark.parametrize("tactic", ["sorry", "unsafe"])
 def test_proof_rejection_deletes_result_before_raising(setup, tactic):
     env, report = setup
