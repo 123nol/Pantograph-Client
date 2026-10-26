@@ -13,12 +13,16 @@ import os
 import signal
 from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence
 from uuid import uuid4
+import weakref
 
 from .launch import PantographLaunchSpec, build_launch_spec
 from .protocol import (
+    CertificationResult,
     CommandAcknowledgement,
     CommandError,
     GoalStartResult,
+    InspectionResult,
+    ObligationInspection,
     PantographConfigurationError,
     PantographGoalRejected,
     PantographProtocolError,
@@ -417,6 +421,8 @@ class PantographClient:
         self._allocated_ids.clear()
         for scope in self._scopes:
             scope._live_ids.clear()
+            scope._issued.clear()
+            scope._roots.clear()
 
     async def __aenter__(self) -> "PantographClient":
         self._check_loop()
@@ -679,11 +685,16 @@ class PantographStateScope:
         self._closing = False
         self._closed = False
         self._close_task: asyncio.Task | None = None
-        # Keep exact immutable objects until exit so copied or altered states
-        # cannot change selection bounds or claim another allocation's ownership.
-        self._states: dict[int, StartedGoal | TacticState] = {}
+        # One weak reference per live allocation, keyed by its handle's
+        # allocation number, to the exact object issued for it. Copied or altered
+        # states cannot claim ownership, and released states, or live ones the
+        # caller dropped, can still be reclaimed. Released allocations leave no
+        # record behind.
+        self._issued: dict[int, weakref.ref] = {}
+        self._allocations = 0
         self._live_ids: set[int] = set()
-        self._released: set[int] = set()
+        # The root each live allocation descends from, for certificate linkage.
+        self._roots: dict[int, str] = {}
 
     def _check_active(self) -> None:
         self._client._check_loop()
@@ -731,28 +742,39 @@ class PantographStateScope:
             or handle.scope_id != self.scope_id
         ):
             raise PantographStateError("State belongs to another session or scope.")
-        if self._states.get(id(state)) is not state:
+        issued = self._issued.get(handle.allocation)
+        if issued is None:
+            return False
+        if issued() is not state:
             raise PantographStateError("State was not issued by this scope.")
-        return id(state) not in self._released and handle.state_id in self._live_ids
+        return handle.state_id in self._live_ids
 
     def _register(
-        self, response: GoalStartResult | TacticSuccess
+        self, response: GoalStartResult | TacticSuccess, root: str
     ) -> StartedGoal | TacticState:
         state_id = (
             response.state_id
             if isinstance(response, GoalStartResult)
             else response.next_state_id
         )
-        handle = StateHandle(self._client.session_id, self.scope_id, state_id)
+        self._allocations += 1
+        handle = StateHandle(
+            self._client.session_id, self.scope_id, state_id, self._allocations
+        )
         state = (
             StartedGoal(handle, response.root)
             if isinstance(response, GoalStartResult)
             else TacticState(
-                handle, response.goals, response.validation, response.messages
+                handle,
+                response.goals,
+                response.validation,
+                response.messages,
+                response.transition,
             )
         )
-        self._states[id(state)] = state
+        self._issued[handle.allocation] = weakref.ref(state)
         self._live_ids.add(state_id)
+        self._roots[state_id] = root
         return state
 
     async def start_goal(
@@ -772,7 +794,7 @@ class PantographStateScope:
             return payload
 
         def record(response):
-            allocated.append(self._register(response))
+            allocated.append(self._register(response, response.root))
 
         await self._client._exchange("goal.start", {}, prepare=prepare, record=record)
         return allocated[0]
@@ -806,7 +828,20 @@ class PantographStateScope:
 
         def record(response):
             if isinstance(response, TacticSuccess):
-                allocated.append(self._register(response))
+                allocated.append(
+                    self._register(response, self._roots[state.handle.state_id])
+                )
+                selected = (
+                    state.root
+                    if isinstance(state, StartedGoal)
+                    else state.goals[goal_index].goal_name
+                )
+                # Registered first, so cleanup still owns the allocation.
+                if response.transition.selected != selected:
+                    raise PantographProtocolError(
+                        "Transition provenance names a different selected goal.",
+                        command="goal.tactic",
+                    )
 
         response = await self._client._exchange(
             "goal.tactic", {}, prepare=prepare, record=record
@@ -846,9 +881,76 @@ class PantographStateScope:
 
         def record(_response):
             self._live_ids.discard(state.handle.state_id)
-            self._released.add(id(state))
+            self._issued.pop(state.handle.allocation, None)
+            self._roots.pop(state.handle.state_id, None)
 
         await self._client._exchange("goal.delete", {}, prepare=prepare, record=record)
+
+    async def inspect(
+        self, state: StartedGoal | TacticState, goals: Sequence[str]
+    ) -> tuple[ObligationInspection, ...]:
+        """Read named obligations of a live state, listed or not. Allocates nothing."""
+        self._check_active()
+        if isinstance(goals, str) or not isinstance(goals, (list, tuple)):
+            raise PantographProtocolError("goals must be a list or tuple of names.")
+        names = list(goals)
+
+        def prepare():
+            if not self._validate_state(state):
+                raise PantographStateError("Cannot inspect a released state.")
+            return {"stateId": state.handle.state_id, "goals": names}
+
+        response = await self._client._exchange(
+            "goal.inspect", {}, prepare=prepare
+        )
+        assert isinstance(response, InspectionResult)
+        if [item.name for item in response.obligations] != names:
+            error = PantographProtocolError(
+                "Inspection answered for different obligations.",
+                command="goal.inspect",
+            )
+            self._client._fail(error)
+            await self._client.aclose()
+            raise error
+        return response.obligations
+
+    async def certify(
+        self, state: StartedGoal | TacticState, *, max_heartbeats: int | None = None
+    ) -> CertificationResult:
+        """Kernel-check the state's complete root proof. Read-only.
+
+        A request timeout retires the session like any other transaction, so
+        a slow check never leaves a usable session in an unknown state.
+        """
+        self._check_active()
+        if max_heartbeats is not None and (
+            type(max_heartbeats) is not int or max_heartbeats <= 0
+        ):
+            raise PantographProtocolError("max_heartbeats must be a positive integer.")
+
+        def prepare():
+            if not self._validate_state(state):
+                raise PantographStateError("Cannot certify a released state.")
+            payload = {"stateId": state.handle.state_id}
+            if max_heartbeats is not None:
+                payload["maxHeartbeats"] = max_heartbeats
+            return payload
+
+        response = await self._client._exchange(
+            "goal.certify", {}, prepare=prepare
+        )
+        assert isinstance(response, CertificationResult)
+        if response.is_certified and response.receipt.root != self._root_of(state):
+            error = PantographProtocolError(
+                "Certificate names a different root.", command="goal.certify"
+            )
+            self._client._fail(error)
+            await self._client.aclose()
+            raise error
+        return response
+
+    def _root_of(self, state: StartedGoal | TacticState) -> str | None:
+        return self._roots.get(state.handle.state_id)
 
     async def _retire_after_cleanup_error(self, original: BaseException) -> None:
         error = (
@@ -881,8 +983,9 @@ class PantographStateScope:
                     )
 
                 def record(_response):
-                    self._released.update(self._states)
+                    self._issued.clear()
                     self._live_ids.clear()
+                    self._roots.clear()
 
                 await self._client._exchange(
                     "goal.delete", {}, prepare=prepare, record=record
@@ -894,7 +997,7 @@ class PantographStateScope:
             raise
         finally:
             self._live_ids.clear()
-            self._states.clear()
-            self._released.clear()
+            self._issued.clear()
+            self._roots.clear()
             self._client._scopes.discard(self)
             self._closed = True

@@ -1,4 +1,4 @@
-"""Pure revision-2 contract tests; no Lean process or PyPantograph import."""
+"""Pure revision-3 contract tests; no Lean process or PyPantograph import."""
 
 from __future__ import annotations
 
@@ -538,6 +538,7 @@ def test_immutable_containers():
         result.goals,
         result.validation,
         result.messages,
+        result.transition,
     )
     with pytest.raises(FrozenInstanceError):
         result.next_state_id = 5
@@ -552,7 +553,7 @@ def test_immutable_containers():
 def test_baseline_evidence_is_not_final_contract_evidence():
     assert BASELINE["kind"] == "unmodified-custom-repl-baseline"
     assert FUTURE["kind"] == "authored-future-contract"
-    assert FUTURE["contract_revision"] == 2
+    assert FUTURE["contract_revision"] == 3
     assert BASELINE["readiness_line"] == "ready."
     for entry in BASELINE["interactions"]:
         assert json.loads(entry["response_line"]) == entry["response"]
@@ -576,8 +577,8 @@ def test_frozen_contract_descriptor_matches_the_codec():
     assert {name: set(codes) for name, codes in contract["commands"].items()} == dict(
         COMMAND_ERROR_CATEGORIES
     )
-    assert contract["complete_theorem_certification"] is False
-    assert contract["contract_revision"] == FUTURE["contract_revision"] == 2
+    assert contract["complete_theorem_certification"] is True
+    assert contract["contract_revision"] == FUTURE["contract_revision"] == 3
     assert contract["transition_validation"] == success()["validation"]
     assert set(contract["tactic_responses"]["success"]["required"]) == set(success())
     for variant, fixture in [
@@ -809,10 +810,203 @@ def test_historical_revision1_fixture_is_preserved_but_not_accepted():
             decode_response("goal.tactic", historical[name])
 
 
-def test_validated_companion_capture_decodes_completely():
+def test_historical_revision2_fixture_is_preserved_but_not_accepted():
+    historical = json.loads(
+        (FIXTURES / "historical_revision2" / "future_contract.json").read_text()
+    )
+    for payload in historical["successes"].values():
+        with pytest.raises(PantographProtocolError, match="transition"):
+            decode_response("goal.tactic", payload)
+    with pytest.raises(PantographProtocolError):
+        decode_response("protocol.describe", historical["descriptor"])
+
+
+def test_stage4_companion_capture_is_preserved_but_not_accepted():
     capture = json.loads((FIXTURES / "stage4_companion" / "capture.json").read_text())
     assert capture["subprocess_reaped"] is True
     for entry in capture["interactions"]:
-        response = entry["response"]
-        assert decode_json_response(entry["response_line"]) == response
-        decode_response(entry["command"], response)
+        assert decode_json_response(entry["response_line"]) == entry["response"]
+        if entry["command"] == "protocol.describe" or "nextStateId" in entry["response"]:
+            with pytest.raises(PantographProtocolError):
+                decode_response(entry["command"], entry["response"])
+
+
+def test_snapshot_companion_capture_decodes_completely():
+    capture = json.loads((FIXTURES / "snapshot_companion" / "capture.json").read_text())
+    assert capture["subprocess_reaped"] is True
+    decoded = {}
+    for entry in capture["interactions"]:
+        assert decode_json_response(entry["response_line"]) == entry["response"]
+        decoded[entry["label"]] = decode_response(entry["command"], entry["response"])
+    assert decoded["certificate"].is_certified
+    assert decoded["partial_certificate"].status == "incomplete"
+    assert "Classical.choice" in decoded["classical_certificate"].receipt.axioms
+    assert decoded["shared_assignment"].transition.changed
+    assert [item.status for item in decoded["witness_inspection"].obligations] == [
+        "complete",
+        "complete",
+        "active",
+    ]
+    for label in ("unknown_obligation", "unknown_state"):
+        assert isinstance(decoded[label].as_exception(), PantographStateError)
+
+
+def provenance(payload=None, **changes):
+    payload = deepcopy(payload or success("conjunction_split"))
+    payload["transition"].update(changes)
+    return payload
+
+
+def test_transition_provenance_decodes_and_partitions_the_goals():
+    result = decode_response("goal.tactic", provenance())
+    names = tuple(goal.goal_name for goal in result.goals)
+    assert result.transition.direct == names
+    assert result.transition.introduced == ((), ())
+    assert result.transition.selected == "_selected"
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"direct": ["_uniq.22"]},
+        {"direct": ["_uniq.22", "_uniq.23"], "siblings": ["_uniq.23"]},
+        {"direct": ["_uniq.22", "_uniq.23", "_uniq.24"]},
+        {"direct": ["_uniq.22", "_uniq.22", "_uniq.23"]},
+        {"selected": "_uniq.22", "direct": ["_uniq.23"], "extra": ["_uniq.22"], "introduced": [[]]},
+        {"closed": ["_uniq.23"]},
+        {"closed": ["_selected"]},
+        {"closed": ["_uniq.5"], "dormant": ["_uniq.5"]},
+        {"changed": ["_uniq.22"]},
+        {"introduced": [[]]},
+        {"introduced": [["_uniq.8"], []]},
+        {"version": 2},
+        {"selected": ""},
+    ],
+)
+def test_inconsistent_provenance_is_rejected(changes):
+    with pytest.raises(PantographProtocolError):
+        decode_response("goal.tactic", provenance(**changes))
+
+
+def test_a_goal_left_open_is_its_own_direct_goal():
+    payload = provenance(selected="_uniq.22")
+    result = decode_response("goal.tactic", payload)
+    assert result.transition.selected in result.transition.direct
+
+
+def test_success_without_provenance_is_rejected():
+    payload = success()
+    payload.pop("transition")
+    with pytest.raises(PantographProtocolError, match="transition"):
+        decode_response("goal.tactic", payload)
+
+
+def obligation(**changes):
+    value = {"name": "_uniq.12", "status": "complete", "holes": [], "universeHoles": False}
+    value.update(changes)
+    return value
+
+
+def test_inspection_decodes_each_status():
+    goal = success()["goals"][0]
+    result = decode_response(
+        "goal.inspect",
+        {
+            "obligations": [
+                obligation(status="active", goal=goal),
+                obligation(name="_uniq.3", status="assigned", holes=["_uniq.4"]),
+                obligation(name="_uniq.5", status="delayed", universeHoles=True, holes=[]),
+                obligation(name="_uniq.6"),
+            ]
+        },
+    )
+    active, assigned, delayed, complete = result.obligations
+    assert active.goal.goal_name == "_uniq.12" and not active.is_complete
+    assert assigned.holes == ("_uniq.4",) and delayed.universe_holes
+    assert complete.is_complete and complete.goal is None
+
+
+@pytest.mark.parametrize(
+    "item",
+    [
+        obligation(status="active"),
+        obligation(goal=success()["goals"][0]),
+        obligation(status="pending", goal={**success()["goals"][0], "name": "_uniq.1"}),
+        obligation(holes=["_uniq.4"]),
+        obligation(universeHoles=True),
+        obligation(status="assigned"),
+        obligation(status="solved"),
+        obligation(holes=["_uniq.4", "_uniq.4"], status="assigned"),
+    ],
+)
+def test_inconsistent_inspection_is_rejected(item):
+    with pytest.raises(PantographProtocolError):
+        decode_response("goal.inspect", {"obligations": [item]})
+
+
+def test_certificates_decode_and_carry_exactly_one_explanation():
+    certified = decode_response("goal.certify", deepcopy(FUTURE["certified"]))
+    assert certified.is_certified and certified.reason is None
+    assert certified.receipt.identity == "lean-expr-digest-v1"
+    incomplete = decode_response("goal.certify", deepcopy(FUTURE["incomplete"]))
+    assert not incomplete.is_certified and incomplete.receipt is None
+    for status in ("rejected", "inconclusive"):
+        result = decode_response(
+            "goal.certify", {"version": 1, "status": status, "reason": "why"}
+        )
+        assert result.status == status and not result.is_certified
+
+
+def receipt(**changes):
+    payload = deepcopy(FUTURE["certified"])
+    payload["receipt"].update(changes)
+    return payload
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"version": 1, "status": "certified"},
+        {**deepcopy(FUTURE["certified"]), "reason": "both"},
+        {"version": 1, "status": "incomplete"},
+        {**deepcopy(FUTURE["incomplete"]), "receipt": FUTURE["certified"]["receipt"]},
+        {"version": 1, "status": "proved", "reason": "x"},
+        {"version": 2, "status": "incomplete", "reason": "x"},
+        {"version": 1, "status": "rejected", "reason": ""},
+        receipt(identity="lean-expr-hash-v1"),
+        receipt(proof="00a1"),
+        receipt(rootType="00000000000000A1"),
+        receipt(levels=["Foo.u"]),
+        receipt(axioms=["propext", "propext"]),
+        receipt(version=2),
+    ],
+)
+def test_malformed_certificates_are_rejected(payload):
+    with pytest.raises(PantographProtocolError):
+        decode_response("goal.certify", payload)
+
+
+@pytest.mark.parametrize(
+    "command,payload",
+    [
+        ("goal.inspect", {"stateId": 0, "goals": []}),
+        ("goal.inspect", {"stateId": 0, "goals": ["a", "a"]}),
+        ("goal.inspect", {"stateId": 0, "goals": [""]}),
+        ("goal.inspect", {"stateId": 0}),
+        ("goal.certify", {"stateId": 0, "maxHeartbeats": 0}),
+        ("goal.certify", {"stateId": 0, "maxHeartbeats": True}),
+        ("goal.certify", {"stateId": 0, "type": "False"}),
+    ],
+)
+def test_invalid_snapshot_requests_are_rejected_before_sending(command, payload):
+    with pytest.raises((PantographProtocolError, PantographConfigurationError)):
+        encode_request(command, payload)
+
+
+def test_snapshot_requests_encode_canonically():
+    assert encode_request("goal.inspect", {"stateId": 3, "goals": ["_uniq.1"]}) == (
+        b'goal.inspect {"stateId":3,"goals":["_uniq.1"]}\n'
+    )
+    assert encode_request("goal.certify", {"stateId": 3}) == (
+        b'goal.certify {"stateId":3}\n'
+    )

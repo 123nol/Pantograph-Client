@@ -1,0 +1,1155 @@
+{
+  "kind": "snapshot-companion-live-capture",
+  "readiness_line": "ready.",
+  "imports": [
+    "Init"
+  ],
+  "interactions": [
+    {
+      "label": "descriptor",
+      "command": "protocol.describe",
+      "request": {},
+      "request_line": "protocol.describe {}",
+      "response_line": "{\"transitionValidationVersion\":1,\"transitionProvenanceVersion\":1,\"tacticErrorsFormat\":\"string-array-v1\",\"protocolVersion\":2,\"protocol\":\"maths-ai-pantograph\",\"modelSexpVersion\":1,\"messageVersion\":1,\"inspectionVersion\":1,\"goalSelection\":\"explicit-focused-v1\",\"certificationVersion\":1}",
+      "response": {
+        "transitionValidationVersion": 1,
+        "transitionProvenanceVersion": 1,
+        "tacticErrorsFormat": "string-array-v1",
+        "protocolVersion": 2,
+        "protocol": "maths-ai-pantograph",
+        "modelSexpVersion": 1,
+        "messageVersion": 1,
+        "inspectionVersion": 1,
+        "goalSelection": "explicit-focused-v1",
+        "certificationVersion": 1
+      }
+    },
+    {
+      "label": "options",
+      "command": "options.set",
+      "request": {
+        "printJsonPretty": false,
+        "printExprPretty": true,
+        "printExprAST": true,
+        "printExprModelAST": true,
+        "noRepeat": false,
+        "automaticMode": true
+      },
+      "request_line": "options.set {\"printJsonPretty\":false,\"printExprPretty\":true,\"printExprAST\":true,\"printExprModelAST\":true,\"noRepeat\":false,\"automaticMode\":true}",
+      "response_line": "{}",
+      "response": {}
+    },
+    {
+      "label": "conjunction",
+      "command": "goal.start",
+      "request": {
+        "expr": "True ∧ True"
+      },
+      "request_line": "goal.start {\"expr\":\"True ∧ True\"}",
+      "response_line": "{\"stateId\":0,\"root\":\"_uniq.2\"}",
+      "response": {
+        "stateId": 0,
+        "root": "_uniq.2"
+      }
+    },
+    {
+      "label": "split",
+      "command": "goal.tactic",
+      "request": {
+        "stateId": 0,
+        "goalId": 0,
+        "tactic": "constructor"
+      },
+      "request_line": "goal.tactic {\"stateId\":0,\"goalId\":0,\"tactic\":\"constructor\"}",
+      "response_line": "{\"validation\":{\"version\":1,\"scope\":\"transition-expressions\",\"checked\":true},\"transition\":{\"version\":1,\"siblings\":[],\"selected\":\"_uniq.2\",\"introduced\":[[],[]],\"extra\":[],\"dormant\":[],\"direct\":[\"_uniq.9\",\"_uniq.10\"],\"closed\":[],\"changed\":[]},\"nextStateId\":1,\"messages\":[],\"hasUnsafe\":false,\"hasSorry\":false,\"goals\":[{\"vars\":[],\"userName\":\"left\",\"target\":{\"sexp\":\"(:c True)\",\"pp\":\"True\",\"modelSexpVersion\":1,\"modelSexp\":\"(:c True)\"},\"name\":\"_uniq.9\",\"isConversion\":false,\"fragment\":\"tactic\"},{\"vars\":[],\"userName\":\"right\",\"target\":{\"sexp\":\"(:c True)\",\"pp\":\"True\",\"modelSexpVersion\":1,\"modelSexp\":\"(:c True)\"},\"name\":\"_uniq.10\",\"isConversion\":false,\"fragment\":\"tactic\"}]}",
+      "response": {
+        "validation": {
+          "version": 1,
+          "scope": "transition-expressions",
+          "checked": true
+        },
+        "transition": {
+          "version": 1,
+          "siblings": [],
+          "selected": "_uniq.2",
+          "introduced": [
+            [],
+            []
+          ],
+          "extra": [],
+          "dormant": [],
+          "direct": [
+            "_uniq.9",
+            "_uniq.10"
+          ],
+          "closed": [],
+          "changed": []
+        },
+        "nextStateId": 1,
+        "messages": [],
+        "hasUnsafe": false,
+        "hasSorry": false,
+        "goals": [
+          {
+            "vars": [],
+            "userName": "left",
+            "target": {
+              "sexp": "(:c True)",
+              "pp": "True",
+              "modelSexpVersion": 1,
+              "modelSexp": "(:c True)"
+            },
+            "name": "_uniq.9",
+            "isConversion": false,
+            "fragment": "tactic"
+          },
+          {
+            "vars": [],
+            "userName": "right",
+            "target": {
+              "sexp": "(:c True)",
+              "pp": "True",
+              "modelSexpVersion": 1,
+              "modelSexp": "(:c True)"
+            },
+            "name": "_uniq.10",
+            "isConversion": false,
+            "fragment": "tactic"
+          }
+        ]
+      }
+    },
+    {
+      "label": "right_first",
+      "command": "goal.tactic",
+      "request": {
+        "stateId": 1,
+        "goalId": 1,
+        "tactic": "trivial"
+      },
+      "request_line": "goal.tactic {\"stateId\":1,\"goalId\":1,\"tactic\":\"trivial\"}",
+      "response_line": "{\"validation\":{\"version\":1,\"scope\":\"transition-expressions\",\"checked\":true},\"transition\":{\"version\":1,\"siblings\":[\"_uniq.9\"],\"selected\":\"_uniq.10\",\"introduced\":[],\"extra\":[],\"dormant\":[],\"direct\":[],\"closed\":[],\"changed\":[]},\"nextStateId\":2,\"messages\":[],\"hasUnsafe\":false,\"hasSorry\":false,\"goals\":[{\"vars\":[],\"userName\":\"left\",\"target\":{\"sexp\":\"(:c True)\",\"pp\":\"True\",\"modelSexpVersion\":1,\"modelSexp\":\"(:c True)\"},\"name\":\"_uniq.9\",\"isConversion\":false,\"fragment\":\"tactic\"}]}",
+      "response": {
+        "validation": {
+          "version": 1,
+          "scope": "transition-expressions",
+          "checked": true
+        },
+        "transition": {
+          "version": 1,
+          "siblings": [
+            "_uniq.9"
+          ],
+          "selected": "_uniq.10",
+          "introduced": [],
+          "extra": [],
+          "dormant": [],
+          "direct": [],
+          "closed": [],
+          "changed": []
+        },
+        "nextStateId": 2,
+        "messages": [],
+        "hasUnsafe": false,
+        "hasSorry": false,
+        "goals": [
+          {
+            "vars": [],
+            "userName": "left",
+            "target": {
+              "sexp": "(:c True)",
+              "pp": "True",
+              "modelSexpVersion": 1,
+              "modelSexp": "(:c True)"
+            },
+            "name": "_uniq.9",
+            "isConversion": false,
+            "fragment": "tactic"
+          }
+        ]
+      }
+    },
+    {
+      "label": "left_first",
+      "command": "goal.tactic",
+      "request": {
+        "stateId": 1,
+        "goalId": 0,
+        "tactic": "trivial"
+      },
+      "request_line": "goal.tactic {\"stateId\":1,\"goalId\":0,\"tactic\":\"trivial\"}",
+      "response_line": "{\"validation\":{\"version\":1,\"scope\":\"transition-expressions\",\"checked\":true},\"transition\":{\"version\":1,\"siblings\":[\"_uniq.10\"],\"selected\":\"_uniq.9\",\"introduced\":[],\"extra\":[],\"dormant\":[],\"direct\":[],\"closed\":[],\"changed\":[]},\"nextStateId\":3,\"messages\":[],\"hasUnsafe\":false,\"hasSorry\":false,\"goals\":[{\"vars\":[],\"userName\":\"right\",\"target\":{\"sexp\":\"(:c True)\",\"pp\":\"True\",\"modelSexpVersion\":1,\"modelSexp\":\"(:c True)\"},\"name\":\"_uniq.10\",\"isConversion\":false,\"fragment\":\"tactic\"}]}",
+      "response": {
+        "validation": {
+          "version": 1,
+          "scope": "transition-expressions",
+          "checked": true
+        },
+        "transition": {
+          "version": 1,
+          "siblings": [
+            "_uniq.10"
+          ],
+          "selected": "_uniq.9",
+          "introduced": [],
+          "extra": [],
+          "dormant": [],
+          "direct": [],
+          "closed": [],
+          "changed": []
+        },
+        "nextStateId": 3,
+        "messages": [],
+        "hasUnsafe": false,
+        "hasSorry": false,
+        "goals": [
+          {
+            "vars": [],
+            "userName": "right",
+            "target": {
+              "sexp": "(:c True)",
+              "pp": "True",
+              "modelSexpVersion": 1,
+              "modelSexp": "(:c True)"
+            },
+            "name": "_uniq.10",
+            "isConversion": false,
+            "fragment": "tactic"
+          }
+        ]
+      }
+    },
+    {
+      "label": "partial_certificate",
+      "command": "goal.certify",
+      "request": {
+        "stateId": 2
+      },
+      "request_line": "goal.certify {\"stateId\":2}",
+      "response_line": "{\"version\":1,\"status\":\"incomplete\",\"reason\":\"1 goals remain\"}",
+      "response": {
+        "version": 1,
+        "status": "incomplete",
+        "reason": "1 goals remain"
+      }
+    },
+    {
+      "label": "done",
+      "command": "goal.tactic",
+      "request": {
+        "stateId": 2,
+        "goalId": 0,
+        "tactic": "trivial"
+      },
+      "request_line": "goal.tactic {\"stateId\":2,\"goalId\":0,\"tactic\":\"trivial\"}",
+      "response_line": "{\"validation\":{\"version\":1,\"scope\":\"transition-expressions\",\"checked\":true},\"transition\":{\"version\":1,\"siblings\":[],\"selected\":\"_uniq.9\",\"introduced\":[],\"extra\":[],\"dormant\":[],\"direct\":[],\"closed\":[],\"changed\":[]},\"nextStateId\":4,\"messages\":[],\"hasUnsafe\":false,\"hasSorry\":false,\"goals\":[]}",
+      "response": {
+        "validation": {
+          "version": 1,
+          "scope": "transition-expressions",
+          "checked": true
+        },
+        "transition": {
+          "version": 1,
+          "siblings": [],
+          "selected": "_uniq.9",
+          "introduced": [],
+          "extra": [],
+          "dormant": [],
+          "direct": [],
+          "closed": [],
+          "changed": []
+        },
+        "nextStateId": 4,
+        "messages": [],
+        "hasUnsafe": false,
+        "hasSorry": false,
+        "goals": []
+      }
+    },
+    {
+      "label": "certificate",
+      "command": "goal.certify",
+      "request": {
+        "stateId": 4
+      },
+      "request_line": "goal.certify {\"stateId\":4}",
+      "response_line": "{\"version\":1,\"status\":\"certified\",\"receipt\":{\"version\":1,\"rootType\":\"90bbf111ec3a3ba2\",\"root\":\"_uniq.2\",\"proof\":\"d1e38fe67e41e7a7\",\"levels\":[],\"lean\":\"4.10.0-rc1 3b58e0649156610ce3aeed4f7b5c652340c668d4\",\"identity\":\"lean-expr-digest-v1\",\"environment\":\"57504168f0416b83\",\"axioms\":[],\"auxiliary\":[]}}",
+      "response": {
+        "version": 1,
+        "status": "certified",
+        "receipt": {
+          "version": 1,
+          "rootType": "90bbf111ec3a3ba2",
+          "root": "_uniq.2",
+          "proof": "d1e38fe67e41e7a7",
+          "levels": [],
+          "lean": "4.10.0-rc1 3b58e0649156610ce3aeed4f7b5c652340c668d4",
+          "identity": "lean-expr-digest-v1",
+          "environment": "57504168f0416b83",
+          "axioms": [],
+          "auxiliary": []
+        }
+      }
+    },
+    {
+      "label": "solved_inspection",
+      "command": "goal.inspect",
+      "request": {
+        "stateId": 4,
+        "goals": [
+          "_uniq.9",
+          "_uniq.10"
+        ]
+      },
+      "request_line": "goal.inspect {\"stateId\":4,\"goals\":[\"_uniq.9\",\"_uniq.10\"]}",
+      "response_line": "{\"obligations\":[{\"universeHoles\":false,\"status\":\"complete\",\"name\":\"_uniq.9\",\"holes\":[]},{\"universeHoles\":false,\"status\":\"complete\",\"name\":\"_uniq.10\",\"holes\":[]}]}",
+      "response": {
+        "obligations": [
+          {
+            "universeHoles": false,
+            "status": "complete",
+            "name": "_uniq.9",
+            "holes": []
+          },
+          {
+            "universeHoles": false,
+            "status": "complete",
+            "name": "_uniq.10",
+            "holes": []
+          }
+        ]
+      }
+    },
+    {
+      "label": "witness",
+      "command": "goal.start",
+      "request": {
+        "expr": "∃ n : Nat, n = 0 ∧ n = 1"
+      },
+      "request_line": "goal.start {\"expr\":\"∃ n : Nat, n = 0 ∧ n = 1\"}",
+      "response_line": "{\"stateId\":5,\"root\":\"_uniq.92\"}",
+      "response": {
+        "stateId": 5,
+        "root": "_uniq.92"
+      }
+    },
+    {
+      "label": "witness_parts",
+      "command": "goal.tactic",
+      "request": {
+        "stateId": 5,
+        "goalId": 0,
+        "tactic": "refine ⟨?w, ?a, ?b⟩"
+      },
+      "request_line": "goal.tactic {\"stateId\":5,\"goalId\":0,\"tactic\":\"refine ⟨?w, ?a, ?b⟩\"}",
+      "response_line": "{\"validation\":{\"version\":1,\"scope\":\"transition-expressions\",\"checked\":true},\"transition\":{\"version\":1,\"siblings\":[],\"selected\":\"_uniq.92\",\"introduced\":[[],[],[]],\"extra\":[],\"dormant\":[],\"direct\":[\"_uniq.100\",\"_uniq.112\",\"_uniq.113\"],\"closed\":[],\"changed\":[]},\"nextStateId\":6,\"messages\":[],\"hasUnsafe\":false,\"hasSorry\":false,\"goals\":[{\"vars\":[],\"userName\":\"w\",\"target\":{\"sexp\":\"(:c Nat)\",\"pp\":\"Nat\",\"modelSexpVersion\":1,\"modelSexp\":\"(:c Nat)\"},\"name\":\"_uniq.100\",\"isConversion\":false,\"fragment\":\"tactic\"},{\"vars\":[],\"userName\":\"a\",\"target\":{\"sexp\":\"((:c Eq) (:c Nat) (:mv _uniq.100) ((:c OfNat.ofNat) (:c Nat) (:lit 0) ((:c instOfNatNat) (:lit 0))))\",\"pp\":\"?w = 0\",\"modelSexpVersion\":1,\"modelSexp\":\"(:app (:c Eq) (:arg :implicit-type 0 (:c Nat)) (:arg :explicit 1 (:metavar)) (:arg :explicit 2 (:app (:c OfNat.ofNat) (:arg :implicit-type 0 (:c Nat)) (:arg :explicit 1 (:lit 0)) (:arg :instance 2 (:instance-of (:app (:c OfNat) (:arg :explicit 0 (:c Nat)) (:arg :explicit 1 (:lit 0))))))))\"},\"name\":\"_uniq.112\",\"isConversion\":false,\"fragment\":\"tactic\"},{\"vars\":[],\"userName\":\"b\",\"target\":{\"sexp\":\"((:c Eq) (:c Nat) (:mv _uniq.100) ((:c OfNat.ofNat) (:c Nat) (:lit 1) ((:c instOfNatNat) (:lit 1))))\",\"pp\":\"?w = 1\",\"modelSexpVersion\":1,\"modelSexp\":\"(:app (:c Eq) (:arg :implicit-type 0 (:c Nat)) (:arg :explicit 1 (:metavar)) (:arg :explicit 2 (:app (:c OfNat.ofNat) (:arg :implicit-type 0 (:c Nat)) (:arg :explicit 1 (:lit 1)) (:arg :instance 2 (:instance-of (:app (:c OfNat) (:arg :explicit 0 (:c Nat)) (:arg :explicit 1 (:lit 1))))))))\"},\"name\":\"_uniq.113\",\"isConversion\":false,\"fragment\":\"tactic\"}]}",
+      "response": {
+        "validation": {
+          "version": 1,
+          "scope": "transition-expressions",
+          "checked": true
+        },
+        "transition": {
+          "version": 1,
+          "siblings": [],
+          "selected": "_uniq.92",
+          "introduced": [
+            [],
+            [],
+            []
+          ],
+          "extra": [],
+          "dormant": [],
+          "direct": [
+            "_uniq.100",
+            "_uniq.112",
+            "_uniq.113"
+          ],
+          "closed": [],
+          "changed": []
+        },
+        "nextStateId": 6,
+        "messages": [],
+        "hasUnsafe": false,
+        "hasSorry": false,
+        "goals": [
+          {
+            "vars": [],
+            "userName": "w",
+            "target": {
+              "sexp": "(:c Nat)",
+              "pp": "Nat",
+              "modelSexpVersion": 1,
+              "modelSexp": "(:c Nat)"
+            },
+            "name": "_uniq.100",
+            "isConversion": false,
+            "fragment": "tactic"
+          },
+          {
+            "vars": [],
+            "userName": "a",
+            "target": {
+              "sexp": "((:c Eq) (:c Nat) (:mv _uniq.100) ((:c OfNat.ofNat) (:c Nat) (:lit 0) ((:c instOfNatNat) (:lit 0))))",
+              "pp": "?w = 0",
+              "modelSexpVersion": 1,
+              "modelSexp": "(:app (:c Eq) (:arg :implicit-type 0 (:c Nat)) (:arg :explicit 1 (:metavar)) (:arg :explicit 2 (:app (:c OfNat.ofNat) (:arg :implicit-type 0 (:c Nat)) (:arg :explicit 1 (:lit 0)) (:arg :instance 2 (:instance-of (:app (:c OfNat) (:arg :explicit 0 (:c Nat)) (:arg :explicit 1 (:lit 0))))))))"
+            },
+            "name": "_uniq.112",
+            "isConversion": false,
+            "fragment": "tactic"
+          },
+          {
+            "vars": [],
+            "userName": "b",
+            "target": {
+              "sexp": "((:c Eq) (:c Nat) (:mv _uniq.100) ((:c OfNat.ofNat) (:c Nat) (:lit 1) ((:c instOfNatNat) (:lit 1))))",
+              "pp": "?w = 1",
+              "modelSexpVersion": 1,
+              "modelSexp": "(:app (:c Eq) (:arg :implicit-type 0 (:c Nat)) (:arg :explicit 1 (:metavar)) (:arg :explicit 2 (:app (:c OfNat.ofNat) (:arg :implicit-type 0 (:c Nat)) (:arg :explicit 1 (:lit 1)) (:arg :instance 2 (:instance-of (:app (:c OfNat) (:arg :explicit 0 (:c Nat)) (:arg :explicit 1 (:lit 1))))))))"
+            },
+            "name": "_uniq.113",
+            "isConversion": false,
+            "fragment": "tactic"
+          }
+        ]
+      }
+    },
+    {
+      "label": "shared_assignment",
+      "command": "goal.tactic",
+      "request": {
+        "stateId": 6,
+        "goalId": 1,
+        "tactic": "exact (rfl : 0 = 0)"
+      },
+      "request_line": "goal.tactic {\"stateId\":6,\"goalId\":1,\"tactic\":\"exact (rfl : 0 = 0)\"}",
+      "response_line": "{\"validation\":{\"version\":1,\"scope\":\"transition-expressions\",\"checked\":true},\"transition\":{\"version\":1,\"siblings\":[\"_uniq.113\"],\"selected\":\"_uniq.112\",\"introduced\":[],\"extra\":[],\"dormant\":[],\"direct\":[],\"closed\":[\"_uniq.100\"],\"changed\":[\"_uniq.113\"]},\"nextStateId\":7,\"messages\":[],\"hasUnsafe\":false,\"hasSorry\":false,\"goals\":[{\"vars\":[],\"userName\":\"b\",\"target\":{\"sexp\":\"((:c Eq) (:c Nat) ((:c OfNat.ofNat) (:c Nat) (:lit 0) ((:c instOfNatNat) (:lit 0))) ((:c OfNat.ofNat) (:c Nat) (:lit 1) ((:c instOfNatNat) (:lit 1))))\",\"pp\":\"0 = 1\",\"modelSexpVersion\":1,\"modelSexp\":\"(:app (:c Eq) (:arg :implicit-type 0 (:c Nat)) (:arg :explicit 1 (:app (:c OfNat.ofNat) (:arg :implicit-type 0 (:c Nat)) (:arg :explicit 1 (:lit 0)) (:arg :instance 2 (:instance-of (:app (:c OfNat) (:arg :explicit 0 (:c Nat)) (:arg :explicit 1 (:lit 0))))))) (:arg :explicit 2 (:app (:c OfNat.ofNat) (:arg :implicit-type 0 (:c Nat)) (:arg :explicit 1 (:lit 1)) (:arg :instance 2 (:instance-of (:app (:c OfNat) (:arg :explicit 0 (:c Nat)) (:arg :explicit 1 (:lit 1))))))))\"},\"name\":\"_uniq.113\",\"isConversion\":false,\"fragment\":\"tactic\"}]}",
+      "response": {
+        "validation": {
+          "version": 1,
+          "scope": "transition-expressions",
+          "checked": true
+        },
+        "transition": {
+          "version": 1,
+          "siblings": [
+            "_uniq.113"
+          ],
+          "selected": "_uniq.112",
+          "introduced": [],
+          "extra": [],
+          "dormant": [],
+          "direct": [],
+          "closed": [
+            "_uniq.100"
+          ],
+          "changed": [
+            "_uniq.113"
+          ]
+        },
+        "nextStateId": 7,
+        "messages": [],
+        "hasUnsafe": false,
+        "hasSorry": false,
+        "goals": [
+          {
+            "vars": [],
+            "userName": "b",
+            "target": {
+              "sexp": "((:c Eq) (:c Nat) ((:c OfNat.ofNat) (:c Nat) (:lit 0) ((:c instOfNatNat) (:lit 0))) ((:c OfNat.ofNat) (:c Nat) (:lit 1) ((:c instOfNatNat) (:lit 1))))",
+              "pp": "0 = 1",
+              "modelSexpVersion": 1,
+              "modelSexp": "(:app (:c Eq) (:arg :implicit-type 0 (:c Nat)) (:arg :explicit 1 (:app (:c OfNat.ofNat) (:arg :implicit-type 0 (:c Nat)) (:arg :explicit 1 (:lit 0)) (:arg :instance 2 (:instance-of (:app (:c OfNat) (:arg :explicit 0 (:c Nat)) (:arg :explicit 1 (:lit 0))))))) (:arg :explicit 2 (:app (:c OfNat.ofNat) (:arg :implicit-type 0 (:c Nat)) (:arg :explicit 1 (:lit 1)) (:arg :instance 2 (:instance-of (:app (:c OfNat) (:arg :explicit 0 (:c Nat)) (:arg :explicit 1 (:lit 1))))))))"
+            },
+            "name": "_uniq.113",
+            "isConversion": false,
+            "fragment": "tactic"
+          }
+        ]
+      }
+    },
+    {
+      "label": "witness_inspection",
+      "command": "goal.inspect",
+      "request": {
+        "stateId": 7,
+        "goals": [
+          "_uniq.100",
+          "_uniq.112",
+          "_uniq.113"
+        ]
+      },
+      "request_line": "goal.inspect {\"stateId\":7,\"goals\":[\"_uniq.100\",\"_uniq.112\",\"_uniq.113\"]}",
+      "response_line": "{\"obligations\":[{\"universeHoles\":false,\"status\":\"complete\",\"name\":\"_uniq.100\",\"holes\":[]},{\"universeHoles\":false,\"status\":\"complete\",\"name\":\"_uniq.112\",\"holes\":[]},{\"universeHoles\":false,\"status\":\"active\",\"name\":\"_uniq.113\",\"holes\":[],\"goal\":{\"vars\":[],\"userName\":\"b\",\"target\":{\"sexp\":\"((:c Eq) (:c Nat) ((:c OfNat.ofNat) (:c Nat) (:lit 0) ((:c instOfNatNat) (:lit 0))) ((:c OfNat.ofNat) (:c Nat) (:lit 1) ((:c instOfNatNat) (:lit 1))))\",\"pp\":\"0 = 1\",\"modelSexpVersion\":1,\"modelSexp\":\"(:app (:c Eq) (:arg :implicit-type 0 (:c Nat)) (:arg :explicit 1 (:app (:c OfNat.ofNat) (:arg :implicit-type 0 (:c Nat)) (:arg :explicit 1 (:lit 0)) (:arg :instance 2 (:instance-of (:app (:c OfNat) (:arg :explicit 0 (:c Nat)) (:arg :explicit 1 (:lit 0))))))) (:arg :explicit 2 (:app (:c OfNat.ofNat) (:arg :implicit-type 0 (:c Nat)) (:arg :explicit 1 (:lit 1)) (:arg :instance 2 (:instance-of (:app (:c OfNat) (:arg :explicit 0 (:c Nat)) (:arg :explicit 1 (:lit 1))))))))\"},\"name\":\"_uniq.113\",\"isConversion\":false,\"fragment\":\"tactic\"}}]}",
+      "response": {
+        "obligations": [
+          {
+            "universeHoles": false,
+            "status": "complete",
+            "name": "_uniq.100",
+            "holes": []
+          },
+          {
+            "universeHoles": false,
+            "status": "complete",
+            "name": "_uniq.112",
+            "holes": []
+          },
+          {
+            "universeHoles": false,
+            "status": "active",
+            "name": "_uniq.113",
+            "holes": [],
+            "goal": {
+              "vars": [],
+              "userName": "b",
+              "target": {
+                "sexp": "((:c Eq) (:c Nat) ((:c OfNat.ofNat) (:c Nat) (:lit 0) ((:c instOfNatNat) (:lit 0))) ((:c OfNat.ofNat) (:c Nat) (:lit 1) ((:c instOfNatNat) (:lit 1))))",
+                "pp": "0 = 1",
+                "modelSexpVersion": 1,
+                "modelSexp": "(:app (:c Eq) (:arg :implicit-type 0 (:c Nat)) (:arg :explicit 1 (:app (:c OfNat.ofNat) (:arg :implicit-type 0 (:c Nat)) (:arg :explicit 1 (:lit 0)) (:arg :instance 2 (:instance-of (:app (:c OfNat) (:arg :explicit 0 (:c Nat)) (:arg :explicit 1 (:lit 0))))))) (:arg :explicit 2 (:app (:c OfNat.ofNat) (:arg :implicit-type 0 (:c Nat)) (:arg :explicit 1 (:lit 1)) (:arg :instance 2 (:instance-of (:app (:c OfNat) (:arg :explicit 0 (:c Nat)) (:arg :explicit 1 (:lit 1))))))))"
+              },
+              "name": "_uniq.113",
+              "isConversion": false,
+              "fragment": "tactic"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "label": "conflict_certificate",
+      "command": "goal.certify",
+      "request": {
+        "stateId": 7
+      },
+      "request_line": "goal.certify {\"stateId\":7}",
+      "response_line": "{\"version\":1,\"status\":\"incomplete\",\"reason\":\"1 goals remain\"}",
+      "response": {
+        "version": 1,
+        "status": "incomplete",
+        "reason": "1 goals remain"
+      }
+    },
+    {
+      "label": "nested",
+      "command": "goal.start",
+      "request": {
+        "expr": "∀ (p q : Prop), p → q → (p ∧ q) ∧ True"
+      },
+      "request_line": "goal.start {\"expr\":\"∀ (p q : Prop), p → q → (p ∧ q) ∧ True\"}",
+      "response_line": "{\"stateId\":8,\"root\":\"_uniq.189\"}",
+      "response": {
+        "stateId": 8,
+        "root": "_uniq.189"
+      }
+    },
+    {
+      "label": "nested_intro",
+      "command": "goal.tactic",
+      "request": {
+        "stateId": 8,
+        "goalId": 0,
+        "tactic": "intro p q hp hq\nconstructor"
+      },
+      "request_line": "goal.tactic {\"stateId\":8,\"goalId\":0,\"tactic\":\"intro p q hp hq\\nconstructor\"}",
+      "response_line": "{\"validation\":{\"version\":1,\"scope\":\"transition-expressions\",\"checked\":true},\"transition\":{\"version\":1,\"siblings\":[],\"selected\":\"_uniq.189\",\"introduced\":[[\"_uniq.190\",\"_uniq.193\",\"_uniq.196\",\"_uniq.199\"],[\"_uniq.190\",\"_uniq.193\",\"_uniq.196\",\"_uniq.199\"]],\"extra\":[],\"dormant\":[],\"direct\":[\"_uniq.208\",\"_uniq.209\"],\"closed\":[],\"changed\":[]},\"nextStateId\":9,\"messages\":[],\"hasUnsafe\":false,\"hasSorry\":false,\"goals\":[{\"vars\":[{\"userName\":\"p\",\"type\":{\"sexp\":\"(:sort 0)\",\"pp\":\"Prop\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Prop)\"},\"name\":\"_uniq.190\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":0,\"binderRole\":\":explicit\"},{\"userName\":\"q\",\"type\":{\"sexp\":\"(:sort 0)\",\"pp\":\"Prop\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Prop)\"},\"name\":\"_uniq.193\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":1,\"binderRole\":\":explicit\"},{\"userName\":\"hp\",\"type\":{\"sexp\":\"(:fv _uniq.190)\",\"pp\":\"p\",\"modelSexpVersion\":1,\"modelSexp\":\"(:fv FV0)\"},\"name\":\"_uniq.196\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":2,\"binderRole\":\":explicit\"},{\"userName\":\"hq\",\"type\":{\"sexp\":\"(:fv _uniq.193)\",\"pp\":\"q\",\"modelSexpVersion\":1,\"modelSexp\":\"(:fv FV1)\"},\"name\":\"_uniq.199\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":3,\"binderRole\":\":explicit\"}],\"userName\":\"left\",\"target\":{\"sexp\":\"((:c And) (:fv _uniq.190) (:fv _uniq.193))\",\"pp\":\"p ∧ q\",\"modelSexpVersion\":1,\"modelSexp\":\"(:app (:c And) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:fv FV1)))\"},\"name\":\"_uniq.208\",\"isConversion\":false,\"fragment\":\"tactic\"},{\"vars\":[{\"userName\":\"p\",\"type\":{\"sexp\":\"(:sort 0)\",\"pp\":\"Prop\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Prop)\"},\"name\":\"_uniq.190\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":0,\"binderRole\":\":explicit\"},{\"userName\":\"q\",\"type\":{\"sexp\":\"(:sort 0)\",\"pp\":\"Prop\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Prop)\"},\"name\":\"_uniq.193\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":1,\"binderRole\":\":explicit\"},{\"userName\":\"hp\",\"type\":{\"sexp\":\"(:fv _uniq.190)\",\"pp\":\"p\",\"modelSexpVersion\":1,\"modelSexp\":\"(:fv FV0)\"},\"name\":\"_uniq.196\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":2,\"binderRole\":\":explicit\"},{\"userName\":\"hq\",\"type\":{\"sexp\":\"(:fv _uniq.193)\",\"pp\":\"q\",\"modelSexpVersion\":1,\"modelSexp\":\"(:fv FV1)\"},\"name\":\"_uniq.199\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":3,\"binderRole\":\":explicit\"}],\"userName\":\"right\",\"target\":{\"sexp\":\"(:c True)\",\"pp\":\"True\",\"modelSexpVersion\":1,\"modelSexp\":\"(:c True)\"},\"name\":\"_uniq.209\",\"isConversion\":false,\"fragment\":\"tactic\"}]}",
+      "response": {
+        "validation": {
+          "version": 1,
+          "scope": "transition-expressions",
+          "checked": true
+        },
+        "transition": {
+          "version": 1,
+          "siblings": [],
+          "selected": "_uniq.189",
+          "introduced": [
+            [
+              "_uniq.190",
+              "_uniq.193",
+              "_uniq.196",
+              "_uniq.199"
+            ],
+            [
+              "_uniq.190",
+              "_uniq.193",
+              "_uniq.196",
+              "_uniq.199"
+            ]
+          ],
+          "extra": [],
+          "dormant": [],
+          "direct": [
+            "_uniq.208",
+            "_uniq.209"
+          ],
+          "closed": [],
+          "changed": []
+        },
+        "nextStateId": 9,
+        "messages": [],
+        "hasUnsafe": false,
+        "hasSorry": false,
+        "goals": [
+          {
+            "vars": [
+              {
+                "userName": "p",
+                "type": {
+                  "sexp": "(:sort 0)",
+                  "pp": "Prop",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:sort Prop)"
+                },
+                "name": "_uniq.190",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 0,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "q",
+                "type": {
+                  "sexp": "(:sort 0)",
+                  "pp": "Prop",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:sort Prop)"
+                },
+                "name": "_uniq.193",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 1,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "hp",
+                "type": {
+                  "sexp": "(:fv _uniq.190)",
+                  "pp": "p",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:fv FV0)"
+                },
+                "name": "_uniq.196",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 2,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "hq",
+                "type": {
+                  "sexp": "(:fv _uniq.193)",
+                  "pp": "q",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:fv FV1)"
+                },
+                "name": "_uniq.199",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 3,
+                "binderRole": ":explicit"
+              }
+            ],
+            "userName": "left",
+            "target": {
+              "sexp": "((:c And) (:fv _uniq.190) (:fv _uniq.193))",
+              "pp": "p ∧ q",
+              "modelSexpVersion": 1,
+              "modelSexp": "(:app (:c And) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:fv FV1)))"
+            },
+            "name": "_uniq.208",
+            "isConversion": false,
+            "fragment": "tactic"
+          },
+          {
+            "vars": [
+              {
+                "userName": "p",
+                "type": {
+                  "sexp": "(:sort 0)",
+                  "pp": "Prop",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:sort Prop)"
+                },
+                "name": "_uniq.190",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 0,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "q",
+                "type": {
+                  "sexp": "(:sort 0)",
+                  "pp": "Prop",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:sort Prop)"
+                },
+                "name": "_uniq.193",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 1,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "hp",
+                "type": {
+                  "sexp": "(:fv _uniq.190)",
+                  "pp": "p",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:fv FV0)"
+                },
+                "name": "_uniq.196",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 2,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "hq",
+                "type": {
+                  "sexp": "(:fv _uniq.193)",
+                  "pp": "q",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:fv FV1)"
+                },
+                "name": "_uniq.199",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 3,
+                "binderRole": ":explicit"
+              }
+            ],
+            "userName": "right",
+            "target": {
+              "sexp": "(:c True)",
+              "pp": "True",
+              "modelSexpVersion": 1,
+              "modelSexp": "(:c True)"
+            },
+            "name": "_uniq.209",
+            "isConversion": false,
+            "fragment": "tactic"
+          }
+        ]
+      }
+    },
+    {
+      "label": "nested_split",
+      "command": "goal.tactic",
+      "request": {
+        "stateId": 9,
+        "goalId": 0,
+        "tactic": "constructor"
+      },
+      "request_line": "goal.tactic {\"stateId\":9,\"goalId\":0,\"tactic\":\"constructor\"}",
+      "response_line": "{\"validation\":{\"version\":1,\"scope\":\"transition-expressions\",\"checked\":true},\"transition\":{\"version\":1,\"siblings\":[\"_uniq.209\"],\"selected\":\"_uniq.208\",\"introduced\":[[],[]],\"extra\":[],\"dormant\":[],\"direct\":[\"_uniq.218\",\"_uniq.219\"],\"closed\":[],\"changed\":[]},\"nextStateId\":10,\"messages\":[],\"hasUnsafe\":false,\"hasSorry\":false,\"goals\":[{\"vars\":[{\"userName\":\"p\",\"type\":{\"sexp\":\"(:sort 0)\",\"pp\":\"Prop\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Prop)\"},\"name\":\"_uniq.190\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":0,\"binderRole\":\":explicit\"},{\"userName\":\"q\",\"type\":{\"sexp\":\"(:sort 0)\",\"pp\":\"Prop\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Prop)\"},\"name\":\"_uniq.193\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":1,\"binderRole\":\":explicit\"},{\"userName\":\"hp\",\"type\":{\"sexp\":\"(:fv _uniq.190)\",\"pp\":\"p\",\"modelSexpVersion\":1,\"modelSexp\":\"(:fv FV0)\"},\"name\":\"_uniq.196\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":2,\"binderRole\":\":explicit\"},{\"userName\":\"hq\",\"type\":{\"sexp\":\"(:fv _uniq.193)\",\"pp\":\"q\",\"modelSexpVersion\":1,\"modelSexp\":\"(:fv FV1)\"},\"name\":\"_uniq.199\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":3,\"binderRole\":\":explicit\"}],\"userName\":\"left.left\",\"target\":{\"sexp\":\"(:fv _uniq.190)\",\"pp\":\"p\",\"modelSexpVersion\":1,\"modelSexp\":\"(:fv FV0)\"},\"name\":\"_uniq.218\",\"isConversion\":false,\"fragment\":\"tactic\"},{\"vars\":[{\"userName\":\"p\",\"type\":{\"sexp\":\"(:sort 0)\",\"pp\":\"Prop\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Prop)\"},\"name\":\"_uniq.190\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":0,\"binderRole\":\":explicit\"},{\"userName\":\"q\",\"type\":{\"sexp\":\"(:sort 0)\",\"pp\":\"Prop\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Prop)\"},\"name\":\"_uniq.193\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":1,\"binderRole\":\":explicit\"},{\"userName\":\"hp\",\"type\":{\"sexp\":\"(:fv _uniq.190)\",\"pp\":\"p\",\"modelSexpVersion\":1,\"modelSexp\":\"(:fv FV0)\"},\"name\":\"_uniq.196\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":2,\"binderRole\":\":explicit\"},{\"userName\":\"hq\",\"type\":{\"sexp\":\"(:fv _uniq.193)\",\"pp\":\"q\",\"modelSexpVersion\":1,\"modelSexp\":\"(:fv FV1)\"},\"name\":\"_uniq.199\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":3,\"binderRole\":\":explicit\"}],\"userName\":\"left.right\",\"target\":{\"sexp\":\"(:fv _uniq.193)\",\"pp\":\"q\",\"modelSexpVersion\":1,\"modelSexp\":\"(:fv FV1)\"},\"name\":\"_uniq.219\",\"isConversion\":false,\"fragment\":\"tactic\"},{\"vars\":[{\"userName\":\"p\",\"type\":{\"sexp\":\"(:sort 0)\",\"pp\":\"Prop\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Prop)\"},\"name\":\"_uniq.190\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":0,\"binderRole\":\":explicit\"},{\"userName\":\"q\",\"type\":{\"sexp\":\"(:sort 0)\",\"pp\":\"Prop\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Prop)\"},\"name\":\"_uniq.193\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":1,\"binderRole\":\":explicit\"},{\"userName\":\"hp\",\"type\":{\"sexp\":\"(:fv _uniq.190)\",\"pp\":\"p\",\"modelSexpVersion\":1,\"modelSexp\":\"(:fv FV0)\"},\"name\":\"_uniq.196\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":2,\"binderRole\":\":explicit\"},{\"userName\":\"hq\",\"type\":{\"sexp\":\"(:fv _uniq.193)\",\"pp\":\"q\",\"modelSexpVersion\":1,\"modelSexp\":\"(:fv FV1)\"},\"name\":\"_uniq.199\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":3,\"binderRole\":\":explicit\"}],\"userName\":\"right\",\"target\":{\"sexp\":\"(:c True)\",\"pp\":\"True\",\"modelSexpVersion\":1,\"modelSexp\":\"(:c True)\"},\"name\":\"_uniq.209\",\"isConversion\":false,\"fragment\":\"tactic\"}]}",
+      "response": {
+        "validation": {
+          "version": 1,
+          "scope": "transition-expressions",
+          "checked": true
+        },
+        "transition": {
+          "version": 1,
+          "siblings": [
+            "_uniq.209"
+          ],
+          "selected": "_uniq.208",
+          "introduced": [
+            [],
+            []
+          ],
+          "extra": [],
+          "dormant": [],
+          "direct": [
+            "_uniq.218",
+            "_uniq.219"
+          ],
+          "closed": [],
+          "changed": []
+        },
+        "nextStateId": 10,
+        "messages": [],
+        "hasUnsafe": false,
+        "hasSorry": false,
+        "goals": [
+          {
+            "vars": [
+              {
+                "userName": "p",
+                "type": {
+                  "sexp": "(:sort 0)",
+                  "pp": "Prop",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:sort Prop)"
+                },
+                "name": "_uniq.190",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 0,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "q",
+                "type": {
+                  "sexp": "(:sort 0)",
+                  "pp": "Prop",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:sort Prop)"
+                },
+                "name": "_uniq.193",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 1,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "hp",
+                "type": {
+                  "sexp": "(:fv _uniq.190)",
+                  "pp": "p",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:fv FV0)"
+                },
+                "name": "_uniq.196",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 2,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "hq",
+                "type": {
+                  "sexp": "(:fv _uniq.193)",
+                  "pp": "q",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:fv FV1)"
+                },
+                "name": "_uniq.199",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 3,
+                "binderRole": ":explicit"
+              }
+            ],
+            "userName": "left.left",
+            "target": {
+              "sexp": "(:fv _uniq.190)",
+              "pp": "p",
+              "modelSexpVersion": 1,
+              "modelSexp": "(:fv FV0)"
+            },
+            "name": "_uniq.218",
+            "isConversion": false,
+            "fragment": "tactic"
+          },
+          {
+            "vars": [
+              {
+                "userName": "p",
+                "type": {
+                  "sexp": "(:sort 0)",
+                  "pp": "Prop",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:sort Prop)"
+                },
+                "name": "_uniq.190",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 0,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "q",
+                "type": {
+                  "sexp": "(:sort 0)",
+                  "pp": "Prop",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:sort Prop)"
+                },
+                "name": "_uniq.193",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 1,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "hp",
+                "type": {
+                  "sexp": "(:fv _uniq.190)",
+                  "pp": "p",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:fv FV0)"
+                },
+                "name": "_uniq.196",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 2,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "hq",
+                "type": {
+                  "sexp": "(:fv _uniq.193)",
+                  "pp": "q",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:fv FV1)"
+                },
+                "name": "_uniq.199",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 3,
+                "binderRole": ":explicit"
+              }
+            ],
+            "userName": "left.right",
+            "target": {
+              "sexp": "(:fv _uniq.193)",
+              "pp": "q",
+              "modelSexpVersion": 1,
+              "modelSexp": "(:fv FV1)"
+            },
+            "name": "_uniq.219",
+            "isConversion": false,
+            "fragment": "tactic"
+          },
+          {
+            "vars": [
+              {
+                "userName": "p",
+                "type": {
+                  "sexp": "(:sort 0)",
+                  "pp": "Prop",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:sort Prop)"
+                },
+                "name": "_uniq.190",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 0,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "q",
+                "type": {
+                  "sexp": "(:sort 0)",
+                  "pp": "Prop",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:sort Prop)"
+                },
+                "name": "_uniq.193",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 1,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "hp",
+                "type": {
+                  "sexp": "(:fv _uniq.190)",
+                  "pp": "p",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:fv FV0)"
+                },
+                "name": "_uniq.196",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 2,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "hq",
+                "type": {
+                  "sexp": "(:fv _uniq.193)",
+                  "pp": "q",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:fv FV1)"
+                },
+                "name": "_uniq.199",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 3,
+                "binderRole": ":explicit"
+              }
+            ],
+            "userName": "right",
+            "target": {
+              "sexp": "(:c True)",
+              "pp": "True",
+              "modelSexpVersion": 1,
+              "modelSexp": "(:c True)"
+            },
+            "name": "_uniq.209",
+            "isConversion": false,
+            "fragment": "tactic"
+          }
+        ]
+      }
+    },
+    {
+      "label": "classical",
+      "command": "goal.start",
+      "request": {
+        "expr": "∀ (p : Prop), p ∨ ¬p"
+      },
+      "request_line": "goal.start {\"expr\":\"∀ (p : Prop), p ∨ ¬p\"}",
+      "response_line": "{\"stateId\":11,\"root\":\"_uniq.224\"}",
+      "response": {
+        "stateId": 11,
+        "root": "_uniq.224"
+      }
+    },
+    {
+      "label": "classical_done",
+      "command": "goal.tactic",
+      "request": {
+        "stateId": 11,
+        "goalId": 0,
+        "tactic": "intro p\nexact Classical.em p"
+      },
+      "request_line": "goal.tactic {\"stateId\":11,\"goalId\":0,\"tactic\":\"intro p\\nexact Classical.em p\"}",
+      "response_line": "{\"validation\":{\"version\":1,\"scope\":\"transition-expressions\",\"checked\":true},\"transition\":{\"version\":1,\"siblings\":[],\"selected\":\"_uniq.224\",\"introduced\":[],\"extra\":[],\"dormant\":[],\"direct\":[],\"closed\":[],\"changed\":[]},\"nextStateId\":12,\"messages\":[],\"hasUnsafe\":false,\"hasSorry\":false,\"goals\":[]}",
+      "response": {
+        "validation": {
+          "version": 1,
+          "scope": "transition-expressions",
+          "checked": true
+        },
+        "transition": {
+          "version": 1,
+          "siblings": [],
+          "selected": "_uniq.224",
+          "introduced": [],
+          "extra": [],
+          "dormant": [],
+          "direct": [],
+          "closed": [],
+          "changed": []
+        },
+        "nextStateId": 12,
+        "messages": [],
+        "hasUnsafe": false,
+        "hasSorry": false,
+        "goals": []
+      }
+    },
+    {
+      "label": "classical_certificate",
+      "command": "goal.certify",
+      "request": {
+        "stateId": 12,
+        "maxHeartbeats": 100000
+      },
+      "request_line": "goal.certify {\"stateId\":12,\"maxHeartbeats\":100000}",
+      "response_line": "{\"version\":1,\"status\":\"certified\",\"receipt\":{\"version\":1,\"rootType\":\"6450238dfc66ce26\",\"root\":\"_uniq.224\",\"proof\":\"d8c163ffe4eb9d5a\",\"levels\":[],\"lean\":\"4.10.0-rc1 3b58e0649156610ce3aeed4f7b5c652340c668d4\",\"identity\":\"lean-expr-digest-v1\",\"environment\":\"57504168f0416b83\",\"axioms\":[\"Classical.choice\",\"Quot.sound\",\"propext\"],\"auxiliary\":[]}}",
+      "response": {
+        "version": 1,
+        "status": "certified",
+        "receipt": {
+          "version": 1,
+          "rootType": "6450238dfc66ce26",
+          "root": "_uniq.224",
+          "proof": "d8c163ffe4eb9d5a",
+          "levels": [],
+          "lean": "4.10.0-rc1 3b58e0649156610ce3aeed4f7b5c652340c668d4",
+          "identity": "lean-expr-digest-v1",
+          "environment": "57504168f0416b83",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "propext"
+          ],
+          "auxiliary": []
+        }
+      }
+    },
+    {
+      "label": "unknown_obligation",
+      "command": "goal.inspect",
+      "request": {
+        "stateId": 6,
+        "goals": [
+          "_uniq.999999"
+        ]
+      },
+      "request_line": "goal.inspect {\"stateId\":6,\"goals\":[\"_uniq.999999\"]}",
+      "response_line": "{\"error\":\"index\",\"desc\":\"Unknown obligation _uniq.999999\"}",
+      "response": {
+        "error": "index",
+        "desc": "Unknown obligation _uniq.999999"
+      }
+    },
+    {
+      "label": "unknown_state",
+      "command": "goal.certify",
+      "request": {
+        "stateId": 999999
+      },
+      "request_line": "goal.certify {\"stateId\":999999}",
+      "response_line": "{\"error\":\"index\",\"desc\":\"Invalid state index 999999\"}",
+      "response": {
+        "error": "index",
+        "desc": "Invalid state index 999999"
+      }
+    },
+    {
+      "label": "final_cleanup",
+      "command": "goal.delete",
+      "request": {
+        "stateIds": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12
+        ]
+      },
+      "request_line": "goal.delete {\"stateIds\":[0,1,2,3,4,5,6,7,8,9,10,11,12]}",
+      "response_line": "{}",
+      "response": {}
+    },
+    {
+      "label": "final_stat",
+      "command": "stat",
+      "request": {},
+      "request_line": "stat {}",
+      "response_line": "{\"nGoals\":0}",
+      "response": {
+        "nGoals": 0
+      }
+    }
+  ],
+  "subprocess_reaped": true
+}

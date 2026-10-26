@@ -36,16 +36,18 @@ def test_contract_base_matches_verified_merge_and_unchanged_environment():
     assert PROVENANCE["repl_sha256"] != PROVENANCE["original_archive_repl_sha256"]
 
 
-def test_planning_revision_does_not_add_a_runtime_schema_selector():
-    assert CONTRACT["contract_revision"] == 2
-    assert CONTRACT["descriptor"]["protocolVersion"] == 1
-    assert CONTRACT["complete_theorem_certification"] is False
+def test_contract_revision_does_not_add_a_runtime_schema_selector():
+    assert CONTRACT["contract_revision"] == 3
+    assert CONTRACT["descriptor"]["protocolVersion"] == 2
+    assert CONTRACT["complete_theorem_certification"] is True
     assert set(CONTRACT["transition_validation"]) == {"version", "scope", "checked"}
     assert CONTRACT["tactic_responses"]["flag_location"].startswith("Top-level only")
     for variant in ("success", "parse_failure", "tactic_failure"):
         required = CONTRACT["tactic_responses"][variant]["required"]
         assert {"hasSorry", "hasUnsafe", "messages"} <= set(required)
-    assert "validation" in CONTRACT["tactic_responses"]["success"]["required"]
+    assert {"validation", "transition"} <= set(
+        CONTRACT["tactic_responses"]["success"]["required"]
+    )
 
 
 @pytest.mark.parametrize("label", sorted(ENTRIES))

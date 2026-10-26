@@ -79,6 +79,13 @@ Key behaviours:
   and reap the process.
 - A transition that introduces `sorry` or an unsafe constant is released and
   rejected. The flags are on `exc.payload.validation`.
+- `state.transition` says which goals the tactic produced for the selected
+  goal and which are siblings carried over, by execution name.
+  `inspect(state, names)` reads obligations a state no longer lists, and
+  `certify(state)` has the kernel check the complete root proof. An empty goal
+  list is not a certificate.
+- Released states can be garbage-collected before the scope exits; the scope
+  keeps only a weak reference per live allocation.
 - `await_cleanup(task)` awaits a retained cleanup task while deferring the
   caller's cancellation until that cleanup has finished. Worker pools use it to
   shut clients down without leaking processes.
@@ -119,9 +126,12 @@ The client speaks one server contract:
 | Field | Value |
 | --- | --- |
 | `protocol` | `maths-ai-pantograph` |
-| `protocolVersion` | 1 |
+| `protocolVersion` | 2 |
 | `modelSexpVersion` | 1 (`pantograph_async.MODEL_SEXP_VERSION`) |
 | `transitionValidationVersion` | 1 |
+| `transitionProvenanceVersion` | 1 |
+| `inspectionVersion` | 1 |
+| `certificationVersion` | 1 |
 | `messageVersion` | 1 |
 | `goalSelection` | `explicit-focused-v1` |
 | `tacticErrorsFormat` | `string-array-v1` |
@@ -178,10 +188,10 @@ wheel with `PANTOGRAPH_CLIENT_REQUIRE_INSTALLED=1`, so imports must come from
 the installed distribution. From a downloaded sdist alone:
 
 ```bash
-tar -xzf pantograph_async_client-0.1.1.tar.gz
-python -m build --wheel pantograph_async_client-0.1.1
-pip install pantograph_async_client-0.1.1/dist/*.whl pytest
-mkdir suite && cp -r pantograph_async_client-0.1.1/tests suite/ && cd suite
+tar -xzf pantograph_async_client-0.2.0.tar.gz
+python -m build --wheel pantograph_async_client-0.2.0
+pip install pantograph_async_client-0.2.0/dist/*.whl pytest
+mkdir suite && cp -r pantograph_async_client-0.2.0/tests suite/ && cd suite
 PANTOGRAPH_CLIENT_REQUIRE_INSTALLED=1 python -m pytest -q --rootdir . tests
 ```
 

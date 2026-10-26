@@ -8,10 +8,10 @@ package.
 
 | Item | Value |
 | --- | --- |
-| Contract revision | 2 (descriptor in [protocol.md](protocol.md)) |
-| Pantograph fork | `https://github.com/jajos12/Pantograph.git` |
-| Base commit | `0dd5d2225e2d093f66a4b6231c1aa35004f2c8f3` (branch `gnn-sexpr-v410`) |
-| Companion patch | `repository_client_contract.patch`, SHA-256 `ca9921913281f0c53f11cdde59afe15cf38f70a08f59068cd7b96f3ab1f2d021` |
+| Contract revision | 3 (descriptor in [protocol.md](protocol.md)) |
+| Pantograph fork | `https://github.com/123nol/Pantograph.git` |
+| Base commit | `0dd5d2225e2d093f66a4b6231c1aa35004f2c8f3` (the patch reproduces branch `client_centric_repo`) |
+| Companion patch | `repository_client_contract.patch`, SHA-256 `18689e1c99335648706f0aa2e2aedebd4fc4b06fd89b648a51fd6a770554d96b` |
 | Lean toolchain | `leanprover/lean4:v4.10.0-rc1` |
 | Tested Mathlib | `29dcec074de168ac2bf835a77ef68bbe069194c5` |
 | Platform | Linux, Python 3.11+, GNU coreutils `stdbuf` |
@@ -25,7 +25,7 @@ smoke, not by that reference hash.
 ## Reproducing the companion REPL
 
 ```bash
-git clone https://github.com/jajos12/Pantograph.git
+git clone https://github.com/123nol/Pantograph.git
 cd Pantograph
 git checkout --detach 0dd5d2225e2d093f66a4b6231c1aa35004f2c8f3
 python -c "from pantograph_async import compatibility as c; import sys; sys.stdout.buffer.write(c.companion_patch())" | git apply -
@@ -50,6 +50,7 @@ without the companion validation metadata. An unextended REPL fails at
 
 ## Historical evidence
 
-`docs/evidence/repository_client_contract.provenance.json` is the original
-Stage 4 provenance record, kept unchanged. Its absolute paths describe the
+`docs/evidence/snapshot_companion.provenance.json` records the build behind the
+current patch. `docs/evidence/repository_client_contract.provenance.json` is the
+original Stage 4 provenance record, kept unchanged. Its absolute paths describe the
 machine where it was captured and are not required locations.

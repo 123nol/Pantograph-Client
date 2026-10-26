@@ -1,4 +1,4 @@
-"""Pure codec for the explicit-focused custom Pantograph contract.
+"""Pure codec for the explicit-focused custom Pantograph contract, version 2.
 
 There is no subprocess or upstream-client dependency here. Missing transition
 evidence is rejected, including responses from the unmodified custom REPL.
@@ -21,9 +21,12 @@ MODEL_SEXP_VERSION = 1
 PROTOCOL_DESCRIPTION = MappingProxyType(
     {
         "protocol": "maths-ai-pantograph",
-        "protocolVersion": 1,
+        "protocolVersion": 2,
         "modelSexpVersion": MODEL_SEXP_VERSION,
         "transitionValidationVersion": 1,
+        "transitionProvenanceVersion": 1,
+        "inspectionVersion": 1,
+        "certificationVersion": 1,
         "messageVersion": 1,
         "goalSelection": "explicit-focused-v1",
         "tacticErrorsFormat": "string-array-v1",
@@ -66,9 +69,15 @@ SUPPORTED_COMMANDS = frozenset(
         "goal.start",
         "goal.tactic",
         "goal.delete",
+        "goal.inspect",
+        "goal.certify",
         "stat",
     }
 )
+OBLIGATION_STATUSES = frozenset({"active", "pending", "assigned", "delayed", "complete"})
+CERTIFICATE_STATUSES = frozenset({"certified", "incomplete", "rejected", "inconclusive"})
+PROOF_IDENTITY = "lean-expr-digest-v1"
+DIGEST = re.compile(r"[0-9a-f]{16}")
 # These categories come from Repl.lean and Library.lean at the pinned base.
 # "validation" is reserved for the required companion extension.
 COMMAND_ERROR_CATEGORIES = MappingProxyType(
@@ -81,6 +90,8 @@ COMMAND_ERROR_CATEGORIES = MappingProxyType(
             {"command", "arguments", "index", "invalid", "validation"}
         ),
         "goal.delete": frozenset({"command"}),
+        "goal.inspect": frozenset({"command", "arguments", "index"}),
+        "goal.certify": frozenset({"command", "arguments", "index"}),
         "stat": frozenset({"command"}),
     }
 )
@@ -135,9 +146,14 @@ class PantographStateError(PantographError):
 
 @dataclass(frozen=True)
 class StateHandle:
+    """A session-bound allocation. ``allocation`` numbers the scope's
+    registrations, so a released handle stays distinct from a later state that
+    reuses its server ID."""
+
     session_id: str
     scope_id: str
     state_id: int
+    allocation: int = 0
 
     def __post_init__(self):
         if (
@@ -147,9 +163,11 @@ class StateHandle:
             or not self.scope_id
             or type(self.state_id) is not int
             or self.state_id < 0
+            or type(self.allocation) is not int
+            or self.allocation < 0
         ):
             raise PantographStateError(
-                "A handle requires session/scope identities and a nonnegative integer ID."
+                "A handle requires session/scope identities and nonnegative integer IDs."
             )
 
 
@@ -219,6 +237,70 @@ class TransitionValidation:
 
 
 @dataclass(frozen=True)
+class TransitionProvenance:
+    """How a transition's goals relate to its input state, by execution name.
+
+    ``direct``, ``siblings`` and ``extra`` partition the result's goals.
+    ``direct`` contains ``selected`` itself when the tactic left it open.
+    ``introduced[i]`` lists the locals ``direct[i]`` has that ``selected`` lacks.
+    Names are valid only inside this session's state lineage.
+    """
+
+    selected: str
+    direct: tuple[str, ...]
+    introduced: tuple[tuple[str, ...], ...]
+    siblings: tuple[str, ...]
+    changed: tuple[str, ...]
+    closed: tuple[str, ...]
+    dormant: tuple[str, ...]
+    extra: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ObligationInspection:
+    name: str
+    status: str
+    goal: ExecutionGoal | None
+    holes: tuple[str, ...]
+    universe_holes: bool
+
+    @property
+    def is_complete(self) -> bool:
+        return self.status == "complete"
+
+
+@dataclass(frozen=True)
+class CertificateReceipt:
+    root: str
+    levels: tuple[str, ...]
+    root_type: str
+    proof: str
+    environment: str
+    lean: str
+    axioms: tuple[str, ...]
+    auxiliary: tuple[str, ...]
+    identity: str = PROOF_IDENTITY
+    version: int = 1
+
+
+@dataclass(frozen=True)
+class CertificationResult:
+    """The kernel's verdict on a state's complete root proof.
+
+    Only ``certified`` is success. ``inconclusive`` means a resource limit,
+    not a rejected proof.
+    """
+
+    status: str
+    reason: str | None
+    receipt: CertificateReceipt | None
+
+    @property
+    def is_certified(self) -> bool:
+        return self.status == "certified"
+
+
+@dataclass(frozen=True)
 class StartedGoal:
     handle: StateHandle
     root: str
@@ -230,6 +312,7 @@ class TacticState:
     goals: tuple[ExecutionGoal, ...]
     validation: TransitionValidation
     messages: tuple[ExecutionMessage, ...]
+    transition: TransitionProvenance
 
 
 @dataclass(frozen=True)
@@ -244,6 +327,7 @@ class TacticSuccess:
     goals: tuple[ExecutionGoal, ...]
     validation: TransitionValidation
     messages: tuple[ExecutionMessage, ...]
+    transition: TransitionProvenance
 
 
 @dataclass(frozen=True)
@@ -268,7 +352,10 @@ class CommandError:
         error_class: type[PantographError] = PantographProtocolError
         if self.command == "goal.start" and self.category in {"parsing", "elab"}:
             error_class = PantographGoalRejected
-        elif self.command == "goal.tactic" and self.category == "index":
+        elif (
+            self.command in {"goal.tactic", "goal.inspect", "goal.certify"}
+            and self.category == "index"
+        ):
             error_class = PantographStateError
         return error_class(
             self.description,
@@ -293,6 +380,9 @@ class ProtocolDescription:
     protocol_version: int
     model_sexp_version: int
     transition_validation_version: int
+    transition_provenance_version: int
+    inspection_version: int
+    certification_version: int
     message_version: int
     goal_selection: str
     tactic_errors_format: str
@@ -306,9 +396,16 @@ class SessionOptions:
         return dict(self.values)
 
 
+@dataclass(frozen=True)
+class InspectionResult:
+    obligations: tuple[ObligationInspection, ...]
+
+
 Response = (
     GoalStartResult
     | TacticSuccess
+    | InspectionResult
+    | CertificationResult
     | TacticParseFailure
     | TacticFailure
     | CommandError
@@ -444,6 +541,22 @@ def encode_request(command: str, payload: Mapping[str, Any]) -> bytes:
         _nat(body["stateId"], "stateId")
         _nat(body["goalId"], "goalId")
         _string(body["tactic"], "tactic", nonempty=True)
+    elif command == "goal.inspect":
+        _fields(body, {"stateId", "goals"})
+        _nat(body["stateId"], "stateId")
+        goals = [
+            _string(item, "obligation name", nonempty=True)
+            for item in _array(body["goals"], "goals")
+        ]
+        if not goals or len(set(goals)) != len(goals):
+            raise PantographProtocolError(
+                "goals must be a nonempty list of distinct names."
+            )
+    elif command == "goal.certify":
+        _fields(body, {"stateId"}, {"maxHeartbeats"})
+        _nat(body["stateId"], "stateId")
+        if "maxHeartbeats" in body and _nat(body["maxHeartbeats"], "maxHeartbeats") == 0:
+            raise PantographProtocolError("maxHeartbeats must be positive.")
     else:
         _fields(body, {"stateIds"})
         ids = [
@@ -612,6 +725,157 @@ def decode_transition_validation(
     )
 
 
+def _names(value: Any, owner: str) -> tuple[str, ...]:
+    names = tuple(
+        _string(item, owner, nonempty=True) for item in _array(value, owner)
+    )
+    if len(set(names)) != len(names):
+        raise PantographProtocolError(f"{owner} names must be distinct.")
+    return names
+
+
+def decode_transition(
+    payload: Any, goals: tuple[ExecutionGoal, ...]
+) -> TransitionProvenance:
+    """Decode provenance and check it against the response's own goals."""
+    obj = _object(payload, "transition")
+    _fields(
+        obj,
+        {
+            "version",
+            "selected",
+            "direct",
+            "introduced",
+            "siblings",
+            "changed",
+            "closed",
+            "dormant",
+            "extra",
+        },
+    )
+    if _nat(obj["version"], "transition version") != 1:
+        raise PantographProtocolError("Unsupported transition provenance version.")
+    selected = _string(obj["selected"], "selected goal", nonempty=True)
+    direct = _names(obj["direct"], "direct")
+    siblings = _names(obj["siblings"], "siblings")
+    extra = _names(obj["extra"], "extra")
+    changed = _names(obj["changed"], "changed")
+    closed = _names(obj["closed"], "closed")
+    dormant = _names(obj["dormant"], "dormant")
+    introduced = tuple(
+        _names(item, "introduced") for item in _array(obj["introduced"], "introduced")
+    )
+    listed = [goal.goal_name for goal in goals]
+    parts = [*direct, *siblings, *extra]
+    if len(set(parts)) != len(parts) or set(parts) != set(listed):
+        raise PantographProtocolError(
+            "direct, siblings and extra must partition the returned goals."
+        )
+    unlisted = [*closed, *dormant, selected]
+    if len(set(unlisted)) != len(unlisted) or set(unlisted[:-1]) & set(listed):
+        raise PantographProtocolError(
+            "The selected, closed and dormant goals must be distinct; closed and dormant goals are unlisted."
+        )
+    # An operation that leaves the selected goal open (skip) lists it as direct.
+    if selected in listed and selected not in direct:
+        raise PantographProtocolError("A listed selected goal must be a direct goal.")
+    if not set(changed) <= set(siblings):
+        raise PantographProtocolError("Changed goals must be siblings.")
+    if len(introduced) != len(direct):
+        raise PantographProtocolError("introduced needs one entry per direct goal.")
+    by_name = {goal.goal_name: goal for goal in goals}
+    for name, locals_ in zip(direct, introduced):
+        visible = {local.internal_name for local in by_name[name].locals}
+        if not set(locals_) <= visible:
+            raise PantographProtocolError(
+                f"Introduced locals of {name} are not in its context."
+            )
+    return TransitionProvenance(
+        selected, direct, introduced, siblings, changed, closed, dormant, extra
+    )
+
+
+def decode_obligation(payload: Any) -> ObligationInspection:
+    obj = _object(payload, "obligation")
+    _fields(obj, {"name", "status", "holes", "universeHoles"}, {"goal"})
+    name = _string(obj["name"], "obligation name", nonempty=True)
+    status = _string(obj["status"], "obligation status")
+    if status not in OBLIGATION_STATUSES:
+        raise PantographProtocolError(f"Unknown obligation status {status!r}.")
+    holes = _names(obj["holes"], "holes")
+    universe_holes = _bool(obj["universeHoles"], "universeHoles")
+    if ("goal" in obj) != (status in {"active", "pending"}):
+        raise PantographProtocolError(
+            "Exactly the active and pending obligations carry a goal."
+        )
+    goal = decode_execution_goal(obj["goal"]) if "goal" in obj else None
+    if goal is not None and goal.goal_name != name:
+        raise PantographProtocolError("An inspected goal must carry its own name.")
+    if status == "complete" and (holes or universe_holes):
+        raise PantographProtocolError("A complete obligation has no holes.")
+    if status in {"assigned", "delayed"} and not (holes or universe_holes):
+        raise PantographProtocolError(
+            "An incomplete assignment must report its remaining holes."
+        )
+    return ObligationInspection(name, status, goal, holes, universe_holes)
+
+
+def decode_certificate(payload: Any) -> CertificationResult:
+    obj = _object(payload, "certification")
+    _fields(obj, {"version", "status"}, {"reason", "receipt"})
+    if _nat(obj["version"], "certification version") != 1:
+        raise PantographProtocolError("Unsupported certification version.")
+    status = _string(obj["status"], "certification status")
+    if status not in CERTIFICATE_STATUSES:
+        raise PantographProtocolError(f"Unknown certification status {status!r}.")
+    if status == "certified":
+        if "reason" in obj or "receipt" not in obj:
+            raise PantographProtocolError(
+                "A certified result carries a receipt and no reason."
+            )
+        raw = _object(obj["receipt"], "receipt")
+        _fields(
+            raw,
+            {
+                "version",
+                "identity",
+                "root",
+                "levels",
+                "rootType",
+                "proof",
+                "environment",
+                "lean",
+                "axioms",
+                "auxiliary",
+            },
+        )
+        if _nat(raw["version"], "receipt version") != 1:
+            raise PantographProtocolError("Unsupported receipt version.")
+        if _string(raw["identity"], "receipt identity") != PROOF_IDENTITY:
+            raise PantographProtocolError("Unsupported proof identity scheme.")
+        digests = [
+            _string(raw[key], key) for key in ("rootType", "proof", "environment")
+        ]
+        if not all(DIGEST.fullmatch(digest) for digest in digests):
+            raise PantographProtocolError("Receipt digests must be 16 hex digits.")
+        receipt = CertificateReceipt(
+            _string(raw["root"], "receipt root", nonempty=True),
+            tuple(_level_name(item) for item in _array(raw["levels"], "levels")),
+            *digests,
+            _string(raw["lean"], "receipt lean", nonempty=True),
+            _names(raw["axioms"], "axioms"),
+            _names(raw["auxiliary"], "auxiliary"),
+        )
+        return CertificationResult(status, None, receipt)
+    if "receipt" in obj or "reason" not in obj:
+        raise PantographProtocolError(
+            "An uncertified result carries a reason and no receipt."
+        )
+    return CertificationResult(
+        status, _string(obj["reason"], "certification reason", nonempty=True), None
+    )
+
+
 def decode_response(command: str, payload: Any) -> Response:
     """Decode one final-contract response, retaining typed domain failures.
 
@@ -658,6 +922,7 @@ def decode_response(command: str, payload: Any) -> Response:
                         "nextStateId",
                         "goals",
                         "validation",
+                        "transition",
                         "messages",
                         "hasSorry",
                         "hasUnsafe",
@@ -685,6 +950,7 @@ def decode_response(command: str, payload: Any) -> Response:
                         has_unsafe=obj["hasUnsafe"],
                     ),
                     messages,
+                    decode_transition(obj["transition"], goals),
                 )
             _fields(obj, {variant, "messages", "hasSorry", "hasUnsafe"})
             has_sorry = _bool(obj["hasSorry"], "hasSorry")
@@ -707,6 +973,16 @@ def decode_response(command: str, payload: Any) -> Response:
                     "tacticErrors must contain at least one error."
                 )
             return TacticFailure(errors, messages)
+        if command == "goal.inspect":
+            _fields(obj, {"obligations"})
+            return InspectionResult(
+                tuple(
+                    decode_obligation(item)
+                    for item in _array(obj["obligations"], "obligations")
+                )
+            )
+        if command == "goal.certify":
+            return decode_certificate(obj)
         if command == "stat":
             _fields(obj, {"nGoals"})
             return PantographStats(_nat(obj["nGoals"], "nGoals"))
@@ -730,6 +1006,9 @@ def decode_response(command: str, payload: Any) -> Response:
                 obj["protocolVersion"],
                 obj["modelSexpVersion"],
                 obj["transitionValidationVersion"],
+                obj["transitionProvenanceVersion"],
+                obj["inspectionVersion"],
+                obj["certificationVersion"],
                 obj["messageVersion"],
                 obj["goalSelection"],
                 obj["tacticErrorsFormat"],
