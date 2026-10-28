@@ -1,15 +1,287 @@
 diff --git a/Pantograph.lean b/Pantograph.lean
-index 292efb9..0a30142 100644
+index 292efb9..4b5b506 100644
 --- a/Pantograph.lean
 +++ b/Pantograph.lean
-@@ -5,4 +5,5 @@ import Pantograph.Goal
+@@ -5,4 +5,7 @@ import Pantograph.Goal
  import Pantograph.Library
  import Pantograph.Protocol
  import Pantograph.Serial
 +import Pantograph.Validation
++import Pantograph.Transition
++import Pantograph.Certify
  import Pantograph.Version
+diff --git a/Pantograph/Certify.lean b/Pantograph/Certify.lean
+new file mode 100644
+index 0000000..7b79fda
+--- /dev/null
++++ b/Pantograph/Certify.lean
+@@ -0,0 +1,200 @@
++/-
++Kernel certification of a state's complete root proof.
++
++The proof is the instantiated root assignment, abstracted natively over the
++root's local context and checked by the kernel as a theorem of the statement the
++root was started with. Checking runs on a copy of the state's trusted
++environment, so no search state or REPL environment sees the temporary
++declaration. The kernel is always invoked directly, so `debug.skipKernelTC`
++cannot turn checking off.
++-/
++import Pantograph.Goal
++
++namespace Pantograph
++open Lean
++
++private structure DependencyScan where
++  visited : NameSet := {}
++  axioms : Array Name := #[]
++  -- Declarations missing from the trusted environment, dependencies first
++  auxiliary : Array Name := #[]
++  problems : Array String := #[]
++
++private abbrev ScanM := ReaderT (Environment × Environment) (StateM DependencyScan)
++
++private def problem (message : String) : ScanM Unit :=
++  modify fun s => { s with problems := s.problems.push message }
++
++/-- Walk every constant a proof reaches, imported ones included, so that an
++    admission or unsafe dependency anywhere in the closure is found. -/
++private partial def scanConstant (name : Name) : ScanM Unit := do
++  if (← get).visited.contains name then return
++  modify fun s => { s with visited := s.visited.insert name }
++  let (trusted, final) ← read
++  let some info := final.find? name | problem s!"Missing dependency {name}"
++  let isNew := !trusted.contains name
++  if name == ``sorryAx then problem "Proof depends on an admission (sorryAx)"
++  if info.isUnsafe then problem s!"Unsafe dependency {name}"
++  let scanExpr (expr : Expr) : ScanM Unit := expr.getUsedConstants.forM scanConstant
++  match info with
++  | .axiomInfo _ =>
++    if isNew then problem s!"New axiom {name}"
++    else modify fun s => { s with axioms := s.axioms.push name }
++  | .defnInfo v => scanExpr v.type; scanExpr v.value
++  | .thmInfo v => scanExpr v.type; scanExpr v.value
++  | .opaqueInfo v => scanExpr v.type; scanExpr v.value
++  | .quotInfo _ => pure ()
++  | .ctorInfo v => scanExpr v.type
++  | .recInfo v => scanExpr v.type
++  | .inductInfo v => scanExpr v.type; v.ctors.forM scanConstant
++  if isNew then modify fun s => { s with auxiliary := s.auxiliary.push name }
++
++private def declarationOf (info : ConstantInfo) : Except String Declaration :=
++  match info with
++  | .thmInfo v => if v.all.length == 1 then .ok (.thmDecl v) else .error "mutual"
++  | .defnInfo v => if v.all.length == 1 then .ok (.defnDecl v) else .error "mutual"
++  | .opaqueInfo v => if v.all.length == 1 then .ok (.opaqueDecl v) else .error "mutual"
++  | _ => .error "unsupported kind"
++
++private def mix (acc value : UInt64) : UInt64 :=
++  (acc ^^^ value) * 1099511628211
++
++private def levelDigest : Level → UInt64
++  | .zero => 1
++  | .succ l => mix 2 (levelDigest l)
++  | .max a b => mix (mix 3 (levelDigest a)) (levelDigest b)
++  | .imax a b => mix (mix 4 (levelDigest a)) (levelDigest b)
++  | .param name => mix 5 (hash name)
++  | .mvar id => mix 6 (hash id.name)
++
++/-- A 64-bit structural digest of an expression, memoized over shared subterms.
++    `Expr.hash` keeps only 32 bits, which is too few for a proof identity. Bound
++    variable names are left out, so the digest identifies a term up to renaming;
++    elaboration gives non-dependent arrows fresh hygienic names every time. -/
++private partial def exprDigest (expr : Expr) : StateM (HashMap Expr UInt64) UInt64 := do
++  if let some digest := (← get).find? expr then return digest
++  let digest ← match expr with
++    | .bvar index => pure (mix 11 (hash index))
++    | .fvar id => pure (mix 12 (hash id.name))
++    | .mvar id => pure (mix 13 (hash id.name))
++    | .sort level => pure (mix 14 (levelDigest level))
++    | .const name levels => pure <| levels.foldl (init := mix 15 (hash name)) fun acc l => mix acc (levelDigest l)
++    | .app fn arg => return mix (mix 16 (← exprDigest fn)) (← exprDigest arg)
++    | .lam _ type body info =>
++      return mix (mix (mix 17 info.toUInt64) (← exprDigest type)) (← exprDigest body)
++    | .forallE _ type body info =>
++      return mix (mix (mix 18 info.toUInt64) (← exprDigest type)) (← exprDigest body)
++    | .letE _ type value body nonDep =>
++      return mix (mix (mix (mix 19 (hash nonDep)) (← exprDigest type)) (← exprDigest value)) (← exprDigest body)
++    | .lit (.natVal n) => pure (mix 20 (hash n))
++    | .lit (.strVal text) => pure (mix 21 (hash text))
++    | .mdata _ body => return mix 22 (← exprDigest body)
++    | .proj name index body => return mix (mix (mix 23 (hash name)) (hash index)) (← exprDigest body)
++  modify (·.insert expr digest)
++  return digest
++
++private def digestOf (expr : Expr) : UInt64 := (exprDigest expr).run' {}
++
++private def hex (value : UInt64) : String :=
++  let digits := (Nat.toDigits 16 value.toNat).asString
++  "".pushn '0' (16 - digits.length) ++ digits
++
++/-- Identity of the trusted environment: the toolchain and the imported modules. -/
++def environmentIdentity (env : Environment) : UInt64 :=
++  env.header.moduleNames.foldl (init := hash Lean.githash) fun acc name => mixHash acc (hash name)
++
++private def freshName (env : Environment) : Name := Id.run do
++  let base := `_pantograph_certificate
++  let mut name := base
++  let mut index := 0
++  while env.contains name do
++    index := index + 1
++    name := base.appendIndexAfter index
++  return name
++
++private def kernelOutcome (opts : Options) (error : KernelException) : CoreM (String × String) := do
++  match error with
++  | .deterministicTimeout => return ("inconclusive", "Kernel heartbeat budget exhausted")
++  | .excessiveMemory => return ("inconclusive", "Kernel memory limit reached")
++  | .deepRecursion => return ("inconclusive", "Kernel recursion limit reached")
++  | .interrupted => return ("inconclusive", "Kernel check interrupted")
++  | other => return ("rejected", s!"Kernel rejected the proof: {← (other.toMessageData opts).toString}")
++
++/-- Certify the complete root proof of `state` with the kernel. Read-only. -/
++def certifyRoot (state : GoalState) (maxHeartbeats : Nat) : CoreM Protocol.GoalCertifyResult := do
++  let result (status reason : String) : Protocol.GoalCertifyResult :=
++    { status, reason? := some reason }
++  unless state.goals.isEmpty do
++    return result "incomplete" s!"{state.goals.length} goals remain"
++  let mctx := state.mctx
++  let some rootDecl := mctx.findDecl? state.root |
++    return result "rejected" "The root is not declared in this state"
++  unless mctx.eAssignment.contains state.root || mctx.dAssignment.contains state.root do
++    return result "incomplete" "The root is unassigned"
++  let (proof, _) := instantiateMVarsCore mctx (.mvar state.root)
++  if proof.hasExprMVar then
++    let holes := (proof.collectMVars {}).result.toList.map (·.name.toString)
++    return result "incomplete" s!"The proof has unresolved holes: {holes}"
++  if proof.hasLevelMVar then
++    return result "incomplete" "The proof has unresolved universe levels"
++  -- Ordinary locals become binders and local definitions keep their values.
++  let fvars := rootDecl.lctx.foldl (init := #[]) fun acc decl =>
++    if decl.isAuxDecl then acc else acc.push (Expr.fvar decl.fvarId)
++  let type := rootDecl.lctx.mkForall fvars state.rootType
++  let value := rootDecl.lctx.mkLambda fvars proof
++  if type.hasMVar || type.hasFVar || type.hasLooseBVars then
++    return result "rejected" "The root statement is not closed"
++  if value.hasFVar then
++    return result "rejected" "The proof refers to a local outside the root context"
++  if value.hasLooseBVars then
++    return result "rejected" "The proof has loose bound variables"
++  let trusted := state.trustedEnv
++  let scan : ScanM Unit := do
++    type.getUsedConstants.forM scanConstant
++    value.getUsedConstants.forM scanConstant
++  let ((), evidence) := (scan.run (trusted, state.env)).run {}
++  unless evidence.problems.isEmpty do
++    return result "rejected" (String.intercalate "; " evidence.problems.toList)
++  let opts ← getOptions
++  let budget := (maxHeartbeats * 1000).toUSize
++  let mut env := trusted
++  for name in evidence.auxiliary do
++    let some info := state.env.find? name | return result "rejected" s!"Missing dependency {name}"
++    let decl ← match declarationOf info with
++      | .ok decl => pure decl
++      | .error kind => return result "rejected" s!"Auxiliary declaration {name} has {kind} form"
++    match Environment.addDeclCore env budget decl with
++    | .ok next => env := next
++    | .error error =>
++      let (status, reason) ← kernelOutcome opts error
++      return result status s!"{name}: {reason}"
++  let name := freshName env
++  let asTheorem := Declaration.thmDecl {
++    name, levelParams := state.rootLevels, type, value, all := [name]
++  }
++  -- A root that is not a proposition is a term to construct, checked as a definition.
++  let checked := match Environment.addDeclCore env budget asTheorem with
++    | .error (.thmTypeIsNotProp ..) =>
++      Environment.addDeclCore env budget <| .defnDecl {
++        name, levelParams := state.rootLevels, type, value,
++        hints := .opaque, safety := .safe, all := [name]
++      }
++    | other => other
++  if let .error error := checked then
++    let (status, reason) ← kernelOutcome opts error
++    return result status reason
++  return {
++    status := "certified",
++    receipt? := some {
++      root := state.root.name.toString,
++      levels := state.rootLevels.toArray.map (·.toString),
++      rootType := hex (digestOf type),
++      proof := hex (digestOf value),
++      environment := hex (environmentIdentity trusted),
++      lean := s!"{Lean.versionString} {Lean.githash}",
++      axioms := (evidence.axioms.qsort (·.toString < ·.toString)).map (·.toString),
++      auxiliary := evidence.auxiliary.map (·.toString),
++    }
++  }
++
++end Pantograph
+diff --git a/Pantograph/Diagnostics.lean b/Pantograph/Diagnostics.lean
+new file mode 100644
+index 0000000..80fa9ca
+--- /dev/null
++++ b/Pantograph/Diagnostics.lean
+@@ -0,0 +1,58 @@
++import Pantograph.Protocol
++import Lean
++
++namespace Pantograph
++open Lean
++
++private def messageKind : MessageData → Name
++  | .tagged name _ => name
++  | .withContext _ data | .withNamingContext _ data | .nest _ data
++  | .group data | .ofWidget _ data => messageKind data
++  | _ => .anonymous
++
++/-- Elaborate source strings against their actual source map. -/
++def withInputContext (input : String) (action : Elab.TermElabM α) : Elab.TermElabM α :=
++  withTheReader Core.Context (fun ctx =>
++    { ctx with fileName := "<pantograph>", fileMap := input.toFileMap }) action
++
++/-- Render diagnostics without introducing source locations absent from Lean. -/
++def renderMessages (log : MessageLog) : CoreM (Array Protocol.Message) := do
++  log.toArray.mapM fun message => do
++    let context ← read
++    let known := message.pos.line > 0 && !context.fileMap.source.isEmpty && message.fileName == context.fileName
++    let pos : Protocol.MessagePos := if known then
++      { line := message.pos.line, column := message.pos.column } else {}
++    let endPos? := message.endPos.bind fun p =>
++      if known && (p.line > pos.line || (p.line == pos.line && p.column >= pos.column)) then
++        some { line := p.line, column := p.column } else none
++    return {
++      kind := (messageKind message.data).toString,
++      severity := match message.severity with
++        | .information => "information"
++        | .warning => "warning"
++        | .error => "error",
++      pos, endPos?, data := ← message.data.toString
++    }
++
++private def convSequence : Parser.Parser :=
++  Parser.node ``Parser.Tactic.Conv.convSeq <|
++    (Parser.node ``Parser.Tactic.Conv.convSeqBracketed <|
++      Parser.symbol "{" >> Parser.withoutPosition
++        (Parser.Tactic.sepByIndentSemicolon (Parser.categoryParser `conv 0)) >> Parser.symbol "}") <|>
++    (Parser.node ``Parser.Tactic.Conv.convSeq1Indented <|
++      Parser.Tactic.sepBy1IndentSemicolon (Parser.categoryParser `conv 0))
++
++/-- Parse a full selected-mode sequence, including the final end-of-input check. -/
++def parseTacticSequence (env : Environment) (isConv : Bool) (input : String) : Except String Syntax :=
++  let parser := if isConv then convSequence else Parser.Tactic.tacticSeq
++  let context := Parser.mkInputContext input "<pantograph>"
++  let state := (Parser.andthenFn Parser.whitespace parser.fn).run context
++    { env, options := {} } (Parser.getTokenTable env) (Parser.mkParserState input)
++  if !state.allErrors.isEmpty then
++    .error (state.toErrorMsg context)
++  else if context.input.atEnd state.pos then
++    .ok state.stxStack.back
++  else
++    .error ((state.mkError "end of input").toErrorMsg context)
++
++end Pantograph
 diff --git a/Pantograph/Goal.lean b/Pantograph/Goal.lean
-index ad8f3bd..a10ed9a 100644
+index ad8f3bd..d102112 100644
 --- a/Pantograph/Goal.lean
 +++ b/Pantograph/Goal.lean
 @@ -3,6 +3,7 @@ Functions for handling metavariables
@@ -20,7 +292,7 @@ index ad8f3bd..a10ed9a 100644
  import Pantograph.Tactic
  import Lean
  
-@@ -16,7 +17,9 @@ def filename: String := "<pantograph>"
+@@ -16,10 +17,16 @@ def filename: String := "<pantograph>"
  Represents an interconnected set of metavariables, or a state in proof search
   -/
  structure GoalState where
@@ -30,23 +302,37 @@ index ad8f3bd..a10ed9a 100644
  
    -- The root hole which is the search target
    root: MVarId
-@@ -44,6 +47,7 @@ protected def GoalState.create (expr: Expr): Elab.TermElabM GoalState := do
++  -- The statement the root was started with and its universe parameters.
++  -- Certification checks the proof against these, not the root's current type.
++  rootType: Expr
++  rootLevels: List Name := []
+ 
+   -- Parent state metavariable source
+   parentMVar?: Option MVarId
+@@ -43,7 +50,9 @@ protected def GoalState.create (expr: Expr): Elab.TermElabM GoalState := do
+   let savedState ← savedStateMonad { elaborator := .anonymous } |>.run' { goals := [root.mvarId!]}
    return {
      root := root.mvarId!,
++    rootType := expr,
      savedState,
 +    trustedEnv := ← getEnv,
      parentMVar? := .none,
    }
  @[export pantograph_goal_state_create_from_mvars_m]
-@@ -53,6 +57,7 @@ protected def GoalState.createFromMVars (goals: List MVarId) (root: MVarId): Met
+@@ -52,7 +61,12 @@ protected def GoalState.createFromMVars (goals: List MVarId) (root: MVarId): Met
+   let savedState ← savedStateMonad { elaborator := .anonymous } |>.run' { goals } |>.run' {}
    return {
      root,
++    -- Frontend states have an anonymous root, which cannot be certified.
++    rootType := ← match (← getMCtx).findDecl? root with
++      | .some decl => instantiateMVars decl.type
++      | .none => pure (mkSort levelZero),
      savedState,
 +    trustedEnv := ← getEnv,
      parentMVar? := .none,
    }
  @[export pantograph_goal_state_is_conv]
-@@ -74,8 +79,21 @@ protected def GoalState.metaContextOfGoal (state: GoalState) (mvarId: MVarId): O
+@@ -74,8 +88,21 @@ protected def GoalState.metaContextOfGoal (state: GoalState) (mvarId: MVarId): O
  protected def GoalState.metaState (state: GoalState): Meta.State :=
    state.savedState.term.meta.meta
  
@@ -70,7 +356,7 @@ index ad8f3bd..a10ed9a 100644
  
  protected def GoalState.withParentContext { n } [MonadControlT MetaM n] [Monad n] (state: GoalState): n α → n α :=
    Meta.mapMetaM <| state.withContext state.parentMVar?.get!
-@@ -88,10 +106,6 @@ protected def GoalState.restoreMetaM (state: GoalState): MetaM Unit :=
+@@ -88,10 +115,6 @@ protected def GoalState.restoreMetaM (state: GoalState): MetaM Unit :=
    state.savedState.term.meta.restore
  protected def GoalState.restoreElabM (state: GoalState): Elab.TermElabM Unit :=
    state.savedState.term.restore
@@ -81,7 +367,7 @@ index ad8f3bd..a10ed9a 100644
  @[export pantograph_goal_state_focus]
  protected def GoalState.focus (state: GoalState) (goalId: Nat): Option GoalState := do
    let goal ← state.savedState.tactic.goals.get? goalId
-@@ -128,7 +142,7 @@ protected def GoalState.resume (state: GoalState) (goals: List MVarId): Except S
+@@ -128,7 +151,7 @@ protected def GoalState.resume (state: GoalState) (goals: List MVarId): Except S
      .error s!"Goals {invalid_goals} are not in scope"
    else
      -- Set goals to the goals that have not been assigned yet, similar to the `focus` tactic.
@@ -90,7 +376,7 @@ index ad8f3bd..a10ed9a 100644
        let mctx := state.mctx
        ¬(mctx.eAssignment.contains goal || mctx.dAssignment.contains goal))
      .ok {
-@@ -188,6 +202,7 @@ protected def GoalState.step (state: GoalState) (goal: MVarId) (tacticM: Elab.Ta
+@@ -188,6 +211,7 @@ protected def GoalState.step (state: GoalState) (goal: MVarId) (tacticM: Elab.Ta
      state with
      savedState := { term := nextElabState, tactic := newGoals },
      parentMVar? := .some goal,
@@ -98,7 +384,7 @@ index ad8f3bd..a10ed9a 100644
      calcPrevRhs? := .none,
    }
  
-@@ -196,38 +211,74 @@ inductive TacticResult where
+@@ -196,38 +220,74 @@ inductive TacticResult where
    -- Goes to next state
    | success (state: GoalState)
    -- Tactic failed with messages
@@ -191,7 +477,7 @@ index ad8f3bd..a10ed9a 100644
    let expr ← match Parser.runParserCategory
      (env := ← MonadEnv.getEnv)
      (catName := `term)
-@@ -235,13 +286,12 @@ protected def GoalState.tryAssign (state: GoalState) (goal: MVarId) (expr: Strin
+@@ -235,13 +295,12 @@ protected def GoalState.tryAssign (state: GoalState) (goal: MVarId) (expr: Strin
      (fileName := filename) with
      | .ok syn => pure syn
      | .error error => return .parseError error
@@ -207,7 +493,7 @@ index ad8f3bd..a10ed9a 100644
    let type ← match Parser.runParserCategory
      (env := ← MonadEnv.getEnv)
      (catName := `term)
-@@ -249,16 +299,16 @@ protected def GoalState.tryLet (state: GoalState) (goal: MVarId) (binderName: St
+@@ -249,16 +308,16 @@ protected def GoalState.tryLet (state: GoalState) (goal: MVarId) (binderName: St
      (fileName := filename) with
      | .ok syn => pure syn
      | .error error => return .parseError error
@@ -227,7 +513,7 @@ index ad8f3bd..a10ed9a 100644
  
      -- See Lean.Elab.Tactic.Conv.convTarget
      let convMVar ← Elab.Tactic.withMainContext do
-@@ -266,30 +316,27 @@ protected def GoalState.conv (state: GoalState) (goal: MVarId):
+@@ -266,30 +325,29 @@ protected def GoalState.conv (state: GoalState) (goal: MVarId):
        Elab.Tactic.replaceMainGoal [newGoal.mvarId!]
        pure rhs.mvarId!
      return (← MonadBacktrack.saveState, convMVar)
@@ -249,6 +535,8 @@ index ad8f3bd..a10ed9a 100644
 +  let otherGoals := state.goals.filter $ λ g => g != goal
 +  return .success {
 +    root := state.root,
++    rootType := state.rootType,
++    rootLevels := state.rootLevels,
 +    trustedEnv := state.trustedEnv,
 +    savedState := nextSavedState
 +    parentMVar? := .some goal,
@@ -270,7 +558,7 @@ index ad8f3bd..a10ed9a 100644
  
      -- Close all existing goals with `refl`
      for mvarId in (← Elab.Tactic.getGoals) do
-@@ -306,17 +353,15 @@ protected def GoalState.convExit (state: GoalState):
+@@ -306,17 +364,17 @@ protected def GoalState.convExit (state: GoalState):
        let proof ← instantiateMVars (.mvar convGoal)
        Elab.Tactic.liftMetaTactic1 fun mvarId => mvarId.replaceTargetEq targetNew proof
      MonadBacktrack.saveState
@@ -288,6 +576,8 @@ index ad8f3bd..a10ed9a 100644
 +  let nextSavedState ← tacticM { elaborator := .anonymous } |>.run' state.savedState.tactic
 +  return .success {
 +    root := state.root,
++    rootType := state.rootType,
++    rootLevels := state.rootLevels,
 +    trustedEnv := state.trustedEnv,
 +    savedState := nextSavedState
 +    parentMVar? := .some convGoal,
@@ -297,7 +587,7 @@ index ad8f3bd..a10ed9a 100644
  
  protected def GoalState.calcPrevRhsOf? (state: GoalState) (goal: MVarId): Option Expr := do
    let (mvarId, rhs) ← state.calcPrevRhs?
-@@ -326,8 +371,7 @@ protected def GoalState.calcPrevRhsOf? (state: GoalState) (goal: MVarId): Option
+@@ -326,8 +384,7 @@ protected def GoalState.calcPrevRhsOf? (state: GoalState) (goal: MVarId): Option
      .none
  @[export pantograph_goal_state_try_calc_m]
  protected def GoalState.tryCalc (state: GoalState) (goal: MVarId) (pred: String):
@@ -307,7 +597,7 @@ index ad8f3bd..a10ed9a 100644
    if state.convMVar?.isSome then
      return .invalidAction "Cannot initiate `calc` while in `conv` state"
    let `(term|$pred) ← match Parser.runParserCategory
-@@ -342,58 +386,56 @@ protected def GoalState.tryCalc (state: GoalState) (goal: MVarId) (pred: String)
+@@ -342,58 +399,58 @@ protected def GoalState.tryCalc (state: GoalState) (goal: MVarId) (pred: String)
    let decl ← goal.getDecl
    let target ← instantiateMVars decl.type
    let tag := decl.userName
@@ -405,6 +695,8 @@ index ad8f3bd..a10ed9a 100644
 +  let calcPrevRhs? := remainder?.map $ λ g => (g, rhs)
 +  return .success {
 +    root := state.root,
++    rootType := state.rootType,
++    rootLevels := state.rootLevels,
 +    trustedEnv := state.trustedEnv,
 +    savedState := {
 +      term := ← MonadBacktrack.saveState,
@@ -416,10 +708,10 @@ index ad8f3bd..a10ed9a 100644
  
  end Pantograph
 diff --git a/Pantograph/Library.lean b/Pantograph/Library.lean
-index 23a2046..296ab43 100644
+index 23a2046..6b2e10c 100644
 --- a/Pantograph/Library.lean
 +++ b/Pantograph/Library.lean
-@@ -124,11 +124,30 @@ def exprEcho (expr: String) (expectedType?: Option String := .none) (levels: Arr
+@@ -124,11 +124,33 @@ def exprEcho (expr: String) (expectedType?: Option String := .none) (levels: Arr
  
  @[export pantograph_goal_start_expr_m]
  def goalStartExpr (expr: String) (levels: Array String): CoreM (Protocol.CR GoalState) :=
@@ -444,7 +736,10 @@ index 23a2046..296ab43 100644
 +      if log.hasErrors then
 +        let messages ← renderMessages log
 +        return .error (errorI "elab" (String.intercalate "\n" (messages.map (·.data)).toList))
-+      return .ok { state with trustedEnv := outer.meta.core.env }
++      return .ok { state with
++        trustedEnv := outer.meta.core.env,
++        rootType := ← instantiateMVars state.rootType,
++        rootLevels := levels.toList.map (·.toName) }
 +    catch exception =>
 +      return .error (errorI "elab" (← exception.toMessageData.toString))
 +    finally
@@ -455,7 +750,7 @@ index 23a2046..296ab43 100644
  
  @[export pantograph_goal_resume]
  def goalResume (target: GoalState) (goals: Array String): Except String GoalState :=
-@@ -158,37 +177,35 @@ def goalTactic (state: GoalState) (goal:  MVarId) (tactic: String): CoreM Tactic
+@@ -158,37 +180,35 @@ def goalTactic (state: GoalState) (goal:  MVarId) (tactic: String): CoreM Tactic
  def goalAssign (state: GoalState) (goal: MVarId) (expr: String): CoreM TacticResult :=
    runTermElabM <| state.tryAssign goal expr
  @[export pantograph_goal_have_m]
@@ -512,10 +807,10 @@ index 23a2046..296ab43 100644
  def goalLet (state: GoalState) (goal: MVarId) (binderName: String) (type: String): CoreM TacticResult :=
    runTermElabM <| state.tryLet goal binderName type
 diff --git a/Pantograph/Protocol.lean b/Pantograph/Protocol.lean
-index 781f4bf..e782003 100644
+index 781f4bf..8bc5122 100644
 --- a/Pantograph/Protocol.lean
 +++ b/Pantograph/Protocol.lean
-@@ -267,6 +267,24 @@ structure Message where
+@@ -267,6 +267,51 @@ structure Message where
  /-- Helper to create an error message from a plain string -/
  def Message.error (s : String) : Message := { severity := "error", data := s }
  
@@ -523,9 +818,12 @@ index 781f4bf..e782003 100644
 +  deriving Lean.FromJson
 +structure ProtocolDescriptor where
 +  protocol: String := "maths-ai-pantograph"
-+  protocolVersion: Nat := 1
++  protocolVersion: Nat := 2
 +  modelSexpVersion: Nat := 1
 +  transitionValidationVersion: Nat := 1
++  transitionProvenanceVersion: Nat := 1
++  inspectionVersion: Nat := 1
++  certificationVersion: Nat := 1
 +  messageVersion: Nat := 1
 +  goalSelection: String := "explicit-focused-v1"
 +  tacticErrorsFormat: String := "string-array-v1"
@@ -537,18 +835,95 @@ index 781f4bf..e782003 100644
 +  checked: Bool
 +  deriving Lean.ToJson
 +
++/-- How the goals of a successful transition relate to its input snapshot.
++    `goals` is partitioned by `direct`, `siblings` and `extra`; names are
++    metavariable IDs of the result snapshot. -/
++structure TransitionProvenance where
++  version: Nat := 1
++  -- The input obligation the operation ran on
++  selected: String
++  -- Unassigned goals the operation produced for `selected`, in tactic order.
++  -- Contains `selected` itself if the operation left it open.
++  direct: Array String
++  -- For each direct goal, the visible locals it has that `selected` does not
++  introduced: Array (Array String)
++  -- Input goals other than `selected` that are still listed
++  siblings: Array String
++  -- Siblings whose instantiated target or local context changed
++  changed: Array String
++  -- Input goals other than `selected` that this transition assigned
++  closed: Array String
++  -- Input goals other than `selected` that are unassigned but no longer listed
++  dormant: Array String
++  -- Remaining listed obligations, such as reachable holes restored by validation
++  extra: Array String
++  deriving Lean.ToJson
++
  structure GoalTacticResult where
    -- The next goal state id. Existence of this field shows success
    nextStateId?: Option Nat          := .none
-@@ -282,6 +300,8 @@ structure GoalTacticResult where
+@@ -282,6 +327,9 @@ structure GoalTacticResult where
    -- Structured diagnostic / error messages from execution
    messages: Array Message := #[]
  
 +  validation?: Option TransitionValidation := .none
++  transition?: Option TransitionProvenance := .none
 +
    -- Soundness audit flags expected by modern clients
    hasSorry: Bool := false
    hasUnsafe: Bool := false
+@@ -319,6 +367,51 @@ structure GoalPrintResult where
+   parent?: Option Expression
+   deriving Lean.ToJson
+ 
++-- Read obligations of a retained state, listed or not
++structure GoalInspect where
++  stateId: Nat
++  goals: Array String
++  deriving Lean.FromJson
++structure ObligationInspection where
++  name: String
++  -- active | pending | assigned | delayed | complete
++  status: String
++  -- Present for active and pending obligations
++  goal?: Option Goal := .none
++  -- Unassigned metavariables reachable from the obligation
++  holes: Array String := #[]
++  universeHoles: Bool := false
++  deriving Lean.ToJson
++structure GoalInspectResult where
++  obligations: Array ObligationInspection
++  deriving Lean.ToJson
++
++-- Kernel-check the complete proof of a state's root
++structure GoalCertify where
++  stateId: Nat
++  -- In thousands, as the `maxHeartbeats` option
++  maxHeartbeats?: Option Nat := .none
++  deriving Lean.FromJson
++structure CertificateReceipt where
++  version: Nat := 1
++  identity: String := "lean-expr-digest-v1"
++  root: String
++  levels: Array String
++  rootType: String
++  proof: String
++  environment: String
++  lean: String
++  axioms: Array String
++  auxiliary: Array String
++  deriving Lean.ToJson
++structure GoalCertifyResult where
++  version: Nat := 1
++  -- certified | incomplete | rejected | inconclusive
++  status: String
++  reason?: Option String := .none
++  receipt?: Option CertificateReceipt := .none
++  deriving Lean.ToJson
++
+ -- Diagnostic Options, not available in REPL
+ structure GoalDiag where
+   printContext: Bool := true
 diff --git a/Pantograph/Serial.lean b/Pantograph/Serial.lean
 index 00766ca..c0f600e 100644
 --- a/Pantograph/Serial.lean
@@ -573,314 +948,121 @@ index 00766ca..c0f600e 100644
      let savedState := goalState.savedState
      let goals := savedState.tactic.goals
      let mctx ← getMCtx
-diff --git a/Repl.lean b/Repl.lean
-index f031e47..1d3ee61 100644
---- a/Repl.lean
-+++ b/Repl.lean
-@@ -1,5 +1,6 @@
- import Lean.Data.HashMap
- import Pantograph
-+import Pantograph.Validation
- 
- namespace Pantograph.Repl
- 
-@@ -33,6 +34,7 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
-       | .error ierror => return Lean.toJson ierror
-     | .error error => return Lean.toJson $ errorCommand s!"Unable to parse json: {error}"
-   match command.cmd with
-+  | "protocol.describe" => run protocol_describe
-   | "reset"         => run reset
-   | "stat"          => run stat
-   | "expr.echo"     => run expr_echo
-@@ -62,6 +64,8 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
-       nextId := state.nextId + 1
-     }
-     return stateId
-+  protocol_describe (_ : Protocol.ProtocolDescribe) : MainM (CR Protocol.ProtocolDescriptor) :=
-+    pure (.ok {})
-   -- Command Functions
-   reset (_: Protocol.Reset): MainM (CR Protocol.StatResult) := do
-     let state ← get
-@@ -147,6 +151,7 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
-           return if autoMode then .success resumedState else result
-         match ← resumedState.convExit with
-         | .success exitedState =>
-+          let exitedState := { exitedState with messages := nextGoalState.messages ++ exitedState.messages }
-           if autoMode then
-             let dormantGoals := goalState.convMVar?.map (fun (_, _, goals) => goals) |>.getD []
-             match exitedState.resume (exitedState.goals ++ dormantGoals) with
-@@ -194,24 +199,19 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
-           let .ok result := nextGoalState.resume (nextGoalState.goals ++ dormantGoals) | throwError "Resuming known goals"
-           pure result
-         | false, _ => pure nextGoalState
--      let nextStateId ← newGoalState nextGoalState
-+      let checked ← match validateTransition goalState nextGoalState goal with
-+        | .ok checked => pure checked
-+        | .error message => return .error (errorI "validation" message)
-+      let nextGoalState := checked.state
-       let goals ← nextGoalState.serializeGoals (parent := .some goalState) (options := state.options) |>.run'
--      -- Fragment entry can leave the parent unassigned; parentExpr? handles it.
--      -- Auditing the parent also catches sorry/unsafe use in partial branches.
--      let env ← Lean.MonadEnv.getEnv
--      let proofExpr? := nextGoalState.parentExpr?
--      let hasSorry := proofExpr?.map (·.hasSorry) |>.getD false
--      let hasUnsafe := proofExpr?.map (fun expr =>
--        expr.getUsedConstants.any (fun constName =>
--          (env.find? constName).map (·.isUnsafe) |>.getD false
--        )
--      ) |>.getD false
-+      let nextStateId ← newGoalState nextGoalState
-       return .ok {
-         nextStateId? := .some nextStateId,
-         goals? := .some goals,
--        messages := #[],
--        hasSorry,
--        hasUnsafe,
-+        messages := nextGoalState.messages,
-+        hasSorry := checked.hasSorry,
-+        hasUnsafe := checked.hasUnsafe,
-+        validation? := some { checked := true },
-       }
-     | .ok (.parseError message) =>
-       return .ok {
-@@ -220,10 +220,10 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
-       }
-     | .ok (.invalidAction message) =>
-       return .error $ errorI "invalid" message
--    | .ok (.failure messages) =>
-+    | .ok (.failure messages diagnostics) =>
-       return .ok {
-         tacticErrors? := .some messages,
--        messages := messages.map Protocol.Message.error,
-+        messages := diagnostics,
-       }
-   goal_continue (args: Protocol.GoalContinue): MainM (CR Protocol.GoalContinueResult) := do
-     let state ← get
-diff --git a/Test/Common.lean b/Test/Common.lean
-index 699ea4e..559a611 100644
---- a/Test/Common.lean
-+++ b/Test/Common.lean
-@@ -69,7 +69,7 @@ def GoalState.tacticOn (state: GoalState) (goalId: Nat) (tactic: String) := stat
- 
- def TacticResult.toString : TacticResult → String
-   | .success state => s!".success ({state.goals.length} goals)"
--  | .failure messages =>
-+  | .failure messages _ =>
-     let messages := "\n".intercalate messages.toList
-     s!".failure {messages}"
-   | .parseError error => s!".parseError {error}"
-diff --git a/Test/Integration.lean b/Test/Integration.lean
-index a45e6ce..29e1688 100644
---- a/Test/Integration.lean
-+++ b/Test/Integration.lean
-@@ -87,11 +87,11 @@ def test_tactic : Test :=
-     step "goal.start" [("expr", .str "∀ (p q: Prop), p ∨ q → q ∨ p")]
-      ({ stateId := 0, root := "_uniq.9" }: Protocol.GoalStartResult),
-     step "goal.tactic" [("stateId", .num 0), ("goalId", .num 0), ("tactic", .str "intro x")]
--     ({ nextStateId? := .some 1, goals? := #[goal1], }: Protocol.GoalTacticResult),
-+     ({ nextStateId? := .some 1, goals? := #[goal1], validation? := some { checked := true } }: Protocol.GoalTacticResult),
-     step "goal.print" [("stateId", .num 1)]
-      ({ parent? := .some { pp? := .some "fun x => ?m.12 x" }, }: Protocol.GoalPrintResult),
-     step "goal.tactic" [("stateId", .num 1), ("goalId", .num 0), ("tactic", .str "intro y")]
--     ({ nextStateId? := .some 2, goals? := #[goal2], }: Protocol.GoalTacticResult),
-+     ({ nextStateId? := .some 2, goals? := #[goal2], validation? := some { checked := true } }: Protocol.GoalTacticResult),
-   ]
- def test_automatic_mode (automatic: Bool): Test :=
-   let varsPQ := #[
-@@ -135,12 +135,12 @@ def test_automatic_mode (automatic: Bool): Test :=
-     step "goal.start" [("expr", .str "∀ (p q: Prop), p ∨ q → q ∨ p")]
-      ({ stateId := 0, root := "_uniq.9" }: Protocol.GoalStartResult),
-     step "goal.tactic" [("stateId", .num 0), ("goalId", .num 0), ("tactic", .str "intro p q h")]
--     ({ nextStateId? := .some 1, goals? := #[goal1], }: Protocol.GoalTacticResult),
-+     ({ nextStateId? := .some 1, goals? := #[goal1], validation? := some { checked := true } }: Protocol.GoalTacticResult),
-     step "goal.tactic" [("stateId", .num 1), ("goalId", .num 0), ("tactic", .str "cases h")]
--     ({ nextStateId? := .some 2, goals? := #[goal2l, goal2r], }: Protocol.GoalTacticResult),
-+     ({ nextStateId? := .some 2, goals? := #[goal2l, goal2r], validation? := some { checked := true } }: Protocol.GoalTacticResult),
-     let goals? := if automatic then #[goal3l, goal2r] else #[goal3l]
-     step "goal.tactic" [("stateId", .num 2), ("goalId", .num 0), ("tactic", .str "apply Or.inr")]
--     ({ nextStateId? := .some 3, goals?, }: Protocol.GoalTacticResult),
-+     ({ nextStateId? := .some 3, goals?, validation? := some { checked := true } }: Protocol.GoalTacticResult),
-   ]
- 
- def test_env_add_inspect : Test :=
-@@ -256,7 +256,7 @@ def test_protocol_compat : Test :=
-     ]
-   }
-   let convGoal: Protocol.Goal := {
--    name := "_uniq.98",
-+    name := "_uniq.151",
-     isConversion := true,
-     fragment := "conv",
-     target := { pp? := .some "1 + 2 = 3" },
-@@ -272,7 +272,7 @@ def test_protocol_compat : Test :=
-      ({ stateId := 0, root := "_uniq.7" }: Protocol.GoalStartResult),
-     -- 1. Omit goalId (defaults to 0)
-     step "goal.tactic" [("stateId", .num 0), ("tactic", .str "intro p h")]
--     ({ nextStateId? := .some 1, goals? := #[goal1] }: Protocol.GoalTacticResult),
-+     ({ nextStateId? := .some 1, goals? := #[goal1], validation? := some { checked := true } }: Protocol.GoalTacticResult),
-     -- 2. Tactic failure: returns structured message objects with kind, severity, pos, data
-     step "goal.tactic" [("stateId", .num 1), ("tactic", .str "rfl")]
-      ({
-@@ -280,23 +280,23 @@ def test_protocol_compat : Test :=
-        messages := #[{
-          kind := "[anonymous]",
-          severity := "error",
--         pos := { line := 0, column := 0 },
--         endPos? := .none,
-+         pos := { line := 1, column := 0 },
-+         endPos? := some { line := 1, column := 3 },
-          data := "The rfl tactic failed. Possible reasons:\n- The goal is not a reflexive relation (neither `=` nor a relation with a @[refl] lemma).\n- The arguments of the relation are not equal.\nTry using the reflexivity lemma for your relation explicitly, e.g. `exact Eq.refl _` or\n`exact HEq.rfl` etc.\np : Prop\nh : p\n⊢ p"
-        }]
-      }: Protocol.GoalTacticResult),
-     -- 3. Sorry detection: returns hasSorry := true
-     step "goal.tactic" [("stateId", .num 1), ("tactic", .str "sorry")]
--     ({ nextStateId? := .some 2, goals? := .some #[], hasSorry := true }: Protocol.GoalTacticResult),
-+     ({ nextStateId? := .some 2, goals? := .some #[], hasSorry := true, validation? := some { checked := true } }: Protocol.GoalTacticResult),
-     -- 4. Conv mode exits explicitly or when its final goal closes
-     step "goal.start" [("expr", .str "1 + 2 = 3")]
-      ({ stateId := 3, root := "_uniq.96" }: Protocol.GoalStartResult),
-     step "goal.tactic" [("stateId", .num 3), ("mode", .str "conv")]
--     ({ nextStateId? := .some 4, goals? := #[convGoal] }: Protocol.GoalTacticResult),
-+     ({ nextStateId? := .some 4, goals? := #[convGoal], validation? := some { checked := true } }: Protocol.GoalTacticResult),
-     step "goal.tactic" [("stateId", .num 4), ("mode", .str "tactic")]
--     ({ nextStateId? := .some 5, goals? := #[exitedConvGoal] }: Protocol.GoalTacticResult),
-+     ({ nextStateId? := .some 5, goals? := #[exitedConvGoal], validation? := some { checked := true } }: Protocol.GoalTacticResult),
-     step "goal.tactic" [("stateId", .num 4), ("tactic", .str "rfl")]
--     ({ nextStateId? := .some 6, goals? := #[exitedConvGoal] }: Protocol.GoalTacticResult),
-+     ({ nextStateId? := .some 6, goals? := #[exitedConvGoal], validation? := some { checked := true } }: Protocol.GoalTacticResult),
-   ]
- 
- def test_conv_protocol : Test :=
-diff --git a/Test/Main.lean b/Test/Main.lean
-index 0fde5fa..271f4d2 100644
---- a/Test/Main.lean
-+++ b/Test/Main.lean
-@@ -7,6 +7,7 @@ import Test.Metavar
- import Test.Proofs
- import Test.Serial
- import Test.Tactic
-+import Test.Validation
- 
- -- Test running infrastructure
- 
-@@ -44,6 +45,7 @@ def main (args: List String) := do
-     (trustLevel := 1)
- 
-   let suites: List (String × List (String × IO LSpec.TestSeq)) := [
-+    ("Validation", Validation.suite env_default),
-     ("Environment", Environment.suite),
-     ("Frontend", Frontend.suite env_default),
-     ("Integration", Integration.suite env_default),
-diff --git a/Test/Proofs.lean b/Test/Proofs.lean
-index a5ec349..82f43b2 100644
---- a/Test/Proofs.lean
-+++ b/Test/Proofs.lean
-@@ -127,7 +127,7 @@ def test_nat_add_comm (manual: Bool): TestM Unit := do
-     #[buildGoal [("n", "Nat"), ("m", "Nat")] "n + m = m + n"])
- 
-   match ← state1.tacticOn 0 "assumption" with
--  | .failure #[message] =>
-+  | .failure #[message] _ =>
-     addTest $ LSpec.check "assumption" (message = "tactic 'assumption' failed\nn m : Nat\n⊢ n + m = m + n")
-   | other => do
-     addTest $ assertUnreachable $ other.toString
-@@ -282,9 +282,9 @@ def test_or_comm: TestM Unit := do
-     serializeExpressionSexp (← instantiateAll state2.parentExpr?.get!) (sanitize := false)
-   let orPQ := s!"((:c Or) (:fv {fvP}) (:fv {fvQ}))"
-   let orQP := s!"((:c Or) (:fv {fvQ}) (:fv {fvP}))"
--  let motive := s!"(:lambda t._@._hyg.26 {orPQ} (:forall h ((:c Eq) ((:c Or) (:fv {fvP}) (:fv {fvQ})) (:fv {fvH}) 0) {orQP}))"
--  let caseL := s!"(:lambda h._@._hyg.27 (:fv {fvP}) (:lambda h._@._hyg.28 ((:c Eq) {orPQ} (:fv {fvH}) ((:c Or.inl) (:fv {fvP}) (:fv {fvQ}) 0)) (:subst (:mv {caseL}) (:fv {fvP}) (:fv {fvQ}) 1)))"
--  let caseR := s!"(:lambda h._@._hyg.29 (:fv {fvQ}) (:lambda h._@._hyg.30 ((:c Eq) {orPQ} (:fv {fvH}) ((:c Or.inr) (:fv {fvP}) (:fv {fvQ}) 0)) (:subst (:mv {caseR}) (:fv {fvP}) (:fv {fvQ}) 1)))"
-+  let motive := s!"(:lambda t._@._hyg.30 {orPQ} (:forall h ((:c Eq) ((:c Or) (:fv {fvP}) (:fv {fvQ})) (:fv {fvH}) 0) {orQP}))"
-+  let caseL := s!"(:lambda h._@._hyg.31 (:fv {fvP}) (:lambda h._@._hyg.32 ((:c Eq) {orPQ} (:fv {fvH}) ((:c Or.inl) (:fv {fvP}) (:fv {fvQ}) 0)) (:subst (:mv {caseL}) (:fv {fvP}) (:fv {fvQ}) 1)))"
-+  let caseR := s!"(:lambda h._@._hyg.33 (:fv {fvQ}) (:lambda h._@._hyg.34 ((:c Eq) {orPQ} (:fv {fvH}) ((:c Or.inr) (:fv {fvP}) (:fv {fvQ}) 0)) (:subst (:mv {caseR}) (:fv {fvP}) (:fv {fvQ}) 1)))"
-   let conduit := s!"((:c Eq.refl) {orPQ} (:fv {fvH}))"
-   addTest $ LSpec.test "(2 parent)" (state2parent ==
-     s!"((:c Or.casesOn) (:fv {fvP}) (:fv {fvQ}) {motive} (:fv {fvH}) {caseL} {caseR} {conduit})")
-diff --git a/Test/Tactic/Prograde.lean b/Test/Tactic/Prograde.lean
-index 132718a..60ef47e 100644
---- a/Test/Tactic/Prograde.lean
-+++ b/Test/Tactic/Prograde.lean
-@@ -121,7 +121,7 @@ def test_define_root_expr : TestT Elab.TermElabM Unit := do
-   let .success state1 ← state0.tacticOn (goalId := 0) tactic | addTest $ assertUnreachable tactic
-   let binderName := `binder
-   let value := "x.fst"
--  let expr ← state1.goals[0]!.withContext $ strToTermSyntax value
-+  let expr ← state1.withContext (state1.get! 0) $ strToTermSyntax value
-   let tacticM := Tactic.evalDefine binderName expr
-   let .success state2 ← state1.tryTacticM (state1.get! 0) tacticM | addTest $ assertUnreachable s!"define {binderName} := {value}"
-   let tactic := s!"apply {binderName}"
-@@ -267,7 +267,7 @@ def test_let (specialized: Bool): TestT Elab.TermElabM Unit := do
- 
-   let tactic := "exact h"
-   match ← state3r.tacticOn (goalId := 0) (tactic := tactic) with
--  | .failure #[message] =>
-+  | .failure #[message] _ =>
-     addTest $ LSpec.check tactic  (message = s!"type mismatch\n  h\nhas type\n  a : Prop\nbut is expected to have type\n  {mainTarget} : Prop")
-   | other => do
-     addTest $ assertUnreachable $ other.toString
-diff --git a/Pantograph/Diagnostics.lean b/Pantograph/Diagnostics.lean
+diff --git a/Pantograph/Transition.lean b/Pantograph/Transition.lean
 new file mode 100644
-index 0000000..80fa9ca
+index 0000000..582b22c
 --- /dev/null
-+++ b/Pantograph/Diagnostics.lean
-@@ -0,0 +1,58 @@
-+import Pantograph.Protocol
-+import Lean
++++ b/Pantograph/Transition.lean
+@@ -0,0 +1,111 @@
++/-
++Transition provenance and read-only obligation inspection for retained states.
++
++A search keeps result states alive and runs later tactics on them directly, so
++it needs to know which listed goals a tactic produced for the selected goal and
++which were siblings carried over by automatic resumption. That is decided here
++from metavariable identities, never from printed goals.
++-/
++import Pantograph.Goal
++import Pantograph.Serial
 +
 +namespace Pantograph
 +open Lean
 +
-+private def messageKind : MessageData → Name
-+  | .tagged name _ => name
-+  | .withContext _ data | .withNamingContext _ data | .nest _ data
-+  | .group data | .ofWidget _ data => messageKind data
-+  | _ => .anonymous
++private def isUnassigned (mctx : MetavarContext) (goal : MVarId) : Bool :=
++  !(mctx.eAssignment.contains goal || mctx.dAssignment.contains goal)
 +
-+/-- Elaborate source strings against their actual source map. -/
-+def withInputContext (input : String) (action : Elab.TermElabM α) : Elab.TermElabM α :=
-+  withTheReader Core.Context (fun ctx =>
-+    { ctx with fileName := "<pantograph>", fileMap := input.toFileMap }) action
++private def instantiated (mctx : MetavarContext) (expr : Expr) : Expr :=
++  (instantiateMVarsCore mctx expr).1
 +
-+/-- Render diagnostics without introducing source locations absent from Lean. -/
-+def renderMessages (log : MessageLog) : CoreM (Array Protocol.Message) := do
-+  log.toArray.mapM fun message => do
-+    let context ← read
-+    let known := message.pos.line > 0 && !context.fileMap.source.isEmpty && message.fileName == context.fileName
-+    let pos : Protocol.MessagePos := if known then
-+      { line := message.pos.line, column := message.pos.column } else {}
-+    let endPos? := message.endPos.bind fun p =>
-+      if known && (p.line > pos.line || (p.line == pos.line && p.column >= pos.column)) then
-+        some { line := p.line, column := p.column } else none
-+    return {
-+      kind := (messageKind message.data).toString,
-+      severity := match message.severity with
-+        | .information => "information"
-+        | .warning => "warning"
-+        | .error => "error",
-+      pos, endPos?, data := ← message.data.toString
++/-- Whether a goal's instantiated target or any local type or value differs
++    between two snapshots of the same lineage. -/
++private def goalChanged (before after : MetavarContext) (goal : MVarId) : Bool :=
++  match before.findDecl? goal, after.findDecl? goal with
++  | some old, some new =>
++    instantiated before old.type != instantiated after new.type ||
++    new.lctx.foldl (init := false) fun acc decl =>
++      acc || match old.lctx.find? decl.fvarId with
++        | none => true
++        | some prior =>
++          instantiated before prior.type != instantiated after decl.type ||
++          (prior.value?.map (instantiated before)) != (decl.value?.map (instantiated after))
++  | _, _ => true
++
++/-- Locals of `child` that `parent` does not have, in context order, with the
++    same visibility filter as goal serialization. -/
++private def introducedLocals (options : Protocol.Options) (mctx : MetavarContext)
++    (parent child : MVarId) : Array String :=
++  match mctx.findDecl? child with
++  | none => #[]
++  | some decl =>
++    let known := (mctx.findDecl? parent).map (·.lctx)
++    decl.lctx.foldl (init := #[]) fun acc localDecl =>
++      let hidden := !options.printAuxDecls && localDecl.isAuxDecl ||
++        !options.printImplementationDetailHyps && localDecl.isImplementationDetail
++      if hidden || (known.bind (·.find? localDecl.fvarId)).isSome then acc
++      else acc.push localDecl.fvarId.name.toString
++
++/-- Relate the listed goals of `after` to `before`.
++
++`produced` is the goal list the operation itself returned for `selected`,
++before automatic resumption appended the input's siblings. -/
++def transitionProvenance (options : Protocol.Options) (before after : GoalState)
++    (selected : MVarId) (produced : List MVarId) : Protocol.TransitionProvenance :=
++  let mctx := after.mctx
++  let goals := after.goals
++  let prior := before.goals.filter (· != selected)
++  -- A produced goal that was already an input goal stays a sibling. A selected
++  -- goal the operation left open (as `skip` does) is its own direct goal.
++  let direct := (produced.filter fun goal =>
++    goals.contains goal && !prior.contains goal).eraseDups
++  let siblings := prior.filter fun goal => goals.contains goal
++  let extra := goals.filter fun goal => !direct.contains goal && !siblings.contains goal
++  let name (goal : MVarId) := goal.name.toString
++  {
++    selected := name selected,
++    direct := direct.toArray.map name,
++    introduced := direct.toArray.map (introducedLocals options mctx selected),
++    siblings := siblings.toArray.map name,
++    changed := (siblings.filter (goalChanged before.mctx mctx)).toArray.map name,
++    closed := (prior.filter fun goal => !isUnassigned mctx goal).toArray.map name,
++    dormant := (prior.filter fun goal => isUnassigned mctx goal && !goals.contains goal).toArray.map name,
++    extra := extra.toArray.map name,
++  }
++
++/-- Status of one obligation of a retained state. `none` if it is not declared. -/
++def inspectObligation (state : GoalState) (goal : MVarId) (options : Protocol.Options) :
++    MetaM (Option Protocol.ObligationInspection) := do
++  let mctx := state.mctx
++  let some decl := mctx.findDecl? goal | return none
++  let holes (expr : Expr) : Array String :=
++    (expr.collectMVars {}).result.map (·.name.toString)
++  let name := goal.name.toString
++  if isUnassigned mctx goal then
++    let status := if state.goals.contains goal then "active" else "pending"
++    let serialized ← state.withMetaState <|
++      serializeGoal options goal decl (goalState? := .some state)
++    let type := instantiated mctx decl.type
++    let context := decl.lctx.foldl (init := #[]) fun acc localDecl =>
++      let acc := acc ++ holes (instantiated mctx localDecl.type)
++      match localDecl.value? with
++      | some value => acc ++ holes (instantiated mctx value)
++      | none => acc
++    return some {
++      name, status, goal? := some serialized,
++      holes := (holes type ++ context).toList.eraseDups.toArray,
++      universeHoles := type.hasLevelMVar,
 +    }
-+
-+private def convSequence : Parser.Parser :=
-+  Parser.node ``Parser.Tactic.Conv.convSeq <|
-+    (Parser.node ``Parser.Tactic.Conv.convSeqBracketed <|
-+      Parser.symbol "{" >> Parser.withoutPosition
-+        (Parser.Tactic.sepByIndentSemicolon (Parser.categoryParser `conv 0)) >> Parser.symbol "}") <|>
-+    (Parser.node ``Parser.Tactic.Conv.convSeq1Indented <|
-+      Parser.Tactic.sepBy1IndentSemicolon (Parser.categoryParser `conv 0))
-+
-+/-- Parse a full selected-mode sequence, including the final end-of-input check. -/
-+def parseTacticSequence (env : Environment) (isConv : Bool) (input : String) : Except String Syntax :=
-+  let parser := if isConv then convSequence else Parser.Tactic.tacticSeq
-+  let context := Parser.mkInputContext input "<pantograph>"
-+  let state := (Parser.andthenFn Parser.whitespace parser.fn).run context
-+    { env, options := {} } (Parser.getTokenTable env) (Parser.mkParserState input)
-+  if !state.allErrors.isEmpty then
-+    .error (state.toErrorMsg context)
-+  else if context.input.atEnd state.pos then
-+    .ok state.stxStack.back
-+  else
-+    .error ((state.mkError "end of input").toErrorMsg context)
++  -- A delayed assignment is complete when its pending proof is.
++  let value := match mctx.dAssignment.find? goal with
++    | some delayed => instantiated mctx (.mvar delayed.mvarIdPending)
++    | none => instantiated mctx (.mvar goal)
++  let remaining := holes value
++  let complete := remaining.isEmpty && !value.hasLevelMVar
++  let status :=
++    if complete then "complete"
++    else if mctx.eAssignment.contains goal then "assigned"
++    else "delayed"
++  return some { name, status, holes := remaining, universeHoles := value.hasLevelMVar }
 +
 +end Pantograph
 diff --git a/Pantograph/Validation.lean b/Pantograph/Validation.lean
@@ -1018,12 +1200,165 @@ index 0000000..5ea55e9
 +  return { state, hasSorry := evidence.hasSorry, hasUnsafe := evidence.hasUnsafe }
 +
 +end Pantograph
+diff --git a/Repl.lean b/Repl.lean
+index f031e47..88caa61 100644
+--- a/Repl.lean
++++ b/Repl.lean
+@@ -1,5 +1,8 @@
+ import Lean.Data.HashMap
+ import Pantograph
++import Pantograph.Validation
++import Pantograph.Transition
++import Pantograph.Certify
+ 
+ namespace Pantograph.Repl
+ 
+@@ -33,6 +36,7 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+       | .error ierror => return Lean.toJson ierror
+     | .error error => return Lean.toJson $ errorCommand s!"Unable to parse json: {error}"
+   match command.cmd with
++  | "protocol.describe" => run protocol_describe
+   | "reset"         => run reset
+   | "stat"          => run stat
+   | "expr.echo"     => run expr_echo
+@@ -45,6 +49,8 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+   | "goal.tactic"   => run goal_tactic
+   | "goal.continue" => run goal_continue
+   | "goal.delete"   => run goal_delete
++  | "goal.inspect"  => run goal_inspect
++  | "goal.certify"  => run goal_certify
+   | "goal.print"    => run goal_print
+   | "frontend.process"  => run frontend_process
+   | cmd =>
+@@ -62,6 +68,8 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+       nextId := state.nextId + 1
+     }
+     return stateId
++  protocol_describe (_ : Protocol.ProtocolDescribe) : MainM (CR Protocol.ProtocolDescriptor) :=
++    pure (.ok {})
+   -- Command Functions
+   reset (_: Protocol.Reset): MainM (CR Protocol.StatResult) := do
+     let state ← get
+@@ -110,7 +118,7 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+       | .none, .some copyFrom =>
+         (match env.find? <| copyFrom.toName with
+         | .none => return .error <| errorIndex s!"Symbol not found: {copyFrom}"
+-        | .some cInfo => return .ok (← GoalState.create cInfo.type))
++        | .some cInfo => return .ok { (← GoalState.create cInfo.type) with rootLevels := cInfo.levelParams })
+       | _, _ =>
+         return .error <| errorI "arguments" "Exactly one of {expr, copyFrom} must be supplied")
+     match expr? with
+@@ -147,6 +155,7 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+           return if autoMode then .success resumedState else result
+         match ← resumedState.convExit with
+         | .success exitedState =>
++          let exitedState := { exitedState with messages := nextGoalState.messages ++ exitedState.messages }
+           if autoMode then
+             let dormantGoals := goalState.convMVar?.map (fun (_, _, goals) => goals) |>.getD []
+             match exitedState.resume (exitedState.goals ++ dormantGoals) with
+@@ -182,6 +191,7 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+     match nextGoalState? with
+     | .error error => return .error error
+     | .ok (.success nextGoalState) => do
++      let produced := nextGoalState.goals
+       let nextGoalState ← match autoMode, isConvExit with
+         | true, false => do
+           if goalState.convMVar?.isNone && nextGoalState.convMVar?.isNone then
+@@ -194,24 +204,21 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+           let .ok result := nextGoalState.resume (nextGoalState.goals ++ dormantGoals) | throwError "Resuming known goals"
+           pure result
+         | false, _ => pure nextGoalState
+-      let nextStateId ← newGoalState nextGoalState
++      let checked ← match validateTransition goalState nextGoalState goal with
++        | .ok checked => pure checked
++        | .error message => return .error (errorI "validation" message)
++      let nextGoalState := checked.state
+       let goals ← nextGoalState.serializeGoals (parent := .some goalState) (options := state.options) |>.run'
+-      -- Fragment entry can leave the parent unassigned; parentExpr? handles it.
+-      -- Auditing the parent also catches sorry/unsafe use in partial branches.
+-      let env ← Lean.MonadEnv.getEnv
+-      let proofExpr? := nextGoalState.parentExpr?
+-      let hasSorry := proofExpr?.map (·.hasSorry) |>.getD false
+-      let hasUnsafe := proofExpr?.map (fun expr =>
+-        expr.getUsedConstants.any (fun constName =>
+-          (env.find? constName).map (·.isUnsafe) |>.getD false
+-        )
+-      ) |>.getD false
++      let transition := transitionProvenance state.options goalState nextGoalState goal produced
++      let nextStateId ← newGoalState nextGoalState
+       return .ok {
+         nextStateId? := .some nextStateId,
+         goals? := .some goals,
+-        messages := #[],
+-        hasSorry,
+-        hasUnsafe,
++        messages := nextGoalState.messages,
++        hasSorry := checked.hasSorry,
++        hasUnsafe := checked.hasUnsafe,
++        validation? := some { checked := true },
++        transition? := some transition,
+       }
+     | .ok (.parseError message) =>
+       return .ok {
+@@ -220,10 +227,10 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+       }
+     | .ok (.invalidAction message) =>
+       return .error $ errorI "invalid" message
+-    | .ok (.failure messages) =>
++    | .ok (.failure messages diagnostics) =>
+       return .ok {
+         tacticErrors? := .some messages,
+-        messages := messages.map Protocol.Message.error,
++        messages := diagnostics,
+       }
+   goal_continue (args: Protocol.GoalContinue): MainM (CR Protocol.GoalContinueResult) := do
+     let state ← get
+@@ -254,6 +261,26 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+     let goalStates := args.stateIds.foldl (λ map id => map.erase id) state.goalStates
+     set { state with goalStates }
+     return .ok {}
++  goal_inspect (args: Protocol.GoalInspect): MainM (CR Protocol.GoalInspectResult) := do
++    let state ← get
++    let .some goalState := state.goalStates.find? args.stateId |
++      return .error $ errorIndex s!"Invalid state index {args.stateId}"
++    if args.goals.isEmpty || args.goals.toList.eraseDups.length != args.goals.size then
++      return .error <| errorI "arguments" "goals must be a nonempty list of distinct names"
++    let mut obligations := #[]
++    for name in args.goals do
++      let some obligation ← runMetaInMainM <| inspectObligation goalState ⟨name.toName⟩ state.options |
++        return .error $ errorIndex s!"Unknown obligation {name}"
++      obligations := obligations.push obligation
++    return .ok { obligations }
++  goal_certify (args: Protocol.GoalCertify): MainM (CR Protocol.GoalCertifyResult) := do
++    let state ← get
++    let .some goalState := state.goalStates.find? args.stateId |
++      return .error $ errorIndex s!"Invalid state index {args.stateId}"
++    let maxHeartbeats := args.maxHeartbeats?.getD 200000
++    if maxHeartbeats == 0 then
++      return .error <| errorI "arguments" "maxHeartbeats must be positive"
++    return .ok (← certifyRoot goalState maxHeartbeats)
+   goal_print (args: Protocol.GoalPrint): MainM (CR Protocol.GoalPrintResult) := do
+     let state ← get
+     let .some goalState := state.goalStates.find? args.stateId | return .error $ errorIndex s!"Invalid state index {args.stateId}"
+diff --git a/Test/Common.lean b/Test/Common.lean
+index 699ea4e..559a611 100644
+--- a/Test/Common.lean
++++ b/Test/Common.lean
+@@ -69,7 +69,7 @@ def GoalState.tacticOn (state: GoalState) (goalId: Nat) (tactic: String) := stat
+ 
+ def TacticResult.toString : TacticResult → String
+   | .success state => s!".success ({state.goals.length} goals)"
+-  | .failure messages =>
++  | .failure messages _ =>
+     let messages := "\n".intercalate messages.toList
+     s!".failure {messages}"
+   | .parseError error => s!".parseError {error}"
 diff --git a/Test/ContractFixtures.lean b/Test/ContractFixtures.lean
 new file mode 100644
-index 0000000..e0bf327
+index 0000000..3ee0785
 --- /dev/null
 +++ b/Test/ContractFixtures.lean
-@@ -0,0 +1,89 @@
+@@ -0,0 +1,105 @@
 +import Pantograph
 +
 +open Lean Elab Tactic
@@ -1113,6 +1448,436 @@ index 0000000..e0bf327
 +  Meta.withLetDecl `hiddenValue (mkConst ``True) hole fun value => do
 +    goal.assign (← Meta.mkLetFVars #[value] value)
 +  setGoals []
++
++/-- Close the goal with an axiom added during the search. -/
++elab "contract_new_axiom" : tactic => do
++  let goal ← getMainGoal
++  let name := `ContractFixtures.searchAxiom
++  addDecl (.axiomDecl { name, levelParams := [], type := ← instantiateMVars (← goal.getType), isUnsafe := false })
++  goal.assign (mkConst name)
++  setGoals []
++
++/-- Close the goal with a checked auxiliary lemma added during the search. -/
++elab "contract_auxiliary_lemma" : tactic => do
++  let goal ← getMainGoal
++  let name := `ContractFixtures.auxiliaryLemma
++  addDecl (.thmDecl { name, levelParams := [], type := mkConst ``True, value := mkConst ``True.intro })
++  goal.assign (mkConst name)
++  setGoals []
+diff --git a/Test/Integration.lean b/Test/Integration.lean
+index a45e6ce..5aae5f3 100644
+--- a/Test/Integration.lean
++++ b/Test/Integration.lean
+@@ -13,6 +13,10 @@ def step { α } [Lean.ToJson α] (cmd: String) (payload: List (String × Lean.Js
+   let payload := Lean.Json.mkObj payload
+   let name := name?.getD s!"{cmd} {payload.compress}"
+   let result ← Repl.execute { cmd, payload }
++  -- Transition provenance is checked by the snapshot suite.
++  let result := match result with
++    | .obj fields => Lean.Json.obj (fields.erase compare "transition")
++    | other => other
+   return LSpec.test name (toString result = toString (Lean.toJson expected))
+ 
+ def stepGoalFragments (payload: List (String × Lean.Json)) (expected: Array String):
+@@ -87,11 +91,11 @@ def test_tactic : Test :=
+     step "goal.start" [("expr", .str "∀ (p q: Prop), p ∨ q → q ∨ p")]
+      ({ stateId := 0, root := "_uniq.9" }: Protocol.GoalStartResult),
+     step "goal.tactic" [("stateId", .num 0), ("goalId", .num 0), ("tactic", .str "intro x")]
+-     ({ nextStateId? := .some 1, goals? := #[goal1], }: Protocol.GoalTacticResult),
++     ({ nextStateId? := .some 1, goals? := #[goal1], validation? := some { checked := true } }: Protocol.GoalTacticResult),
+     step "goal.print" [("stateId", .num 1)]
+      ({ parent? := .some { pp? := .some "fun x => ?m.12 x" }, }: Protocol.GoalPrintResult),
+     step "goal.tactic" [("stateId", .num 1), ("goalId", .num 0), ("tactic", .str "intro y")]
+-     ({ nextStateId? := .some 2, goals? := #[goal2], }: Protocol.GoalTacticResult),
++     ({ nextStateId? := .some 2, goals? := #[goal2], validation? := some { checked := true } }: Protocol.GoalTacticResult),
+   ]
+ def test_automatic_mode (automatic: Bool): Test :=
+   let varsPQ := #[
+@@ -135,12 +139,12 @@ def test_automatic_mode (automatic: Bool): Test :=
+     step "goal.start" [("expr", .str "∀ (p q: Prop), p ∨ q → q ∨ p")]
+      ({ stateId := 0, root := "_uniq.9" }: Protocol.GoalStartResult),
+     step "goal.tactic" [("stateId", .num 0), ("goalId", .num 0), ("tactic", .str "intro p q h")]
+-     ({ nextStateId? := .some 1, goals? := #[goal1], }: Protocol.GoalTacticResult),
++     ({ nextStateId? := .some 1, goals? := #[goal1], validation? := some { checked := true } }: Protocol.GoalTacticResult),
+     step "goal.tactic" [("stateId", .num 1), ("goalId", .num 0), ("tactic", .str "cases h")]
+-     ({ nextStateId? := .some 2, goals? := #[goal2l, goal2r], }: Protocol.GoalTacticResult),
++     ({ nextStateId? := .some 2, goals? := #[goal2l, goal2r], validation? := some { checked := true } }: Protocol.GoalTacticResult),
+     let goals? := if automatic then #[goal3l, goal2r] else #[goal3l]
+     step "goal.tactic" [("stateId", .num 2), ("goalId", .num 0), ("tactic", .str "apply Or.inr")]
+-     ({ nextStateId? := .some 3, goals?, }: Protocol.GoalTacticResult),
++     ({ nextStateId? := .some 3, goals?, validation? := some { checked := true } }: Protocol.GoalTacticResult),
+   ]
+ 
+ def test_env_add_inspect : Test :=
+@@ -256,7 +260,7 @@ def test_protocol_compat : Test :=
+     ]
+   }
+   let convGoal: Protocol.Goal := {
+-    name := "_uniq.98",
++    name := "_uniq.151",
+     isConversion := true,
+     fragment := "conv",
+     target := { pp? := .some "1 + 2 = 3" },
+@@ -272,7 +276,7 @@ def test_protocol_compat : Test :=
+      ({ stateId := 0, root := "_uniq.7" }: Protocol.GoalStartResult),
+     -- 1. Omit goalId (defaults to 0)
+     step "goal.tactic" [("stateId", .num 0), ("tactic", .str "intro p h")]
+-     ({ nextStateId? := .some 1, goals? := #[goal1] }: Protocol.GoalTacticResult),
++     ({ nextStateId? := .some 1, goals? := #[goal1], validation? := some { checked := true } }: Protocol.GoalTacticResult),
+     -- 2. Tactic failure: returns structured message objects with kind, severity, pos, data
+     step "goal.tactic" [("stateId", .num 1), ("tactic", .str "rfl")]
+      ({
+@@ -280,23 +284,23 @@ def test_protocol_compat : Test :=
+        messages := #[{
+          kind := "[anonymous]",
+          severity := "error",
+-         pos := { line := 0, column := 0 },
+-         endPos? := .none,
++         pos := { line := 1, column := 0 },
++         endPos? := some { line := 1, column := 3 },
+          data := "The rfl tactic failed. Possible reasons:\n- The goal is not a reflexive relation (neither `=` nor a relation with a @[refl] lemma).\n- The arguments of the relation are not equal.\nTry using the reflexivity lemma for your relation explicitly, e.g. `exact Eq.refl _` or\n`exact HEq.rfl` etc.\np : Prop\nh : p\n⊢ p"
+        }]
+      }: Protocol.GoalTacticResult),
+     -- 3. Sorry detection: returns hasSorry := true
+     step "goal.tactic" [("stateId", .num 1), ("tactic", .str "sorry")]
+-     ({ nextStateId? := .some 2, goals? := .some #[], hasSorry := true }: Protocol.GoalTacticResult),
++     ({ nextStateId? := .some 2, goals? := .some #[], hasSorry := true, validation? := some { checked := true } }: Protocol.GoalTacticResult),
+     -- 4. Conv mode exits explicitly or when its final goal closes
+     step "goal.start" [("expr", .str "1 + 2 = 3")]
+      ({ stateId := 3, root := "_uniq.96" }: Protocol.GoalStartResult),
+     step "goal.tactic" [("stateId", .num 3), ("mode", .str "conv")]
+-     ({ nextStateId? := .some 4, goals? := #[convGoal] }: Protocol.GoalTacticResult),
++     ({ nextStateId? := .some 4, goals? := #[convGoal], validation? := some { checked := true } }: Protocol.GoalTacticResult),
+     step "goal.tactic" [("stateId", .num 4), ("mode", .str "tactic")]
+-     ({ nextStateId? := .some 5, goals? := #[exitedConvGoal] }: Protocol.GoalTacticResult),
++     ({ nextStateId? := .some 5, goals? := #[exitedConvGoal], validation? := some { checked := true } }: Protocol.GoalTacticResult),
+     step "goal.tactic" [("stateId", .num 4), ("tactic", .str "rfl")]
+-     ({ nextStateId? := .some 6, goals? := #[exitedConvGoal] }: Protocol.GoalTacticResult),
++     ({ nextStateId? := .some 6, goals? := #[exitedConvGoal], validation? := some { checked := true } }: Protocol.GoalTacticResult),
+   ]
+ 
+ def test_conv_protocol : Test :=
+diff --git a/Test/Main.lean b/Test/Main.lean
+index 0fde5fa..3504b48 100644
+--- a/Test/Main.lean
++++ b/Test/Main.lean
+@@ -6,7 +6,9 @@ import Test.Library
+ import Test.Metavar
+ import Test.Proofs
+ import Test.Serial
++import Test.Snapshot
+ import Test.Tactic
++import Test.Validation
+ 
+ -- Test running infrastructure
+ 
+@@ -44,6 +46,7 @@ def main (args: List String) := do
+     (trustLevel := 1)
+ 
+   let suites: List (String × List (String × IO LSpec.TestSeq)) := [
++    ("Validation", Validation.suite env_default),
+     ("Environment", Environment.suite),
+     ("Frontend", Frontend.suite env_default),
+     ("Integration", Integration.suite env_default),
+@@ -51,6 +54,7 @@ def main (args: List String) := do
+     ("Metavar", Metavar.suite env_default),
+     ("Proofs", Proofs.suite env_default),
+     ("Serial", Serial.suite env_default),
++    ("Snapshot", Snapshot.suite env_default),
+     ("Tactic/Congruence", Tactic.Congruence.suite env_default),
+     ("Tactic/Motivated Apply", Tactic.MotivatedApply.suite env_default),
+     ("Tactic/No Confuse", Tactic.NoConfuse.suite env_default),
+diff --git a/Test/Proofs.lean b/Test/Proofs.lean
+index a5ec349..82f43b2 100644
+--- a/Test/Proofs.lean
++++ b/Test/Proofs.lean
+@@ -127,7 +127,7 @@ def test_nat_add_comm (manual: Bool): TestM Unit := do
+     #[buildGoal [("n", "Nat"), ("m", "Nat")] "n + m = m + n"])
+ 
+   match ← state1.tacticOn 0 "assumption" with
+-  | .failure #[message] =>
++  | .failure #[message] _ =>
+     addTest $ LSpec.check "assumption" (message = "tactic 'assumption' failed\nn m : Nat\n⊢ n + m = m + n")
+   | other => do
+     addTest $ assertUnreachable $ other.toString
+@@ -282,9 +282,9 @@ def test_or_comm: TestM Unit := do
+     serializeExpressionSexp (← instantiateAll state2.parentExpr?.get!) (sanitize := false)
+   let orPQ := s!"((:c Or) (:fv {fvP}) (:fv {fvQ}))"
+   let orQP := s!"((:c Or) (:fv {fvQ}) (:fv {fvP}))"
+-  let motive := s!"(:lambda t._@._hyg.26 {orPQ} (:forall h ((:c Eq) ((:c Or) (:fv {fvP}) (:fv {fvQ})) (:fv {fvH}) 0) {orQP}))"
+-  let caseL := s!"(:lambda h._@._hyg.27 (:fv {fvP}) (:lambda h._@._hyg.28 ((:c Eq) {orPQ} (:fv {fvH}) ((:c Or.inl) (:fv {fvP}) (:fv {fvQ}) 0)) (:subst (:mv {caseL}) (:fv {fvP}) (:fv {fvQ}) 1)))"
+-  let caseR := s!"(:lambda h._@._hyg.29 (:fv {fvQ}) (:lambda h._@._hyg.30 ((:c Eq) {orPQ} (:fv {fvH}) ((:c Or.inr) (:fv {fvP}) (:fv {fvQ}) 0)) (:subst (:mv {caseR}) (:fv {fvP}) (:fv {fvQ}) 1)))"
++  let motive := s!"(:lambda t._@._hyg.30 {orPQ} (:forall h ((:c Eq) ((:c Or) (:fv {fvP}) (:fv {fvQ})) (:fv {fvH}) 0) {orQP}))"
++  let caseL := s!"(:lambda h._@._hyg.31 (:fv {fvP}) (:lambda h._@._hyg.32 ((:c Eq) {orPQ} (:fv {fvH}) ((:c Or.inl) (:fv {fvP}) (:fv {fvQ}) 0)) (:subst (:mv {caseL}) (:fv {fvP}) (:fv {fvQ}) 1)))"
++  let caseR := s!"(:lambda h._@._hyg.33 (:fv {fvQ}) (:lambda h._@._hyg.34 ((:c Eq) {orPQ} (:fv {fvH}) ((:c Or.inr) (:fv {fvP}) (:fv {fvQ}) 0)) (:subst (:mv {caseR}) (:fv {fvP}) (:fv {fvQ}) 1)))"
+   let conduit := s!"((:c Eq.refl) {orPQ} (:fv {fvH}))"
+   addTest $ LSpec.test "(2 parent)" (state2parent ==
+     s!"((:c Or.casesOn) (:fv {fvP}) (:fv {fvQ}) {motive} (:fv {fvH}) {caseL} {caseR} {conduit})")
+diff --git a/Test/Snapshot.lean b/Test/Snapshot.lean
+new file mode 100644
+index 0000000..d985362
+--- /dev/null
++++ b/Test/Snapshot.lean
+@@ -0,0 +1,237 @@
++import Test.Common
++import Test.ContractFixtures
++import Pantograph.Certify
++import Repl
++
++namespace Pantograph.Test.Snapshot
++open Lean Pantograph.Repl
++
++private def request (cmd : String) (fields : List (String × Json)) : MainM Json :=
++  Repl.execute { cmd, payload := Json.mkObj fields }
++
++private def start (expr : String) (levels : List String := []) : MainM Nat := do
++  let fields := [("expr", Json.str expr)] ++
++    (if levels.isEmpty then [] else [("levels", toJson levels)])
++  let result ← request "goal.start" fields
++  match result.getObjValAs? Nat "stateId" with
++  | .ok id => pure id
++  | .error _ => throwError "goal.start failed: {result}"
++
++private def tactic (id : Nat) (text : String) (index : Nat := 0) : MainM Json :=
++  request "goal.tactic" [("stateId", toJson id), ("goalId", toJson index), ("tactic", .str text)]
++
++private def next (result : Json) : MainM Nat :=
++  match result.getObjValAs? Nat "nextStateId" with
++  | .ok id => pure id
++  | .error _ => throwError "tactic failed: {result}"
++
++private def names (result : Json) : Array String :=
++  (result.getObjValAs? (Array Json) "goals" |>.toOption |>.getD #[]).filterMap
++    fun goal => goal.getObjValAs? String "name" |>.toOption
++
++private def field (result : Json) (key : String) : Array String :=
++  (result.getObjVal? "transition").bind (·.getObjValAs? (Array String) key) |>.toOption |>.getD #[]
++
++private def selected (result : Json) : String :=
++  (result.getObjVal? "transition").bind (·.getObjValAs? String "selected") |>.toOption |>.getD ""
++
++private def inspect (id : Nat) (goals : List String) : MainM (Array Json) := do
++  let result ← request "goal.inspect" [("stateId", toJson id), ("goals", toJson goals)]
++  return result.getObjValAs? (Array Json) "obligations" |>.toOption |>.getD #[]
++
++private def status (obligation : Json) : String :=
++  obligation.getObjValAs? String "status" |>.toOption |>.getD ""
++
++private def certify (id : Nat) : MainM Json :=
++  request "goal.certify" [("stateId", toJson id)]
++
++private def certified (result : Json) : Bool :=
++  (result.getObjValAs? String "status").toOption == some "certified"
++
++private def outcome (result : Json) : String :=
++  result.getObjValAs? String "status" |>.toOption |>.getD ""
++
++private def provenanceTests : MainM LSpec.TestSeq := do
++  let mut tests := LSpec.TestSeq.done
++  let root ← start "True ∧ True"
++  let split ← tactic root "constructor"
++  let pair ← next split
++  tests := tests ++ LSpec.test "constructor produces two direct goals"
++    (field split "direct" == names split && field split "siblings" == #[])
++  let [left, right] := (names split).toList | throwError "expected two goals"
++  let second ← tactic pair "trivial" 1
++  tests := tests ++ LSpec.test "nonzero selection leaves its sibling, not a child"
++    (selected second == right && field second "direct" == #[] && field second "siblings" == #[left])
++  let first ← tactic pair "trivial" 0
++  tests := tests ++ LSpec.test "either side can be solved first"
++    (selected first == left && field first "siblings" == #[right])
++  let unchanged ← tactic root "skip"
++  tests := tests ++ LSpec.test "a goal left open is its own direct goal"
++    (field unchanged "direct" == #[selected unchanged] && field unchanged "extra" == #[])
++  -- The input snapshot is still usable for further alternatives.
++  let again ← tactic pair "trivial" 1
++  tests := tests ++ LSpec.test "input snapshot survives alternatives" (names again == #[left])
++
++  let three ← start "True ∧ True ∧ True"
++  let split ← tactic three "refine ⟨?_, ?_, ?_⟩"
++  tests := tests ++ LSpec.test "identical targets stay distinct occurrences"
++    ((field split "direct").size == 3 && (field split "direct").toList.eraseDups.length == 3)
++
++  let nested ← start "∀ (p q : Prop), p → q → (p ∧ q) ∧ True"
++  let opened ← tactic nested "intro p q hp hq\nconstructor"
++  tests := tests ++ LSpec.test "introduced locals reported per direct goal"
++    ((((opened.getObjVal? "transition").bind (·.getObjValAs? (Array (Array String)) "introduced")).toOption.map
++      (·.map (·.size))) == some #[4, 4])
++  let [inner, outer] := (names opened).toList | throwError "expected two goals"
++  let deeper ← tactic (← next opened) "constructor"
++  tests := tests ++ LSpec.test "descendants are direct and the survivor is a sibling"
++    ((field deeper "direct").size == 2 && field deeper "siblings" == #[outer] &&
++      !(field deeper "direct").contains inner)
++
++  let witness ← start "∃ n : Nat, n = 0 ∧ n = 1"
++  let split ← tactic witness "refine ⟨?w, ?a, ?b⟩"
++  let parts ← next split
++  let [w, a, b] := (names split).toList | throwError "expected three goals"
++  let zero ← tactic parts "exact (rfl : 0 = 0)" 1
++  tests := tests ++ LSpec.test "a shared assignment closes and changes siblings"
++    (field zero "closed" == #[w] && field zero "changed" == #[b] && field zero "siblings" == #[b])
++  let witnessOne ← tactic parts "exact 1" 0
++  tests := tests ++ LSpec.test "assigning the witness changes both equalities"
++    (field witnessOne "changed" == #[a, b])
++  let pending ← inspect parts [w, a, b]
++  tests := tests ++ LSpec.test "alternatives keep separate assignments"
++    (pending.map status == #["active", "active", "active"])
++  let afterZero ← next zero
++  let rootState ← inspect afterZero [w, a, b]
++  tests := tests ++ LSpec.test "solved goals absent from the list are inspectable"
++    (rootState.map status == #["complete", "complete", "active"])
++
++  let delayed ← start "True"
++  let hidden ← tactic delayed "contract_delayed_hole"
++  tests := tests ++ LSpec.test "restored delayed obligation is extra, not direct"
++    ((field hidden "extra").size == 1 && field hidden "direct" == #[])
++
++  let unknown ← request "goal.inspect" [("stateId", toJson parts), ("goals", toJson ["_uniq.999999"])]
++  tests := tests ++ LSpec.test "unknown obligation is an index error"
++    ((unknown.getObjValAs? String "error").toOption == some "index")
++  let duplicate ← request "goal.inspect" [("stateId", toJson parts), ("goals", toJson [w, w])]
++  tests := tests ++ LSpec.test "duplicate inspection request rejected"
++    ((duplicate.getObjValAs? String "error").toOption == some "arguments")
++  let still ← tactic parts "exact 0" 0
++  tests := tests ++ LSpec.test "state usable after failed inspection" ((names still).size == 2)
++
++  let ids := (← get).goalStates.toList.map (·.1)
++  discard <| request "goal.delete" [("stateIds", toJson ids)]
++  return tests
++
++private def certificationTests : MainM LSpec.TestSeq := do
++  let mut tests := LSpec.TestSeq.done
++  let root ← start "True ∧ True"
++  let pair ← next (← tactic root "constructor")
++  tests := tests ++ LSpec.test "remaining goals are incomplete" (outcome (← certify pair) == "incomplete")
++  let done ← next (← tactic (← next (← tactic pair "trivial" 1)) "trivial")
++  let first ← certify done
++  tests := tests ++ LSpec.test "complete root certifies" (certified first)
++  let count := (← get).goalStates.size
++  let repeated ← certify done
++  tests := tests ++ LSpec.test "repeated certification is read-only"
++    (repeated == first && (← get).goalStates.size == count)
++  tests := tests ++ LSpec.test "input of a certified state still usable"
++    ((names (← tactic pair "trivial" 0)).size == 1)
++
++  let witness ← start "∃ n : Nat, n = 0 ∧ n = 1"
++  let parts ← next (← tactic witness "refine ⟨?w, ?a, ?b⟩")
++  let solvedZero ← next (← tactic parts "exact (rfl : 0 = 0)" 1)
++  tests := tests ++ LSpec.test "conflicting witness cannot complete" (outcome (← certify solvedZero) == "incomplete")
++
++  let poly ← start "∀ (α : Sort u), α → α" ["u"]
++  let done ← next (← tactic poly "intro α a\nexact a")
++  let receipt ← certify done
++  tests := tests ++ LSpec.test "universe-polymorphic term certifies"
++    (certified receipt && ((receipt.getObjVal? "receipt").bind (·.getObjValAs? (Array String) "levels")).toOption == some #["u"])
++
++  let equality ← start "∀ (α : Sort u) (a : α), a = a" ["u"]
++  let done ← next (← tactic equality "intro α a\nrfl")
++  tests := tests ++ LSpec.test "universe-polymorphic proposition certifies" (certified (← certify done))
++
++  let classical ← start "∀ (p : Prop), p ∨ ¬p"
++  let done ← next (← tactic classical "intro p\nexact Classical.em p")
++  let receipt ← certify done
++  tests := tests ++ LSpec.test "baseline axioms are reported"
++    (certified receipt && (((receipt.getObjVal? "receipt").bind (·.getObjValAs? (Array String) "axioms")).toOption.getD #[]).contains "Classical.choice")
++
++  let axiomRoot ← start "1 = 2"
++  let done ← next (← tactic axiomRoot "contract_new_axiom")
++  tests := tests ++ LSpec.test "a new axiom is rejected" (outcome (← certify done) == "rejected")
++
++  let auxiliary ← start "True"
++  let done ← next (← tactic auxiliary "contract_auxiliary_lemma")
++  let receipt ← certify done
++  tests := tests ++ LSpec.test "a new checked lemma is rechecked and reported"
++    (certified receipt && ((receipt.getObjVal? "receipt").bind (·.getObjValAs? (Array String) "auxiliary")).toOption == some #["ContractFixtures.auxiliaryLemma"])
++
++  let admitted ← start "True"
++  let done ← next (← tactic admitted "contract_dependency_sorry")
++  tests := tests ++ LSpec.test "a new admitted dependency is rejected" (outcome (← certify done) == "rejected")
++
++  discard <| request "env.add" [("name", .str "ContractFixtures.trustedAdmission"), ("type", .str "True"),
++    ("value", .str "sorry"), ("isTheorem", .bool true)]
++  let transitive ← start "True"
++  let used ← tactic transitive "exact ContractFixtures.trustedAdmission"
++  let done ← next used
++  tests := tests ++ LSpec.test "an admission in the trusted basis passes transition checks"
++    ((used.getObjValAs? Bool "hasSorry").toOption == some false)
++  tests := tests ++ LSpec.test "a transitive admission is rejected" (outcome (← certify done) == "rejected")
++
++  let field (result : Json) (key : String) : Option String :=
++    (result.getObjVal? "receipt").bind (·.getObjValAs? String key) |>.toOption
++  let first ← start "∀ (p q : Prop), p → q → p ∧ q"
++  let one ← certify (← next (← tactic first "intro p q hp hq\nexact ⟨hp, hq⟩"))
++  let second ← start "∀ (p q : Prop), p → q → p ∧ q"
++  let other ← certify (← next (← tactic second "intro a b ha hb\nexact ⟨ha, hb⟩"))
++  tests := tests ++ LSpec.test "identities ignore bound variable names"
++    (field one "rootType" == field other "rootType" && (field one "rootType").isSome &&
++      field one "proof" == field other "proof")
++
++  let unknown ← certify 999999
++  tests := tests ++ LSpec.test "unknown state is an index error"
++    ((unknown.getObjValAs? String "error").toOption == some "index")
++  let ids := (← get).goalStates.toList.map (·.1)
++  discard <| request "goal.delete" [("stateIds", toJson ids)]
++  return tests
++
++/-- States the REPL cannot build: an ill-typed assignment and a replaced root type. -/
++private def kernelTests : Elab.TermElabM LSpec.TestSeq := do
++  let mut tests := LSpec.TestSeq.done
++  let state ← GoalState.create (mkConst ``True)
++  state.restoreElabM
++  state.root.assign (mkNatLit 0)
++  let illTyped := { state with savedState := { state.savedState with
++    term := ← Elab.Term.saveState, tactic := { goals := [] } } }
++  let result ← withOptions (debug.skipKernelTC.set · true) <| certifyRoot illTyped 200000
++  tests := tests ++ LSpec.test "ill-typed assignment rejected with skipKernelTC" (result.status == "rejected")
++  let state ← GoalState.create (mkConst ``True)
++  state.restoreElabM
++  state.root.assign (mkConst ``True.intro)
++  let solved := { state with savedState := { state.savedState with
++    term := ← Elab.Term.saveState, tactic := { goals := [] } } }
++  tests := tests ++ LSpec.test "proof of the started statement certifies"
++    ((← certifyRoot solved 200000).status == "certified")
++  let replaced := { solved with rootType := mkConst ``False }
++  tests := tests ++ LSpec.test "a replaced root statement is rejected"
++    ((← certifyRoot replaced 200000).status == "rejected")
++  tests := tests ++ LSpec.test "certification leaves the environment unchanged"
++    (!(← getEnv).contains `_pantograph_certificate)
++  return tests
++
++def suite (env : Environment) : List (String × IO LSpec.TestSeq) := [
++  ("Kernel boundary", runTermElabMSeq env kernelTests),
++  ("Transition provenance and inspection", do
++    let env ← importModules #[{ module := `Test.ContractFixtures }] {} (trustLevel := 1)
++    runCoreMSeq env (provenanceTests.run { imports := ["Test.ContractFixtures"] } |>.run' {})),
++  ("Root certification", do
++    let env ← importModules #[{ module := `Test.ContractFixtures }] {} (trustLevel := 1)
++    runCoreMSeq env (certificationTests.run { imports := ["Test.ContractFixtures"] } |>.run' {})),
++]
++
++end Pantograph.Test.Snapshot
+diff --git a/Test/Tactic/Prograde.lean b/Test/Tactic/Prograde.lean
+index 132718a..60ef47e 100644
+--- a/Test/Tactic/Prograde.lean
++++ b/Test/Tactic/Prograde.lean
+@@ -121,7 +121,7 @@ def test_define_root_expr : TestT Elab.TermElabM Unit := do
+   let .success state1 ← state0.tacticOn (goalId := 0) tactic | addTest $ assertUnreachable tactic
+   let binderName := `binder
+   let value := "x.fst"
+-  let expr ← state1.goals[0]!.withContext $ strToTermSyntax value
++  let expr ← state1.withContext (state1.get! 0) $ strToTermSyntax value
+   let tacticM := Tactic.evalDefine binderName expr
+   let .success state2 ← state1.tryTacticM (state1.get! 0) tacticM | addTest $ assertUnreachable s!"define {binderName} := {value}"
+   let tactic := s!"apply {binderName}"
+@@ -267,7 +267,7 @@ def test_let (specialized: Bool): TestT Elab.TermElabM Unit := do
+ 
+   let tactic := "exact h"
+   match ← state3r.tacticOn (goalId := 0) (tactic := tactic) with
+-  | .failure #[message] =>
++  | .failure #[message] _ =>
+     addTest $ LSpec.check tactic  (message = s!"type mismatch\n  h\nhas type\n  a : Prop\nbut is expected to have type\n  {mainTarget} : Prop")
+   | other => do
+     addTest $ assertUnreachable $ other.toString
 diff --git a/Test/Validation.lean b/Test/Validation.lean
 new file mode 100644
 index 0000000..7612c84
@@ -1274,6 +2039,219 @@ index 0000000..7612c84
 +]
 +
 +end Pantograph.Test.Validation
+diff --git a/doc/repository_client_contract.md b/doc/repository_client_contract.md
+new file mode 100644
+index 0000000..83b6eed
+--- /dev/null
++++ b/doc/repository_client_contract.md
+@@ -0,0 +1,84 @@
++# Repository-owned client companion contract
++
++Stage 4 extends merged PR #1 at
++`0dd5d2225e2d093f66a4b6231c1aa35004f2c8f3` on `client_centric_repo`.
++The Lean toolchain and Mathlib deployment pin remain unchanged.
++
++`protocol.describe {}` identifies `maths-ai-pantograph`, protocol version 2,
++model S-expression version 1, transition validation version 1, message version 1,
++`explicit-focused-v1` goal selection, and `string-array-v1` tactic errors.
++Version 2 adds transition provenance, `goal.inspect` and `goal.certify`; see
++[snapshot_protocol.md](snapshot_protocol.md).
++The planning document's contract revision 2 is not a runtime compatibility mode.
++
++Successful `goal.tactic` responses retain `nextStateId`, `goals`, `messages`,
++`hasSorry`, and `hasUnsafe`. They also carry
++`validation: {version: 1, scope: "transition-expressions", checked: true}`.
++The metadata states that the defined expression checks completed. A positive
++admission or unsafe flag remains a successful allocation for the client to delete
++before rejecting that candidate. Missing or cyclic evidence returns a command
++error with category `validation` and allocates no result state.
++
++The shared operation transaction captures diagnostics and restores its caller's
++meta, elaborator, environment, message, trace, information, and declaration-cache
++state. Fresh-name counters remain monotonic. Logged errors reject execution even
++when tactics return normally. Thrown errors retain their diagnostics. Warnings
++and information survive success. Tagged messages retain their kind. Source
++strings use their real source maps; unavailable positions are exactly `(0, 0)`.
++Snapshot serialization and diagnostics also restore their caller.
++
++The parser runs full tactic or conversion sequences with end-of-input checking.
++Deferred synthetic elaboration runs inside the transaction. Default synthesis
++resolves ordinary implicit arguments. Partial synthesis runs deferred tactics
++while permitting unresolved typeclass obligations. Reachable unresolved holes
++remain goals. This applies to goal initialization as well as subsequent operations.
++
++Validation inspects the selected goal, input and returned goals, new or changed
++ordinary and delayed assignments, new local contexts, and pending synthetic
++expressions. It follows ordinary assignments and delayed pending assignments,
++local types and values, constant dependencies, and projection dependencies.
++Admission scanning uses elaborated terms rather than tactic strings. Unsafe
++scanning concerns resulting proof dependencies rather than the implementation
++of the tactic elaborator.
++
++Each state retains its original trust environment. Dependency traversal stops at
++that environment but still checks directly referenced constants for unsafe status.
++New reachable declarations have their types and values scanned recursively,
++including declarations retained from earlier transitions. Imported Mathlib
++remains the trust basis. This does not audit all imported axioms or kernel-certify
++an assembled theorem reconstructed from independent search nodes.
++
++Safety scanning covers changed assignments even when they are no longer visible.
++Obligation retention follows the selected, input and returned goals and their
++reachable expressions. Discarded elaboration variables are not all promoted to
++user goals. Existing dormant siblings retain manual-mode behavior. A retained
++conversion equation owns its evolving right-hand placeholders until conversion
++exit; unresolved holes after exit remain obligations. Cyclic expression
++assignments and missing declarations fail validation.
++
++All existing structured operations use the shared transaction: assignment,
++have/let/define, calc, motivated application, no-confusion, and conversion
++entry/exit. The merged omitted-index default, nonzero selection, sibling resumption,
++mode metadata and automatic final-conversion exit remain supported. Repeated
++references to the same resumed goal are removed while preserving order.
++
++The model serializer's expression normalization, fields, binder roles and local
++indices are unchanged. Its snapshot reads now restore their caller. Complete
++sequence parsing and synthetic elaboration can change fresh internal names;
++normalized expressions, graph fingerprints, node features and edges retain their
++canonical meaning.
++
++Verification: `lake build repl Test.ContractFixtures` and `lake test` pass.
++The suite contains 299 assertions, including 37 Stage 4 assertions. Existing
++Python codec, reconciliation, environment and model tests report 316 passes.
++The final diagnostic records 61 raw Mathlib exchanges against the existing codec,
++four unchanged canonical graph goldens, zero final allocations, and confirmed
++subprocess reaping. The sandboxed diagnostic's shutdown timeout is not counted
++as a pass; the recorded final capture ran outside that sandbox.
++
++The tracked patch, source hashes, executable hash and live evidence are in
++`pantograph_backport/`. The build reused a copied archive dependency/build cache
++and rebuilt changed targets. Stage 7's fresh release reproduction remains pending.
++Stage 5 actual-client integration, Stage 6 production migration, and Stage 8
++RL/deployment validation remain pending. No fork publication, dependency migration
++or RL launch is part of Stage 4.
+diff --git a/doc/snapshot_protocol.md b/doc/snapshot_protocol.md
+new file mode 100644
+index 0000000..d853f12
+--- /dev/null
++++ b/doc/snapshot_protocol.md
+@@ -0,0 +1,117 @@
++# Retained snapshots: provenance, inspection and certification
++
++Protocol version 2 lets a client keep result states alive and run later
++tactics on them directly, instead of rebuilding each goal from its printed
++form. It adds what such a client needs: how a transition's goals relate to its
++input, a read-only view of obligations a state no longer lists, and a kernel
++check of a complete root proof.
++
++`protocol.describe` reports `protocolVersion: 2` together with
++`transitionProvenanceVersion: 1`, `inspectionVersion: 1` and
++`certificationVersion: 1`. The model S-expression version stays 1, and model
++goal serialization is unchanged.
++
++Names below are metavariable and free-variable IDs (`_uniq.N`). They identify
++an obligation or local inside one state lineage. They are not stable across
++sessions or across a replay of the same tactics, and a client must not persist
++them.
++
++## Transition provenance
++
++Every successful `goal.tactic` response carries `transition`:
++
++| Field | Meaning |
++| --- | --- |
++| `selected` | The input goal the operation ran on |
++| `direct` | Unassigned goals the operation produced for `selected`, in the order the tactic returned them, before automatic resumption |
++| `introduced` | One list per `direct` goal: its visible locals that `selected` does not have, in context order |
++| `siblings` | Input goals other than `selected` that the result still lists |
++| `changed` | The siblings whose instantiated target, or a local type or value, differs from the input |
++| `closed` | Input goals other than `selected` that the transition assigned |
++| `dormant` | Input goals other than `selected` that are unassigned but not listed |
++| `extra` | Every other listed goal, such as a reachable hole restored by validation |
++
++`direct`, `siblings` and `extra` partition `goals`. A goal the tactic returned
++that was already an input goal counts as a sibling, not as a direct goal. If the
++operation leaves `selected` itself open, as `skip` does, `selected` is its own
++only direct goal. The
++categories come from metavariable identities and assignments in the saved
++contexts, never from comparing printed goals.
++
++After `constructor` on `True ∧ True`, both goals are direct. Solving the second
++of them gives `selected` = that goal, no direct goals, and the first goal as a
++sibling. With `∃ n : Nat, n = 0 ∧ n = 1` split into `?w`, `?a` and `?b`, solving
++`?a` with `rfl` assigns the witness: `?w` is closed and `?b` is changed.
++
++## `goal.inspect`
++
++Request `{"stateId", "goals"}`, where `goals` is a nonempty list of distinct
++obligation names. The response lists one entry per name, in request order:
++
++| Field | Meaning |
++| --- | --- |
++| `name` | The obligation |
++| `status` | `active` (listed), `pending` (unassigned, not listed), `assigned` (assigned, with unresolved holes), `delayed` (delayed assignment whose pending proof has unresolved holes) or `complete` |
++| `goal` | The serialized goal, for `active` and `pending` |
++| `holes` | Unassigned metavariables reachable from the instantiated target and locals, or from the instantiated assignment |
++| `universeHoles` | Whether a universe metavariable remains |
++
++An obligation is `complete` when its instantiated assignment has no
++metavariables, including universe ones. A name the state does not declare is an
++`index` error. Inspection changes no state and allocates nothing.
++
++## `goal.certify`
++
++Request `{"stateId"}` with optional `maxHeartbeats` (thousands, as the Lean
++option; default 200000). The response is `{version, status, reason?, receipt?}`:
++
++| `status` | Meaning |
++| --- | --- |
++| `certified` | The kernel accepted the root proof; `receipt` is present |
++| `incomplete` | Goals remain, the root is unassigned, or holes remain |
++| `rejected` | The proof is not acceptable; `reason` says why |
++| `inconclusive` | The kernel ran out of heartbeats, memory or recursion depth, or was interrupted |
++
++The server records the root statement and its universe parameters at
++`goal.start`. Certification:
++
++1. requires an empty goal list and an assigned root, then instantiates the root
++   assignment and requires it to be free of term and universe metavariables;
++2. abstracts the proof over the root's local context natively (assumptions
++   become binders, local definitions keep their values) and rejects loose bound
++   variables or locals outside that context;
++3. checks the proof against the recorded root statement, not the root's
++   current type and not any caller-supplied statement;
++4. walks every constant the proof reaches, imported ones included, and rejects
++   `sorryAx`, unsafe dependencies, missing declarations and axioms that are not
++   in the state's trusted environment;
++5. rechecks declarations added during the search (auxiliary lemmas, matchers)
++   in dependency order on a copy of the trusted environment, then checks the
++   root as a theorem (or, for a statement that is not a proposition, as an
++   opaque definition) with `Environment.addDeclCore`. The kernel is called
++   directly, so `debug.skipKernelTC` cannot skip checking.
++
++Checking works on environment values only. No search state, and not the REPL's
++own environment, sees the temporary declaration, and certifying again returns
++the same result.
++
++The receipt records the root name, universe parameters, a structural 64-bit
++digest of the checked statement and proof (`identity: lean-expr-digest-v1`,
++which ignores bound variable names, so a term is identified up to renaming),
++an identity of the trusted environment (toolchain commit and imported module
++names), the Lean version, the baseline axioms the proof uses and the
++auxiliary declarations that were rechecked. It is reproducibility metadata. It
++is not a cryptographic proof, and it does not replace rechecking a replayed
++proof in a fresh session.
++
++## Tests
++
++`Test/Snapshot.lean` covers nonzero selection, either side of a conjunction
++first, identical targets, survivors next to direct goals, introduced locals,
++the shared witness (closed and changed siblings, separate alternatives),
++inspection of solved and delayed obligations, and rejected inspection requests.
++For certification it covers incomplete states, repeated checks, the
++conflicting witness, universe-polymorphic roots, reported baseline axioms, a
++new axiom, a rechecked auxiliary lemma, new and trusted-basis admissions, an
++ill-typed assignment under `debug.skipKernelTC=true`, and a replaced root
++statement.
 diff --git a/scripts/capture_repository_client_contract.py b/scripts/capture_repository_client_contract.py
 new file mode 100644
 index 0000000..925b77b
@@ -1500,91 +2478,3 @@ index 0000000..925b77b
 +
 +if __name__ == "__main__":
 +    main()
-diff --git a/doc/repository_client_contract.md b/doc/repository_client_contract.md
-new file mode 100644
-index 0000000..e505905
---- /dev/null
-+++ b/doc/repository_client_contract.md
-@@ -0,0 +1,82 @@
-+# Repository-owned client companion contract
-+
-+Stage 4 extends merged PR #1 at
-+`0dd5d2225e2d093f66a4b6231c1aa35004f2c8f3` on `client_centric_repo`.
-+The Lean toolchain and Mathlib deployment pin remain unchanged.
-+
-+`protocol.describe {}` identifies `maths-ai-pantograph`, protocol version 1,
-+model S-expression version 1, transition validation version 1, message version 1,
-+`explicit-focused-v1` goal selection, and `string-array-v1` tactic errors.
-+The planning document's contract revision 2 is not a runtime compatibility mode.
-+
-+Successful `goal.tactic` responses retain `nextStateId`, `goals`, `messages`,
-+`hasSorry`, and `hasUnsafe`. They also carry
-+`validation: {version: 1, scope: "transition-expressions", checked: true}`.
-+The metadata states that the defined expression checks completed. A positive
-+admission or unsafe flag remains a successful allocation for the client to delete
-+before rejecting that candidate. Missing or cyclic evidence returns a command
-+error with category `validation` and allocates no result state.
-+
-+The shared operation transaction captures diagnostics and restores its caller's
-+meta, elaborator, environment, message, trace, information, and declaration-cache
-+state. Fresh-name counters remain monotonic. Logged errors reject execution even
-+when tactics return normally. Thrown errors retain their diagnostics. Warnings
-+and information survive success. Tagged messages retain their kind. Source
-+strings use their real source maps; unavailable positions are exactly `(0, 0)`.
-+Snapshot serialization and diagnostics also restore their caller.
-+
-+The parser runs full tactic or conversion sequences with end-of-input checking.
-+Deferred synthetic elaboration runs inside the transaction. Default synthesis
-+resolves ordinary implicit arguments. Partial synthesis runs deferred tactics
-+while permitting unresolved typeclass obligations. Reachable unresolved holes
-+remain goals. This applies to goal initialization as well as subsequent operations.
-+
-+Validation inspects the selected goal, input and returned goals, new or changed
-+ordinary and delayed assignments, new local contexts, and pending synthetic
-+expressions. It follows ordinary assignments and delayed pending assignments,
-+local types and values, constant dependencies, and projection dependencies.
-+Admission scanning uses elaborated terms rather than tactic strings. Unsafe
-+scanning concerns resulting proof dependencies rather than the implementation
-+of the tactic elaborator.
-+
-+Each state retains its original trust environment. Dependency traversal stops at
-+that environment but still checks directly referenced constants for unsafe status.
-+New reachable declarations have their types and values scanned recursively,
-+including declarations retained from earlier transitions. Imported Mathlib
-+remains the trust basis. This does not audit all imported axioms or kernel-certify
-+an assembled theorem reconstructed from independent search nodes.
-+
-+Safety scanning covers changed assignments even when they are no longer visible.
-+Obligation retention follows the selected, input and returned goals and their
-+reachable expressions. Discarded elaboration variables are not all promoted to
-+user goals. Existing dormant siblings retain manual-mode behavior. A retained
-+conversion equation owns its evolving right-hand placeholders until conversion
-+exit; unresolved holes after exit remain obligations. Cyclic expression
-+assignments and missing declarations fail validation.
-+
-+All existing structured operations use the shared transaction: assignment,
-+have/let/define, calc, motivated application, no-confusion, and conversion
-+entry/exit. The merged omitted-index default, nonzero selection, sibling resumption,
-+mode metadata and automatic final-conversion exit remain supported. Repeated
-+references to the same resumed goal are removed while preserving order.
-+
-+The model serializer's expression normalization, fields, binder roles and local
-+indices are unchanged. Its snapshot reads now restore their caller. Complete
-+sequence parsing and synthetic elaboration can change fresh internal names;
-+normalized expressions, graph fingerprints, node features and edges retain their
-+canonical meaning.
-+
-+Verification: `lake build repl Test.ContractFixtures` and `lake test` pass.
-+The suite contains 299 assertions, including 37 Stage 4 assertions. Existing
-+Python codec, reconciliation, environment and model tests report 316 passes.
-+The final diagnostic records 61 raw Mathlib exchanges against the existing codec,
-+four unchanged canonical graph goldens, zero final allocations, and confirmed
-+subprocess reaping. The sandboxed diagnostic's shutdown timeout is not counted
-+as a pass; the recorded final capture ran outside that sandbox.
-+
-+The tracked patch, source hashes, executable hash and live evidence are in
-+`pantograph_backport/`. The build reused a copied archive dependency/build cache
-+and rebuilt changed targets. Stage 7's fresh release reproduction remains pending.
-+Stage 5 actual-client integration, Stage 6 production migration, and Stage 8
-+RL/deployment validation remain pending. No fork publication, dependency migration
-+or RL launch is part of Stage 4.

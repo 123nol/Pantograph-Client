@@ -160,7 +160,7 @@ def test_rejected_goal_has_no_allocation(setup):
             async with client.state_scope() as scope:
                 with pytest.raises(PantographGoalRejected):
                     await scope.start_goal("reject")
-                assert not scope._states and (await client.stat()).n_goals == 0
+                assert not scope._issued and (await client.stat()).n_goals == 0
 
     run(body)
     assert_reaped(report)
@@ -176,7 +176,7 @@ def test_universe_levels_reach_the_server_and_rejections_allocate_nothing(setup)
                     await scope.start_goal("universe:u,v")
                 with pytest.raises(PantographGoalRejected):
                     await scope.start_goal("universe:u,v", levels=["u"])
-                assert not scope._states and client.is_usable
+                assert not scope._issued and client.is_usable
                 first = await scope.start_goal("universe:u,v", levels=("u", "v"))
                 second = await scope.start_goal("universe:w", levels=["w"])
                 plain = await scope.start_goal("True", levels=())
@@ -205,7 +205,7 @@ def test_invalid_levels_are_rejected_before_sending(setup, levels):
             async with client.state_scope() as scope:
                 with pytest.raises(PantographProtocolError):
                     await scope.start_goal("True", levels=levels)
-                assert client.is_usable and not scope._states
+                assert client.is_usable and not scope._issued
                 await scope.start_goal("True")
         assert [row["args"] for row in requests(report, "goal.start")] == [
             {"expr": "True"}
@@ -564,7 +564,8 @@ def test_reused_released_id_does_not_revive_old_state(setup, monkeypatch):
                 old = await scope.start_goal("True")
                 await scope.release(old)
                 new = await scope.start_goal("True")
-                assert old.handle == new.handle
+                assert old.handle.state_id == new.handle.state_id
+                assert old.handle != new.handle
                 await scope.release(old)
                 assert (await client.stat()).n_goals == 1
                 with pytest.raises(PantographStateError):
@@ -584,8 +585,8 @@ def test_bookkeeping_failure_after_owned_allocation_retires_session(setup, monke
         async with client.state_scope() as scope:
             register = scope._register
 
-            def failing_register(response):
-                register(response)
+            def failing_register(response, root):
+                register(response, root)
                 raise RuntimeError("allocation bookkeeping failed")
 
             monkeypatch.setattr(scope, "_register", failing_register)
@@ -609,8 +610,8 @@ def test_cancellation_after_registration_has_an_explicit_owner(setup, monkeypatc
                     register = scope._register
                     task = asyncio.current_task()
 
-                    def cancelling_register(response):
-                        state = register(response)
+                    def cancelling_register(response, root):
+                        state = register(response, root)
                         captured.append((state.handle.state_id, set(scope._live_ids)))
                         client._loop.call_soon(task.cancel, "after allocation")
                         return state
@@ -641,6 +642,134 @@ def test_post_write_tactic_cancellation_clears_all_scope_ownership(setup, monkey
             assert client.phase is SessionPhase.CLOSED
             assert not scope._live_ids and not client._allocated_ids
         assert not client._scopes and not requests(report, "goal.delete")
+
+    run(body)
+    assert_reaped(report)
+
+
+def test_transitions_inspection_and_certification(setup):
+    env, report = setup
+
+    async def body():
+        async with await PantographClient.create(env) as client:
+            async with client.state_scope() as scope:
+                start = await scope.start_goal("True")
+                split = await scope.apply_tactic(start, "split")
+                assert split.transition.selected == start.root
+                assert split.transition.direct == tuple(g.goal_name for g in split.goals)
+                left, right = (goal.goal_name for goal in split.goals)
+                second = await scope.apply_tactic(split, "nonzero_index", goal_index=1)
+                assert second.transition.selected == right
+                inspected = await scope.inspect(split, [right, left])
+                assert [item.name for item in inspected] == [right, left]
+                assert inspected[0].goal.goal_name == right
+                assert (await scope.certify(split)).status == "incomplete"
+                done = await scope.apply_tactic(start, "trivial")
+                result = await scope.certify(done, max_heartbeats=1000)
+                assert result.is_certified and result.receipt.root == start.root
+                assert client.is_usable
+        certify = requests(report, "goal.certify")
+        assert [row["args"] for row in certify][1] == {
+            "stateId": done.handle.state_id,
+            "maxHeartbeats": 1000,
+        }
+
+    run(body)
+    assert_reaped(report)
+
+
+@pytest.mark.parametrize(
+    "scenario,operation",
+    [
+        ("wrong_selected", "tactic"),
+        ("inspect_mismatch", "inspect"),
+        ("wrong_root", "certify"),
+    ],
+)
+def test_linkage_violations_retire_the_session(setup, monkeypatch, scenario, operation):
+    env, report = setup
+    monkeypatch.setenv("PANTOGRAPH_FAKE_SCENARIO", scenario)
+
+    async def body():
+        client = await PantographClient.create(env)
+        async with client.state_scope() as scope:
+            start = await scope.start_goal("True")
+            with pytest.raises(PantographProtocolError):
+                if operation == "tactic":
+                    await scope.apply_tactic(start, "skip")
+                else:
+                    state = await scope.apply_tactic(
+                        start, "split" if operation == "inspect" else "trivial"
+                    )
+                    if operation == "inspect":
+                        await scope.inspect(state, [g.goal_name for g in state.goals])
+                    else:
+                        await scope.certify(state)
+            assert client.phase is SessionPhase.CLOSED
+            assert not scope._live_ids and not scope._issued
+
+    run(body)
+    assert_reaped(report)
+
+
+def test_snapshot_requests_validate_their_state_before_io(setup):
+    env, report = setup
+
+    async def body():
+        async with await PantographClient.create(env) as client:
+            async with client.state_scope() as scope:
+                start = await scope.start_goal("True")
+                split = await scope.apply_tactic(start, "split")
+                with pytest.raises(PantographStateError):
+                    await scope.inspect(replace(split), ["_uniq.22"])
+                for goals in ([], ["_uniq.22", "_uniq.22"], "_uniq.22"):
+                    with pytest.raises(PantographProtocolError):
+                        await scope.inspect(split, goals)
+                for budget in (0, -1, True, 1.5):
+                    with pytest.raises(PantographProtocolError):
+                        await scope.certify(split, max_heartbeats=budget)
+                await scope.release(split)
+                with pytest.raises(PantographStateError):
+                    await scope.inspect(split, ["_uniq.22"])
+                with pytest.raises(PantographStateError):
+                    await scope.certify(split)
+                assert client.is_usable
+        assert not requests(report, "goal.inspect")
+        assert not requests(report, "goal.certify")
+
+    run(body)
+    assert_reaped(report)
+
+
+def test_released_and_dropped_states_are_reclaimed_before_scope_exit(setup):
+    import gc
+    import weakref
+
+    env, report = setup
+
+    async def body():
+        async with await PantographClient.create(env) as client:
+            async with client.state_scope() as scope:
+                start = await scope.start_goal("True")
+                released, dropped = [], []
+                for index in range(50):
+                    state = await scope.apply_tactic(start, "skip")
+                    (released if index % 2 else dropped).append(weakref.ref(state))
+                    if index % 2:
+                        await scope.release(state)
+                    del state
+                gc.collect()
+                assert all(ref() is None for ref in released + dropped)
+                # One record per live allocation: the start and the dropped ones.
+                assert len(scope._issued) == len(scope._live_ids) == 26
+                stale = replace(start, handle=replace(start.handle, allocation=999))
+                with pytest.raises(PantographStateError):
+                    await scope.apply_tactic(stale, "skip")
+                # A copy of a live state never inherits its ownership.
+                with pytest.raises(PantographStateError):
+                    await scope.apply_tactic(replace(start), "skip")
+                await scope.apply_tactic(start, "trivial")
+            assert (await client.stat()).n_goals == 0 and not scope._issued
 
     run(body)
     assert_reaped(report)

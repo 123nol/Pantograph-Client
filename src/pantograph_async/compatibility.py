@@ -53,6 +53,7 @@ def companion_base() -> dict[str, str]:
         "contract_revision": data["contract_revision"],
         "source_url": data["companion"]["source_url"],
         "base_commit": data["companion"]["base_commit"],
+        "source_commit": data["companion"]["source_commit"],
         "patch_sha256": data["companion"]["patch_sha256"],
         "toolchain": data["tested_inputs"]["lean_toolchain"],
         "mathlib_expected_pin": data["tested_inputs"]["mathlib_commit"],

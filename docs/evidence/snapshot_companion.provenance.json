@@ -1,0 +1,52 @@
+{
+  "kind": "snapshot-companion-provenance",
+  "contract_revision": 3,
+  "source_url": "https://github.com/123nol/Pantograph.git",
+  "branch": "client_centric_repo",
+  "base_commit": "0dd5d2225e2d093f66a4b6231c1aa35004f2c8f3",
+  "stage4_commit": "fe57f98d85a3fb6b9bdd32f9e725bdda1c721449",
+  "companion_commits": [
+    "f0b6de3 Report transition provenance and inspect retained obligations",
+    "2309b15 Certify complete root proofs with the kernel"
+  ],
+  "patch": "repository_client_contract.patch",
+  "patch_sha256": "18a973b6ab69190e8343ee8461ff1e4d4235f9c555ff0338299dce89d6ad0c54",
+  "patch_check": "Applies with git apply to a clean checkout of base_commit and reproduces every patched source digest.",
+  "toolchain": "leanprover/lean4:v4.10.0-rc1",
+  "lean_version": "Lean (version 4.10.0-rc1, x86_64-unknown-linux-gnu, commit 3b58e0649156, Release)",
+  "repl_sha256": "9b549ad2d5e8aa33f5c39eb124c7452ad0dd52fce8df605dd0060f15a6c9e198",
+  "build": "lake build repl test in a separate checkout; the previously deployed executable was left in place.",
+  "tests": {
+    "lean_suite": {
+      "command": "lake exe test",
+      "passed": true,
+      "assertions": 334,
+      "snapshot_assertions": 35
+    },
+    "client_offline": {
+      "command": "python -m pytest tests",
+      "passed": 480,
+      "skipped": 13
+    },
+    "client_live": {
+      "command": "python -m pytest tests/test_client_live.py tests/test_installed_distribution.py --run-pantograph-live",
+      "imports": [
+        "Init",
+        "Lean"
+      ],
+      "passed": 19,
+      "skipped": 2,
+      "skipped_reason": "installed-distribution checks run in the packaging job"
+    },
+    "live_capture": "tests/fixtures/snapshot_companion/capture.json",
+    "installed_sdist_suite": {
+      "command": "PANTOGRAPH_CLIENT_REQUIRE_INSTALLED=1 python -m pytest tests (unpacked from the sdist, against the wheel built from it)",
+      "passed": 482,
+      "skipped": 11,
+      "check_sdist": "passed"
+    }
+  },
+  "mathlib": "Not exercised here; the Mathlib release gate is application Stage 8.",
+  "merged_commit": "9ecaaea242f427e534aff29314513c358b4d21ad",
+  "merged_commit_check": "The merged tree of client_centric_repo equals the companion commits, so the patch and source digests are unchanged."
+}
