@@ -23,6 +23,7 @@
     "source_url": "https://github.com/123nol/Pantograph.git",
     "base_commit": "0dd5d2225e2d093f66a4b6231c1aa35004f2c8f3",
     "base_branch": "client_centric_repo",
+    "source_commit": "9ecaaea242f427e534aff29314513c358b4d21ad",
     "patch": "repository_client_contract.patch",
     "patch_sha256": "18a973b6ab69190e8343ee8461ff1e4d4235f9c555ff0338299dce89d6ad0c54",
     "patched_sources_sha256": {

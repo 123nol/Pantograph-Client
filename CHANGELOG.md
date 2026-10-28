@@ -22,7 +22,8 @@ report protocol version 1 are rejected at startup.
   allocation keeps one weak reference to its issued object, keyed by a new
   `StateHandle.allocation` number, so released and dropped states can be
   collected while copies and foreign states are still rejected.
-- The companion is now `123nol/Pantograph` `client_centric_repo`; the patch,
+- The companion is now `123nol/Pantograph` `client_centric_repo` at `9ecaaea`
+  (the merge of 123nol/Pantograph#1), recorded as `source_commit`; the patch,
   source digests and reference binary hash are updated, and a live capture of
   the new operations is in `tests/fixtures/snapshot_companion`.
 

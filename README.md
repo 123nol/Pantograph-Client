@@ -147,13 +147,14 @@ package data:
 from pantograph_async import compatibility
 
 compatibility.verify_contract()      # shipped contract == manifest == codec
-compatibility.companion_base()       # fork URL, base commit, toolchain, Mathlib pin
+compatibility.companion_base()       # fork URL, companion commit, base commit, toolchain, Mathlib pin
 patch = compatibility.companion_patch()  # bytes, checked against its digest
 compatibility.verify_companion_sources("/path/to/Pantograph")  # after applying
 ```
 
-Apply the patch to the Pantograph fork at `companion_base()["base_commit"]`,
-verify the patched files, and build `repl` with Lake. Lean source development
+Check out the Pantograph fork at `companion_base()["source_commit"]`, or apply the
+patch to `companion_base()["base_commit"]`, verify the patched files, and build
+`repl` with Lake. Lean source development
 stays in that fork. [docs/compatibility.md](docs/compatibility.md) has the full
 procedure and what each pin means.
 

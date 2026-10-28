@@ -46,5 +46,7 @@
       "check_sdist": "passed"
     }
   },
-  "mathlib": "Not exercised here; the Mathlib release gate is application Stage 8."
+  "mathlib": "Not exercised here; the Mathlib release gate is application Stage 8.",
+  "merged_commit": "9ecaaea242f427e534aff29314513c358b4d21ad",
+  "merged_commit_check": "The merged tree of client_centric_repo equals the companion commits, so the patch and source digests are unchanged."
 }
