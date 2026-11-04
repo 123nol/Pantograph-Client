@@ -1,10 +1,10 @@
 {
   "kind": "pantograph-async-client-compatibility",
-  "client_version": "0.2.0",
-  "contract_revision": 3,
+  "client_version": "0.3.0",
+  "contract_revision": 4,
   "descriptor": {
     "protocol": "maths-ai-pantograph",
-    "protocolVersion": 2,
+    "protocolVersion": 3,
     "modelSexpVersion": 1,
     "transitionValidationVersion": 1,
     "transitionProvenanceVersion": 1,
@@ -12,7 +12,9 @@
     "certificationVersion": 1,
     "messageVersion": 1,
     "goalSelection": "explicit-focused-v1",
-    "tacticErrorsFormat": "string-array-v1"
+    "tacticErrorsFormat": "string-array-v1",
+    "resourceErrorVersion": 1,
+    "commandTransactionVersion": 1
   },
   "platform": {
     "os": "linux",
@@ -50,12 +52,25 @@
       "doc/snapshot_protocol.md": "c6702ecb3044ae9bc21f70a6f825329541629d2cc95280d1768ec1a498d40866"
     },
     "build_target": "repl",
-    "reference_repl_sha256": "9b549ad2d5e8aa33f5c39eb124c7452ad0dd52fce8df605dd0060f15a6c9e198"
+    "reference_repl_sha256": "9b549ad2d5e8aa33f5c39eb124c7452ad0dd52fce8df605dd0060f15a6c9e198",
+    "descriptor": {
+      "protocol": "maths-ai-pantograph",
+      "protocolVersion": 2,
+      "modelSexpVersion": 1,
+      "transitionValidationVersion": 1,
+      "transitionProvenanceVersion": 1,
+      "inspectionVersion": 1,
+      "certificationVersion": 1,
+      "messageVersion": 1,
+      "goalSelection": "explicit-focused-v1",
+      "tacticErrorsFormat": "string-array-v1"
+    }
   },
   "tested_inputs": {
     "lean_toolchain": "leanprover/lean4:v4.10.0-rc1",
     "lean_version": "Lean (version 4.10.0-rc1, x86_64-unknown-linux-gnu, commit 3b58e0649156, Release)",
     "mathlib_commit": "29dcec074de168ac2bf835a77ef68bbe069194c5"
   },
-  "provenance": "docs/evidence/snapshot_companion.provenance.json"
+  "provenance": "docs/evidence/snapshot_companion.provenance.json",
+  "validation_status": "pending-revision-3-native-companion; recorded companion is historical protocol version 2"
 }

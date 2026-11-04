@@ -121,12 +121,21 @@ never overwritten.
 
 ## Compatibility
 
+This development version requires protocol version 3. The bundled companion
+patch and native captures are historical protocol-version-2 evidence and cannot
+start a session with this client. Native revision-3 validation, application
+migration, and matched deployment remain release requirements. See
+[compatibility](docs/compatibility.md).
+
+
 The client speaks one server contract:
 
 | Field | Value |
 | --- | --- |
 | `protocol` | `maths-ai-pantograph` |
-| `protocolVersion` | 2 |
+| `protocolVersion` | 3 |
+| `resourceErrorVersion` | 1 |
+| `commandTransactionVersion` | 1 |
 | `modelSexpVersion` | 1 (`pantograph_async.MODEL_SEXP_VERSION`) |
 | `transitionValidationVersion` | 1 |
 | `transitionProvenanceVersion` | 1 |
@@ -152,11 +161,13 @@ patch = compatibility.companion_patch()  # bytes, checked against its digest
 compatibility.verify_companion_sources("/path/to/Pantograph")  # after applying
 ```
 
-Check out the Pantograph fork at `companion_base()["source_commit"]`, or apply the
+For historical reproduction only, check out the Pantograph fork at
+`companion_base()["source_commit"]`, or apply the
 patch to `companion_base()["base_commit"]`, verify the patched files, and build
 `repl` with Lake. Lean source development
 stays in that fork. [docs/compatibility.md](docs/compatibility.md) has the full
-procedure and what each pin means.
+procedure and what each pin means. A revision-3 companion must replace these
+historical pins before release.
 
 ## Development
 
@@ -189,10 +200,10 @@ wheel with `PANTOGRAPH_CLIENT_REQUIRE_INSTALLED=1`, so imports must come from
 the installed distribution. From a downloaded sdist alone:
 
 ```bash
-tar -xzf pantograph_async_client-0.2.0.tar.gz
-python -m build --wheel pantograph_async_client-0.2.0
-pip install pantograph_async_client-0.2.0/dist/*.whl pytest
-mkdir suite && cp -r pantograph_async_client-0.2.0/tests suite/ && cd suite
+tar -xzf pantograph_async_client-0.3.0.tar.gz
+python -m build --wheel pantograph_async_client-0.3.0
+pip install pantograph_async_client-0.3.0/dist/*.whl pytest
+mkdir suite && cp -r pantograph_async_client-0.3.0/tests suite/ && cd suite
 PANTOGRAPH_CLIENT_REQUIRE_INSTALLED=1 python -m pytest -q --rootdir . tests
 ```
 

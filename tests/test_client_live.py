@@ -164,7 +164,9 @@ def test_provenance_separates_children_from_siblings(live_env):
                 root = await scope.start_goal("True ∧ True")
                 split = await scope.apply_tactic(root, "constructor")
                 assert split.transition.selected == root.root
-                assert split.transition.direct == tuple(g.goal_name for g in split.goals)
+                assert split.transition.direct == tuple(
+                    g.goal_name for g in split.goals
+                )
                 left, right = (goal.goal_name for goal in split.goals)
                 second = await scope.apply_tactic(split, "trivial", goal_index=1)
                 assert second.transition.selected == right
@@ -176,11 +178,17 @@ def test_provenance_separates_children_from_siblings(live_env):
                 witness = await scope.start_goal("∃ n : Nat, n = 0 ∧ n = 1")
                 parts = await scope.apply_tactic(witness, "refine ⟨?w, ?a, ?b⟩")
                 w, a, b = (goal.goal_name for goal in parts.goals)
-                solved = await scope.apply_tactic(parts, "exact (rfl : 0 = 0)", goal_index=1)
+                solved = await scope.apply_tactic(
+                    parts, "exact (rfl : 0 = 0)", goal_index=1
+                )
                 assert solved.transition.closed == (w,)
                 assert solved.transition.changed == (b,)
                 obligations = await scope.inspect(solved, [w, a, b])
-                assert [item.status for item in obligations] == ["complete", "complete", "active"]
+                assert [item.status for item in obligations] == [
+                    "complete",
+                    "complete",
+                    "active",
+                ]
                 assert obligations[2].goal.target.pp == "0 = 1"
                 untouched = await scope.inspect(parts, [w, a, b])
                 assert [item.status for item in untouched] == ["active"] * 3
@@ -215,7 +223,9 @@ def test_certification_requires_a_kernel_checked_complete_root(live_env):
 
                 witness = await scope.start_goal("∃ n : Nat, n = 0 ∧ n = 1")
                 parts = await scope.apply_tactic(witness, "refine ⟨?w, ?a, ?b⟩")
-                conflict = await scope.apply_tactic(parts, "exact (rfl : 0 = 0)", goal_index=1)
+                conflict = await scope.apply_tactic(
+                    parts, "exact (rfl : 0 = 0)", goal_index=1
+                )
                 assert not (await scope.certify(conflict)).is_certified
 
                 classical = await scope.apply_tactic(
@@ -272,7 +282,38 @@ def test_a_tactic_that_leaves_the_goal_open_keeps_the_session(live_env):
             async with client.state_scope() as scope:
                 root = await scope.start_goal("True")
                 same = await scope.apply_tactic(root, "skip")
-                assert same.transition.direct == (root.root,) == (same.goals[0].goal_name,)
+                assert (
+                    same.transition.direct == (root.root,) == (same.goals[0].goal_name,)
+                )
                 assert client.is_usable
+
+    asyncio.run(run())
+
+
+@pytest.mark.pantograph_live
+def test_native_heartbeat_rollback_keeps_original_state(live_env):
+    """Required revision-3 gate; never substitute fake exchanges for this check."""
+    from pantograph_async import PantographResourceError
+
+    async def run():
+        async with await PantographClient.create(live_env) as client:
+            assert (await client.stat()).n_goals == 0
+            async with client.state_scope() as scope:
+                original = await scope.start_goal("True")
+                # Explicit checks exhaust Lean's command heartbeat budget during execution.
+                tactic = (
+                    "set_option maxHeartbeats 1 in "
+                    'run_tac for _ in [:10000000] do Lean.Core.checkSystem "resource-test"'
+                )
+                for _ in range(3):
+                    with pytest.raises(PantographResourceError) as caught:
+                        await scope.apply_tactic(original, tactic)
+                    assert caught.value.kind == "heartbeats"
+                    assert caught.value.command == "goal.tactic"
+                    assert client.is_usable and (await client.stat()).n_goals == 1
+                done = await scope.apply_tactic(original, "trivial")
+                assert (await scope.certify(done)).is_certified
+            assert (await client.stat()).n_goals == 0
+        assert client.phase.value == "CLOSED"
 
     asyncio.run(run())

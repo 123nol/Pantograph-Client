@@ -4,11 +4,30 @@
 manifest; `pantograph_async.compatibility` reads it through the installed
 package.
 
-## What is pinned
+## Revision-3 validation pending
+
+The client requires `protocolVersion=3`, `resourceErrorVersion=1`, and
+`commandTransactionVersion=1` (client contract revision 4). All older descriptors
+fail startup. The recorded companion below implements protocol version 2;
+its patch, source hashes, and captures are retained as historical evidence.
+They do not establish native resource recovery or reproduce a compatible REPL.
+`compatibility.json` records this under `validation_status` and the companion's
+own `descriptor`.
+
+Release order: implement and build the transactional REPL companion first;
+record its exact source and executable identities and native exchanges; validate
+and release this client against that build; migrate all application callers and
+pins together; then deploy the matched pair during a controlled restart.
+Application migration must cover search, replay/certification, admission, live
+collection, metrics, CLI, and API recovery as specified in the
+[implementation plan](dev_plans/pantograph_client_resource_errors_and_recovery.md).
+No application code or deployment pins are changed by this standalone package.
+
+## Historical pins
 
 | Item | Value |
 | --- | --- |
-| Contract revision | 3 (descriptor in [protocol.md](protocol.md)) |
+| Contract revision | 4 (descriptor in [protocol.md](protocol.md)) |
 | Pantograph fork | `https://github.com/123nol/Pantograph.git` |
 | Companion commit | `9ecaaea242f427e534aff29314513c358b4d21ad` (`client_centric_repo`, merge of 123nol/Pantograph#1) |
 | Base commit | `0dd5d2225e2d093f66a4b6231c1aa35004f2c8f3` (the patch applied here reproduces the companion commit) |
@@ -23,7 +42,7 @@ The manifest also lists the SHA-256 of every file the patch produces
 machines, so a rebuilt `repl` is checked by its source digests and the live
 smoke, not by that reference hash.
 
-## Reproducing the companion REPL
+## Reproducing the historical companion REPL
 
 ```bash
 git clone https://github.com/123nol/Pantograph.git
@@ -31,7 +50,7 @@ cd Pantograph
 git checkout --detach 9ecaaea242f427e534aff29314513c358b4d21ad
 python -c "from pantograph_async import compatibility as c; c.verify_companion_sources('.')"
 lake build repl
-pantograph-client smoke --source-root . --pantograph-repl .lake/build/bin/repl --import Lean
+# This protocol-version-2 build will be rejected by the current client.
 ```
 
 Start from a clean checkout. Do not apply the patch over local changes or over

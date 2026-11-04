@@ -1,4 +1,4 @@
-"""Pure revision-3 contract tests; no Lean process or PyPantograph import."""
+"""Pure protocol-version-3 contract tests; no Lean process or PyPantograph import."""
 
 from __future__ import annotations
 
@@ -553,7 +553,7 @@ def test_immutable_containers():
 def test_baseline_evidence_is_not_final_contract_evidence():
     assert BASELINE["kind"] == "unmodified-custom-repl-baseline"
     assert FUTURE["kind"] == "authored-future-contract"
-    assert FUTURE["contract_revision"] == 3
+    assert FUTURE["contract_revision"] == 4
     assert BASELINE["readiness_line"] == "ready."
     for entry in BASELINE["interactions"]:
         assert json.loads(entry["response_line"]) == entry["response"]
@@ -578,7 +578,7 @@ def test_frozen_contract_descriptor_matches_the_codec():
         COMMAND_ERROR_CATEGORIES
     )
     assert contract["complete_theorem_certification"] is True
-    assert contract["contract_revision"] == FUTURE["contract_revision"] == 3
+    assert contract["contract_revision"] == FUTURE["contract_revision"] == 4
     assert contract["transition_validation"] == success()["validation"]
     assert set(contract["tactic_responses"]["success"]["required"]) == set(success())
     for variant, fixture in [
@@ -831,12 +831,16 @@ def test_stage4_companion_capture_is_preserved_but_not_accepted():
                 decode_response(entry["command"], entry["response"])
 
 
-def test_snapshot_companion_capture_decodes_completely():
+def test_historical_snapshot_capture_preserves_operations_but_rejects_descriptor():
     capture = json.loads((FIXTURES / "snapshot_companion" / "capture.json").read_text())
     assert capture["subprocess_reaped"] is True
     decoded = {}
     for entry in capture["interactions"]:
         assert decode_json_response(entry["response_line"]) == entry["response"]
+        if entry["command"] == "protocol.describe":
+            with pytest.raises(PantographProtocolError):
+                decode_response(entry["command"], entry["response"])
+            continue
         decoded[entry["label"]] = decode_response(entry["command"], entry["response"])
     assert decoded["certificate"].is_certified
     assert decoded["partial_certificate"].status == "incomplete"

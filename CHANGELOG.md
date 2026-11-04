@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.0 (unreleased)
+
+- Require protocol version 3 with resource-error and command-transaction versions
+  1, across startup and all runtime commands. Client contract revision is 4.
+- Expose typed recoverable resource, fatal session resource, and remote internal
+  errors. Preserve allocations on validated rollback; retire fatal sessions.
+- Keep explicit deletion ownership on rollback and retire sessions when lexical
+  cleanup fails, preserving the original operation exception.
+- Bound exception payloads and include offending stdout, command, session and
+  phase in protocol diagnostics.
+- Native revision-3 companion validation, application migration and deployment
+  remain pending. The bundled companion patch is historical protocol version 2.
+
 ## 0.2.0 (unreleased)
 
 Contract revision 3 for protocol version 2 of the companion REPL. Servers that

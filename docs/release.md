@@ -2,7 +2,7 @@
 
 ## Versioning
 
-- The distribution version (`pantograph-async-client`, `0.2.0`) identifies a
+- The distribution version (`pantograph-async-client`, `0.3.0`) identifies a
   library release.
 - The descriptor's protocol, model-expression, transition-validation and message
   versions identify wire semantics.
@@ -12,6 +12,14 @@
 A change to the server contract needs new descriptor versions, a matching
 companion patch and manifest, and a new minor version. Library-only fixes are
 patch releases.
+
+## Current release gate
+
+Version 0.3.0 requires a revision-3 transactional REPL. The bundled patch and
+native captures still describe protocol version 2. Do not release using those
+historical pins. Record the reviewed companion source/binary identities and
+native recovery captures, run the native heartbeat test and full live suite,
+and complete the application's resource-outcome migration before deployment.
 
 ## Checklist
 

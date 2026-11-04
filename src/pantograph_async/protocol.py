@@ -1,4 +1,4 @@
-"""Pure codec for the explicit-focused custom Pantograph contract, version 2.
+"""Pure codec for the explicit-focused custom Pantograph contract, version 3.
 
 There is no subprocess or upstream-client dependency here. Missing transition
 evidence is rejected, including responses from the unmodified custom REPL.
@@ -12,7 +12,7 @@ import re
 from copy import deepcopy
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any, Literal, Mapping, cast
 
 # The client owns every wire version. Consumers compare their own expression
 # representation against these values instead of the codec importing theirs.
@@ -21,7 +21,9 @@ MODEL_SEXP_VERSION = 1
 PROTOCOL_DESCRIPTION = MappingProxyType(
     {
         "protocol": "maths-ai-pantograph",
-        "protocolVersion": 2,
+        "protocolVersion": 3,
+        "resourceErrorVersion": 1,
+        "commandTransactionVersion": 1,
         "modelSexpVersion": MODEL_SEXP_VERSION,
         "transitionValidationVersion": 1,
         "transitionProvenanceVersion": 1,
@@ -74,8 +76,12 @@ SUPPORTED_COMMANDS = frozenset(
         "stat",
     }
 )
-OBLIGATION_STATUSES = frozenset({"active", "pending", "assigned", "delayed", "complete"})
-CERTIFICATE_STATUSES = frozenset({"certified", "incomplete", "rejected", "inconclusive"})
+OBLIGATION_STATUSES = frozenset(
+    {"active", "pending", "assigned", "delayed", "complete"}
+)
+CERTIFICATE_STATUSES = frozenset(
+    {"certified", "incomplete", "rejected", "inconclusive"}
+)
 PROOF_IDENTITY = "lean-expr-digest-v1"
 DIGEST = re.compile(r"[0-9a-f]{16}")
 # These categories come from Repl.lean and Library.lean at the pinned base.
@@ -103,9 +109,12 @@ class PantographError(RuntimeError):
     def __init__(
         self, message: str, *, command: str | None = None, payload: Any = None
     ):
-        super().__init__(message)
+        super().__init__(message[:4096])
         self.command = command
-        self._payload = deepcopy(payload)
+        preview = repr(payload)
+        self._payload = (
+            deepcopy(payload) if len(preview) <= 4096 else {"preview": preview[:4096]}
+        )
 
     @property
     def payload(self) -> Any:
@@ -134,6 +143,86 @@ class PantographProtocolError(PantographError):
 
 class PantographTransportError(PantographError):
     pass
+
+
+ResourceKind = Literal["heartbeats"]
+ResourcePhase = Literal["execute", "validate", "observe", "serialize"]
+Recovery = Literal["command-rolled-back", "session-unusable"]
+
+
+@dataclass(frozen=True)
+class ResourceDetails:
+    version: int
+    kind: ResourceKind
+    phase: ResourcePhase
+    limit: int
+
+
+class _ResourceMetadata:
+    """Read-only metadata shared by recoverable and fatal resource failures."""
+
+    _resource: ResourceDetails
+    _recovery: Recovery
+
+    @property
+    def resource(self) -> ResourceDetails:
+        return self._resource
+
+    @property
+    def kind(self) -> ResourceKind:
+        return self.resource.kind
+
+    @property
+    def phase(self) -> ResourcePhase:
+        return self.resource.phase
+
+    @property
+    def limit(self) -> int:
+        return self.resource.limit
+
+    @property
+    def recovery(self) -> Recovery:
+        return self._recovery
+
+
+class PantographResourceError(_ResourceMetadata, PantographError):
+    """The command rolled back; prior allocations remain valid."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        resource: ResourceDetails,
+        command: str,
+        payload: Any = None,
+    ):
+        super().__init__(message, command=command, payload=payload)
+        self._resource = resource
+        self._recovery = "command-rolled-back"
+
+
+class PantographSessionResourceError(_ResourceMetadata, PantographTransportError):
+    """Resource exhaustion made the entire session unusable."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        resource: ResourceDetails,
+        command: str,
+        payload: Any = None,
+    ):
+        super().__init__(message, command=command, payload=payload)
+        self._resource = resource
+        self._recovery = "session-unusable"
+
+
+class PantographRemoteInternalError(PantographTransportError):
+    """The remote command failed unexpectedly; all handles are invalid."""
+
+    @property
+    def recovery(self) -> Recovery:
+        return "session-unusable"
 
 
 class PantographRequestTimeout(PantographTransportError):
@@ -365,6 +454,57 @@ class CommandError:
 
 
 @dataclass(frozen=True)
+class ResourceError:
+    command: str
+    description: str
+    resource: ResourceDetails
+    recovery: Recovery
+
+    def as_exception(self) -> PantographResourceError | PantographSessionResourceError:
+        error_class = (
+            PantographResourceError
+            if self.recovery == "command-rolled-back"
+            else PantographSessionResourceError
+        )
+        description = self.description[:2048]
+        return error_class(
+            description,
+            command=self.command,
+            resource=self.resource,
+            payload={
+                "error": "resource",
+                "desc": description,
+                "resource": {
+                    "version": self.resource.version,
+                    "kind": self.resource.kind,
+                    "phase": self.resource.phase,
+                    "limit": self.resource.limit,
+                },
+                "recovery": self.recovery,
+            },
+        )
+
+
+@dataclass(frozen=True)
+class InternalError:
+    command: str
+    description: str
+    recovery: Literal["session-unusable"] = "session-unusable"
+
+    def as_exception(self) -> PantographRemoteInternalError:
+        description = self.description[:2048]
+        return PantographRemoteInternalError(
+            description,
+            command=self.command,
+            payload={
+                "error": "internal",
+                "desc": description,
+                "recovery": self.recovery,
+            },
+        )
+
+
+@dataclass(frozen=True)
 class PantographStats:
     n_goals: int
 
@@ -378,6 +518,8 @@ class CommandAcknowledgement:
 class ProtocolDescription:
     protocol: str
     protocol_version: int
+    resource_error_version: int
+    command_transaction_version: int
     model_sexp_version: int
     transition_validation_version: int
     transition_provenance_version: int
@@ -409,6 +551,8 @@ Response = (
     | TacticParseFailure
     | TacticFailure
     | CommandError
+    | ResourceError
+    | InternalError
     | PantographStats
     | CommandAcknowledgement
     | ProtocolDescription
@@ -555,7 +699,10 @@ def encode_request(command: str, payload: Mapping[str, Any]) -> bytes:
     elif command == "goal.certify":
         _fields(body, {"stateId"}, {"maxHeartbeats"})
         _nat(body["stateId"], "stateId")
-        if "maxHeartbeats" in body and _nat(body["maxHeartbeats"], "maxHeartbeats") == 0:
+        if (
+            "maxHeartbeats" in body
+            and _nat(body["maxHeartbeats"], "maxHeartbeats") == 0
+        ):
             raise PantographProtocolError("maxHeartbeats must be positive.")
     else:
         _fields(body, {"stateIds"})
@@ -726,9 +873,7 @@ def decode_transition_validation(
 
 
 def _names(value: Any, owner: str) -> tuple[str, ...]:
-    names = tuple(
-        _string(item, owner, nonempty=True) for item in _array(value, owner)
-    )
+    names = tuple(_string(item, owner, nonempty=True) for item in _array(value, owner))
     if len(set(names)) != len(names):
         raise PantographProtocolError(f"{owner} names must be distinct.")
     return names
@@ -889,8 +1034,49 @@ def decode_response(command: str, payload: Any) -> Response:
     try:
         obj = _object(payload, "response")
         if "error" in obj:
-            _fields(obj, {"error", "desc"})
             category = _string(obj["error"], "error category")
+            if category in {"resource", "internal"}:
+                _fields(
+                    obj,
+                    {"error", "desc", "recovery"}
+                    | ({"resource"} if category == "resource" else set()),
+                )
+                description = _string(obj["desc"], "error description", nonempty=True)
+                recovery = _string(obj["recovery"], "recovery")
+                if recovery not in {"command-rolled-back", "session-unusable"}:
+                    raise PantographProtocolError("Unknown recovery value.")
+                if category == "internal":
+                    if recovery != "session-unusable":
+                        raise PantographProtocolError(
+                            "Internal errors must retire the session."
+                        )
+                    return InternalError(command, description)
+                resource = _object(obj["resource"], "resource")
+                _fields(resource, {"version", "kind", "phase", "limit"})
+                version = _nat(resource["version"], "resource version")
+                kind = _string(resource["kind"], "resource kind")
+                phase = _string(resource["phase"], "resource phase")
+                limit = _nat(resource["limit"], "resource limit")
+                if version != 1 or kind != "heartbeats":
+                    raise PantographProtocolError(
+                        "Unsupported resource version or kind."
+                    )
+                if phase not in {"execute", "validate", "observe", "serialize"}:
+                    raise PantographProtocolError("Unsupported resource phase.")
+                if limit == 0:
+                    raise PantographProtocolError("Resource limit must be positive.")
+                return ResourceError(
+                    command,
+                    description,
+                    ResourceDetails(
+                        version,
+                        cast(ResourceKind, kind),
+                        cast(ResourcePhase, phase),
+                        limit,
+                    ),
+                    cast(Recovery, recovery),
+                )
+            _fields(obj, {"error", "desc"})
             if category not in COMMAND_ERROR_CATEGORIES[command]:
                 raise PantographProtocolError(
                     f"Unknown {command} error category {category!r}."
@@ -1004,6 +1190,8 @@ def decode_response(command: str, payload: Any) -> Response:
             return ProtocolDescription(
                 obj["protocol"],
                 obj["protocolVersion"],
+                obj["resourceErrorVersion"],
+                obj["commandTransactionVersion"],
                 obj["modelSexpVersion"],
                 obj["transitionValidationVersion"],
                 obj["transitionProvenanceVersion"],

@@ -1,8 +1,8 @@
 {
-  "status": "revision3-snapshot-operations-requires-application-migration-and-deployment-validation",
+  "status": "resource-recovery-client-implemented-native-and-application-validation-pending",
   "descriptor": {
     "protocol": "maths-ai-pantograph",
-    "protocolVersion": 2,
+    "protocolVersion": 3,
     "modelSexpVersion": 1,
     "transitionValidationVersion": 1,
     "transitionProvenanceVersion": 1,
@@ -10,7 +10,9 @@
     "certificationVersion": 1,
     "messageVersion": 1,
     "goalSelection": "explicit-focused-v1",
-    "tacticErrorsFormat": "string-array-v1"
+    "tacticErrorsFormat": "string-array-v1",
+    "resourceErrorVersion": 1,
+    "commandTransactionVersion": 1
   },
   "required_options": {
     "printJsonPretty": false,
@@ -103,7 +105,7 @@
   },
   "baseline_provenance": "../tests/fixtures/pantograph/baseline/provenance.json",
   "complete_theorem_certification": true,
-  "contract_revision": 3,
+  "contract_revision": 4,
   "reconciled_on": "2026-10-26",
   "implementation_status": {
     "stage0": "Rebaselined on upstream PR #1; live unextended captures recorded.",
@@ -115,7 +117,8 @@
     "stage5": "Actual client verified against the Stage 4 executable: graph goldens, replay, admission/unsafe rejection, state lifetimes and 100 scoped proofs with zero retained states. CPU-only evidence; not full theorem certification.",
     "stage6": "Atomic factory, reasoner, pool, inference and translator migration implemented. Real factory/executor checks passed with two independent CPU workers. No upstream Python imports or selectable old-client route remain.",
     "stage4": "Companion Lean extension implemented on client_centric_repo over the merged PR #1 base; Stage 4 exit gate passed on 2026-10-10. 299 Lean assertions, 316 Python regressions, 61 raw Mathlib exchanges and four exact canonical graph goldens passed.",
-    "snapshot_operations": "Revision-3 codec, typed inspect/certify scope operations, provenance linkage checks and reclaimable issued-state records implemented against the snapshot companion build."
+    "snapshot_operations": "Revision-3 codec, typed inspect/certify scope operations, provenance linkage checks and reclaimable issued-state records implemented against the snapshot companion build.",
+    "resource_recovery": "Standalone codec, transport and ownership implemented; native companion, application migration and deployment pending."
   },
   "upstream": {
     "branch": "gnn-sexpr-v410",
@@ -205,7 +208,7 @@
   "upstream_live_capture": "../tests/fixtures/pantograph/upstream_pr1/capture.json",
   "revision1_fixture": "../tests/fixtures/pantograph/historical_revision1/future_contract.json",
   "authored_target_fixture": "../tests/fixtures/pantograph/future_contract.json",
-  "descriptor_revision_note": "protocolVersion 2 adds transition provenance, goal.inspect and goal.certify. contract_revision tracks client contract revisions, not a runtime compatibility mode. protocolVersion 1 servers are rejected at startup.",
+  "descriptor_revision_note": "protocolVersion 3 requires resourceErrorVersion 1 and commandTransactionVersion 1. Older servers are rejected.",
   "companion_patch": {
     "file": "repository_client_contract.patch",
     "sha256": "18a973b6ab69190e8343ee8461ff1e4d4235f9c555ff0338299dce89d6ad0c54",
@@ -314,5 +317,23 @@
     "boundary": "Kernel check of the recorded root statement; not an interpretation of empty goal lists or validation flags.",
     "allocation": "None; read-only."
   },
-  "revision2_fixture": "../tests/fixtures/pantograph/historical_revision2/future_contract.json"
+  "revision2_fixture": "../tests/fixtures/pantograph/historical_revision2/future_contract.json",
+  "resource_errors": {
+    "version": 1,
+    "kinds": [
+      "heartbeats"
+    ],
+    "phases": [
+      "execute",
+      "validate",
+      "observe",
+      "serialize"
+    ],
+    "limit": "positive integer in maxHeartbeats option units; booleans rejected",
+    "recovery": [
+      "command-rolled-back",
+      "session-unusable"
+    ],
+    "internal_recovery": "session-unusable"
+  }
 }

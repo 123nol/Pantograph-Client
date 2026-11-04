@@ -13,7 +13,7 @@ older or unextended servers are rejected.
 | `historical_revision1/` | Authored fixtures for the superseded contract revision 1 | No |
 | `historical_revision2/` | Authored fixtures for contract revision 2 (protocol version 1) | No |
 | `stage4_companion/` | Live capture from the Stage 4 companion build (protocol version 1) | Failure variants only |
-| `snapshot_companion/` | Live capture from the snapshot companion build (protocol version 2), with its provenance | Yes |
+| `snapshot_companion/` | Live capture from the snapshot companion build (protocol version 2), with its provenance | Operations only; descriptor rejected |
 | `future_contract.json` | Authored revision-3 responses used by the fake REPL and codec tests | Yes |
 | `fake_repl.py` | Diagnostic child process for real-process transport tests; never used at runtime | n/a |
 

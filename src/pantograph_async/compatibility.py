@@ -47,7 +47,7 @@ def companion_patch() -> bytes:
 
 
 def companion_base() -> dict[str, str]:
-    """Source pins needed to reproduce the validated companion executable."""
+    """Recorded companion pins; consult manifest validation_status before release."""
     data = manifest()
     return {
         "contract_revision": data["contract_revision"],
@@ -66,7 +66,7 @@ def companion_files() -> frozenset[str]:
 
 
 def verify_companion_sources(root: str | Path) -> None:
-    """Require a checkout whose patched files match the validated companion."""
+    """Check recorded source hashes, independently of runtime protocol compatibility."""
     root = Path(root)
     data = manifest()
     mismatched = []

@@ -90,14 +90,61 @@ def main():
     roots = {}
     listed = {}
     next_id = 0
+    resource_sent = False
     for line in sys.stdin:
         command, raw = line.split(" ", 1)
         args = json.loads(raw)
         event("request", command=command, args=args)
+        resource_command = os.environ.get("PANTOGRAPH_FAKE_RESOURCE_COMMAND")
+        resource_tactic = command == "goal.tactic" and args.get(
+            "tactic", ""
+        ).startswith("resource_")
+        if (
+            command == resource_command
+            and (not resource_sent or os.environ.get("PANTOGRAPH_FAKE_RESOURCE_REPEAT"))
+        ) or resource_tactic:
+            resource_sent = True
+            mode = (
+                args["tactic"].removeprefix("resource_")
+                if resource_tactic
+                else os.environ.get("PANTOGRAPH_FAKE_RESOURCE_MODE", "rollback")
+            )
+            delay = float(os.environ.get("PANTOGRAPH_FAKE_RESOURCE_DELAY", "0"))
+            time.sleep(delay)
+            if mode == "text":
+                print("Uncaught IO exception " + "x" * 2000, flush=True)
+                continue
+            result = {
+                "error": "resource",
+                "desc": "Lean command heartbeat budget exhausted",
+                "resource": {
+                    "version": 1,
+                    "kind": "heartbeats",
+                    "phase": "execute",
+                    "limit": 200000,
+                },
+                "recovery": (
+                    "session-unusable" if mode == "fatal" else "command-rolled-back"
+                ),
+            }
+            if mode == "internal":
+                result = {
+                    "error": "internal",
+                    "desc": "Unexpected REPL command failure",
+                    "recovery": "session-unusable",
+                }
+            if mode == "malformed":
+                result["resource"]["limit"] = True
+            send(result, scenario == "split")
+            if mode == "duplicate":
+                send(result)
+            continue
         if command == "protocol.describe":
             result = {
                 "protocol": "maths-ai-pantograph",
-                "protocolVersion": 2,
+                "protocolVersion": 3,
+                "resourceErrorVersion": 1,
+                "commandTransactionVersion": 1,
                 "modelSexpVersion": 1,
                 "transitionValidationVersion": 1,
                 "transitionProvenanceVersion": 1,
@@ -232,20 +279,22 @@ def main():
                     names.reverse()
                 result = {
                     "obligations": [
-                        {
-                            "name": name,
-                            "status": "active",
-                            "goal": goals[name],
-                            "holes": [],
-                            "universeHoles": False,
-                        }
-                        if "vars" in goals.get(name, {})
-                        else {
-                            "name": name,
-                            "status": "complete",
-                            "holes": [],
-                            "universeHoles": False,
-                        }
+                        (
+                            {
+                                "name": name,
+                                "status": "active",
+                                "goal": goals[name],
+                                "holes": [],
+                                "universeHoles": False,
+                            }
+                            if "vars" in goals.get(name, {})
+                            else {
+                                "name": name,
+                                "status": "complete",
+                                "holes": [],
+                                "universeHoles": False,
+                            }
+                        )
                         for name in names
                     ]
                 }

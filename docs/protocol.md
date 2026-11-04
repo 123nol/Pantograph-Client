@@ -1,6 +1,6 @@
 # Wire protocol
 
-The client speaks exactly one contract, revision 3 of the custom REPL
+The client speaks exactly one contract, revision 4 of the custom REPL
 (`src/pantograph_async/resources/contract.json`). The codec in
 `pantograph_async.protocol` rejects anything else; there is no fallback schema.
 
@@ -17,7 +17,9 @@ Startup, under one deadline:
    | Field | Value |
    | --- | --- |
    | `protocol` | `maths-ai-pantograph` |
-   | `protocolVersion` | 2 |
+   | `protocolVersion` | 3 |
+| `resourceErrorVersion` | 1 |
+| `commandTransactionVersion` | 1 |
    | `modelSexpVersion` | 1 |
    | `transitionValidationVersion` | 1 |
    | `transitionProvenanceVersion` | 1 |
@@ -54,7 +56,7 @@ a hierarchical name on the server. Invalid lists are rejected before anything is
 sent. Exposing this field changes no descriptor version.
 
 `goalId` is always sent explicitly. Omission is not unfocused execution.
-Errors are `{"error", "desc"}` with a per-command category set. `goal.start`
+Ordinary errors are `{"error", "desc"}` with a per-command category set. `goal.start`
 parse/elaboration errors map to `PantographGoalRejected`; an unknown state
 or obligation index on `goal.tactic`, `goal.inspect` or `goal.certify` maps to
 `PantographStateError`; everything else is a protocol error.
@@ -127,3 +129,46 @@ Decoded values are frozen dataclasses (`ExecutionGoal`, `ExecutionLocal`,
 `WireExpression`, `TacticState`, `TransitionProvenance`,
 `ObligationInspection`, `CertificationResult`, ...). They expose wire fields only. Converting
 them into an application model is the consumer's job, in its own adapter.
+
+## Transactional resource failures
+
+Every command, including startup probes and deletion, can return:
+
+```json
+{"error":"resource","desc":"Lean command heartbeat budget exhausted","resource":{"version":1,"kind":"heartbeats","phase":"execute","limit":200000},"recovery":"command-rolled-back"}
+```
+
+`kind` currently accepts only `heartbeats`. `phase` is `execute`, `validate`,
+`observe`, or `serialize`. `limit` is a positive integer in Lean's
+`maxHeartbeats` option units; booleans are invalid. No extra fields are accepted.
+The pending request supplies the command identity.
+
+`command-rolled-back` raises `PantographResourceError`, directly in the
+`PantographError` family. Prior state objects remain usable. No allocation is
+registered or consumed, and deletion rollback retains ownership. The client
+never retries automatically. Rollback does not reverse arbitrary external IO.
+
+`session-unusable` raises `PantographSessionResourceError`, in the
+`PantographTransportError` family. Unexpected remote failures return
+`{"error":"internal","desc":"Unexpected REPL command failure","recovery":"session-unusable"}`
+and raise `PantographRemoteInternalError` in the same transport family.
+Both fatal outcomes invalidate all handles, reap the process, and wake queued
+requests with the retained cause before they can write.
+
+Resource exceptions expose read-only `kind`, `phase`, `limit`, `recovery`, and
+frozen `resource` metadata, plus independently copied `payload` context.
+A startup resource error closes the process and surfaces its typed error with
+command and resource phase. It never publishes a READY client.
+
+Explicit release can be attempted again after validated deletion rollback.
+Lexical cleanup failure closes the session to reclaim all allocations. An
+operation error already propagating remains the primary exception, with the
+cleanup error recorded in its notes. Cleanup failure without a prior error
+raises the deletion error. Subsequent client requests raise a transport failure
+with the deletion rollback as its cause because the owner retired the session.
+
+Unknown stdout, duplicate responses, invalid JSON/schema, and interruptions
+after a possible write remain terminal. Protocol diagnostics include a bounded
+stdout prefix, pending command, session identity, session phase, and stderr tail.
+Exception messages and wire payload context are bounded to 4096 characters;
+resource descriptions are bounded to 2048 characters.

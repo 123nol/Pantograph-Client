@@ -1,0 +1,421 @@
+{
+  "evidence": "Authored revision-3 contract fixtures; native companion agreement pending.",
+  "resource": {
+    "error": "resource",
+    "desc": "Lean command heartbeat budget exhausted",
+    "resource": {
+      "version": 1,
+      "kind": "heartbeats",
+      "phase": "execute",
+      "limit": 200000
+    },
+    "recovery": "command-rolled-back"
+  },
+  "fatal_resource": {
+    "error": "resource",
+    "desc": "Lean command heartbeat budget exhausted",
+    "resource": {
+      "version": 1,
+      "kind": "heartbeats",
+      "phase": "execute",
+      "limit": 200000
+    },
+    "recovery": "session-unusable"
+  },
+  "internal": {
+    "error": "internal",
+    "desc": "Unexpected REPL command failure",
+    "recovery": "session-unusable"
+  },
+  "malformed": [
+    {
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 1,
+        "kind": "heartbeats",
+        "phase": "execute",
+        "limit": 200000
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "resource": {
+        "version": 1,
+        "kind": "heartbeats",
+        "phase": "execute",
+        "limit": 200000
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 1,
+        "kind": "heartbeats",
+        "phase": "execute",
+        "limit": 200000
+      }
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": true,
+        "kind": "heartbeats",
+        "phase": "execute",
+        "limit": 200000
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 0,
+        "kind": "heartbeats",
+        "phase": "execute",
+        "limit": 200000
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 2,
+        "kind": "heartbeats",
+        "phase": "execute",
+        "limit": 200000
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": "1",
+        "kind": "heartbeats",
+        "phase": "execute",
+        "limit": 200000
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": null,
+        "kind": "heartbeats",
+        "phase": "execute",
+        "limit": 200000
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 1,
+        "kind": "memory",
+        "phase": "execute",
+        "limit": 200000
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 1,
+        "kind": null,
+        "phase": "execute",
+        "limit": 200000
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 1,
+        "kind": 1,
+        "phase": "execute",
+        "limit": 200000
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 1,
+        "kind": "heartbeats",
+        "phase": "startup",
+        "limit": 200000
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 1,
+        "kind": "heartbeats",
+        "phase": null,
+        "limit": 200000
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 1,
+        "kind": "heartbeats",
+        "phase": 1,
+        "limit": 200000
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 1,
+        "kind": "heartbeats",
+        "phase": "execute",
+        "limit": true
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 1,
+        "kind": "heartbeats",
+        "phase": "execute",
+        "limit": false
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 1,
+        "kind": "heartbeats",
+        "phase": "execute",
+        "limit": 0
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 1,
+        "kind": "heartbeats",
+        "phase": "execute",
+        "limit": -1
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 1,
+        "kind": "heartbeats",
+        "phase": "execute",
+        "limit": 1.5
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 1,
+        "kind": "heartbeats",
+        "phase": "execute",
+        "limit": "1"
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 1,
+        "kind": "heartbeats",
+        "phase": "execute",
+        "limit": null
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "kind": "heartbeats",
+        "phase": "execute",
+        "limit": 200000
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 1,
+        "phase": "execute",
+        "limit": 200000
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 1,
+        "kind": "heartbeats",
+        "limit": 200000
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 1,
+        "kind": "heartbeats",
+        "phase": "execute"
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 1,
+        "kind": "heartbeats",
+        "phase": "execute",
+        "limit": 200000
+      },
+      "recovery": "command-rolled-back",
+      "stateId": 0
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 1,
+        "kind": "heartbeats",
+        "phase": "execute",
+        "limit": 200000
+      },
+      "recovery": "command-rolled-back",
+      "nextStateId": 0
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 1,
+        "kind": "heartbeats",
+        "phase": "execute",
+        "limit": 200000
+      },
+      "recovery": "command-rolled-back",
+      "messages": 0
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 1,
+        "kind": "heartbeats",
+        "phase": "execute",
+        "limit": 200000
+      },
+      "recovery": "command-rolled-back",
+      "unknown": 0
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 1,
+        "kind": "heartbeats",
+        "phase": "execute",
+        "limit": 200000
+      },
+      "recovery": "command-rolled-back",
+      "command": 0
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 1,
+        "kind": "heartbeats",
+        "phase": "execute",
+        "limit": 200000
+      },
+      "recovery": "retry"
+    },
+    {
+      "error": "resource",
+      "desc": "",
+      "resource": {
+        "version": 1,
+        "kind": "heartbeats",
+        "phase": "execute",
+        "limit": 200000
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 1,
+        "kind": "heartbeats",
+        "phase": "execute",
+        "limit": 200000,
+        "unknown": 1
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "internal",
+      "desc": "Unexpected REPL command failure",
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "internal",
+      "desc": "Unexpected REPL command failure",
+      "recovery": "session-unusable",
+      "resource": {
+        "version": 1,
+        "kind": "heartbeats",
+        "phase": "execute",
+        "limit": 200000
+      }
+    },
+    {
+      "error": "internal",
+      "desc": "Unexpected REPL command failure",
+      "recovery": "session-unusable",
+      "stateId": 0
+    }
+  ]
+}

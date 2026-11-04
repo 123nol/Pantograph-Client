@@ -22,16 +22,19 @@ from .protocol import (
     CommandError,
     GoalStartResult,
     InspectionResult,
+    InternalError,
     ObligationInspection,
     PantographConfigurationError,
     PantographGoalRejected,
     PantographProtocolError,
     PantographRequestTimeout,
+    PantographResourceError,
     PantographStartupError,
     PantographStateError,
-    PantographTacticRejected,
     PantographStats,
+    PantographTacticRejected,
     PantographTransportError,
+    ResourceError,
     Response,
     SessionOptions,
     StartedGoal,
@@ -283,6 +286,7 @@ class PantographClient:
         self._lock = asyncio.Lock()
         self._ready = self._loop.create_future()
         self._ready.add_done_callback(_observe)
+        self._pending_command: str | None = None
         self._reply: asyncio.Future | None = None
         self._close_task: asyncio.Task | None = None
         self._failure: Exception | None = None
@@ -404,7 +408,7 @@ class PantographClient:
             )
 
     def _context(self) -> str:
-        return f"command={self.launch_spec.command!r} source_root={self.launch_spec.source_root} phase={self.phase.value} stderr={self.stderr_tail!r}"
+        return f"command={self._pending_command!r} session={self.session_id} executable={self.launch_spec.command!r} source_root={self.launch_spec.source_root} phase={self.phase.value} stderr={self.stderr_tail!r}"
 
     async def stat(self) -> PantographStats:
         return await self._exchange("stat", {})
@@ -458,18 +462,19 @@ class PantographClient:
                     line
                 ) > self.launch_spec.response_line_limit or not line.endswith(b"\n"):
                     raise PantographTransportError(
-                        "REPL response exceeds the line limit or lacks its newline."
+                        f"REPL response exceeds the line limit or lacks its newline; stdout={line[:512]!r}; {self._context()}",
+                        command=self._pending_command,
                     )
                 if first:
                     first = False
                     if line != b"ready.\n":
                         raise PantographStartupError(
-                            f"Invalid readiness line; {self._context()}"
+                            f"Invalid readiness line stdout={line[:512]!r}; {self._context()}"
                         )
                     self._ready.set_result(None)
                 elif self._reply is None or self._reply.done():
                     raise PantographProtocolError(
-                        f"Unsolicited REPL stdout; {self._context()}"
+                        f"Unsolicited REPL stdout={line[:512]!r}; {self._context()}"
                     )
                 else:
                     self._reply.set_result(line)
@@ -535,9 +540,7 @@ class PantographClient:
             if not isinstance(original, asyncio.CancelledError):
                 raise
         except Exception as exc:
-            if not isinstance(original, asyncio.CancelledError):
-                raise
-            original.add_note(f"Cleanup also failed: {exc}")
+            original.add_note(f"Cleanup also failed: {type(exc).__name__}: {exc}")
 
     async def _exchange(
         self,
@@ -587,6 +590,7 @@ class PantographClient:
                     request = encode_request(command, body)
                     if self._loop.time() >= deadline:
                         raise TimeoutError
+                self._pending_command = command
                 self._reply = self._loop.create_future()
                 self._reply.add_done_callback(_observe)
                 process = self._owner.process
@@ -598,11 +602,20 @@ class PantographClient:
                     raise self._failure or PantographTransportError(
                         "Client failed before response decoding."
                     )
-                result = decode_response(command, decode_json_response(line))
+                try:
+                    result = decode_response(command, decode_json_response(line))
+                except PantographProtocolError as exc:
+                    raise PantographProtocolError(
+                        f"{exc}; stdout={line[:512]!r}; {self._context()}",
+                        command=command,
+                        payload={"stdout": repr(line[:512])},
+                    ) from exc
                 if self._loop.time() >= deadline:
                     raise TimeoutError
-                if isinstance(result, CommandError):
-                    raise result.as_exception()
+                if isinstance(result, (CommandError, ResourceError, InternalError)):
+                    error = result.as_exception()
+                    error.add_note(self._context())
+                    raise error
                 if isinstance(result, (GoalStartResult, TacticSuccess)):
                     state_id = (
                         result.state_id
@@ -640,7 +653,7 @@ class PantographClient:
                 )
                 await self._close_after_error(exc)
             raise
-        except PantographGoalRejected:
+        except (PantographGoalRejected, PantographResourceError):
             raise
         except (
             PantographProtocolError,
@@ -672,6 +685,7 @@ class PantographClient:
         finally:
             if acquired:
                 self._reply = None
+                self._pending_command = None
                 self._lock.release()
 
 
@@ -726,10 +740,12 @@ class PantographStateScope:
         try:
             await self.aclose()
         except BaseException as exc:
-            if isinstance(original, asyncio.CancelledError):
+            if original is not None:
                 if exc is not original:
-                    original.add_note(f"Scope cleanup also failed: {exc}")
-                raise original
+                    original.add_note(
+                        f"Scope cleanup also failed: {type(exc).__name__}: {exc}"
+                    )
+                return
             raise
 
     def _validate_state(self, state: StartedGoal | TacticState) -> bool:
@@ -900,9 +916,7 @@ class PantographStateScope:
                 raise PantographStateError("Cannot inspect a released state.")
             return {"stateId": state.handle.state_id, "goals": names}
 
-        response = await self._client._exchange(
-            "goal.inspect", {}, prepare=prepare
-        )
+        response = await self._client._exchange("goal.inspect", {}, prepare=prepare)
         assert isinstance(response, InspectionResult)
         if [item.name for item in response.obligations] != names:
             error = PantographProtocolError(
@@ -936,9 +950,7 @@ class PantographStateScope:
                 payload["maxHeartbeats"] = max_heartbeats
             return payload
 
-        response = await self._client._exchange(
-            "goal.certify", {}, prepare=prepare
-        )
+        response = await self._client._exchange("goal.certify", {}, prepare=prepare)
         assert isinstance(response, CertificationResult)
         if response.is_certified and response.receipt.root != self._root_of(state):
             error = PantographProtocolError(
@@ -958,6 +970,13 @@ class PantographStateScope:
             if isinstance(original, Exception)
             else PantographTransportError("State cleanup cancelled.")
         )
+        if isinstance(original, PantographResourceError):
+            error = PantographTransportError(
+                "Scope cleanup rolled back; the session was retired to reclaim allocations.",
+                command=original.command,
+                payload=original.payload,
+            )
+            error.__cause__ = original
         self._client._fail(error)
         await self._client._close_after_error(original)
 

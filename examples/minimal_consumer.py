@@ -13,6 +13,7 @@ from pantograph_async import (
     PantographClient,
     PantographEnv,
     PantographTacticRejected,
+    PantographResourceError,
     TacticState,
 )
 
@@ -26,9 +27,14 @@ async def main(source_root: Path, repl: Path, imports: tuple[str, ...]) -> None:
             assert isinstance(state, TacticState)
             goal = state.goals[0]
             print("target:", goal.target.pp, "| model:", goal.target.model_sexp)
-            print("locals:", [(local.user_name, local.type.pp) for local in goal.locals])
+            print(
+                "locals:", [(local.user_name, local.type.pp) for local in goal.locals]
+            )
             try:
                 await scope.apply_tactic(state, "exact False", goal_index=0)
+            except PantographResourceError as exc:
+                # This attempt published no state; another candidate may use state.
+                print("resource failure:", exc.kind, exc.phase, exc.limit)
             except PantographTacticRejected as exc:
                 print("rejected:", str(exc).splitlines()[0])
             done = await scope.apply_tactic(state, "exact h", goal_index=0)
@@ -38,4 +44,6 @@ async def main(source_root: Path, repl: Path, imports: tuple[str, ...]) -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main(Path(sys.argv[1]), Path(sys.argv[2]), tuple(sys.argv[3:]) or ("Init",)))
+    asyncio.run(
+        main(Path(sys.argv[1]), Path(sys.argv[2]), tuple(sys.argv[3:]) or ("Init",))
+    )
