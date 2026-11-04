@@ -18,3 +18,10 @@ older or unextended servers are rejected.
 | `fake_repl.py` | Diagnostic child process for real-process transport tests; never used at runtime | n/a |
 
 Canonical graph goldens belong to the consuming application, not here.
+
+`transactional_snapshot_companion/` records current protocol-version-3 snapshot
+and options exchanges. `transactional_resources/` carries the exact shared
+error schema/fixtures from companion commit `5cab95e`, plus fresh raw executable
+recovery exchanges. Artifact hashes and the source/binary identity are recorded
+in `docs/evidence/transactional_companion.provenance.json`. Historical captures
+are preserved unchanged.

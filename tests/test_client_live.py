@@ -296,15 +296,15 @@ def test_native_heartbeat_rollback_keeps_original_state(live_env):
     from pantograph_async import PantographResourceError
 
     async def run():
-        async with await PantographClient.create(live_env) as client:
+        fixture_env = replace(
+            live_env, imports=(*live_env.imports, "Test.ContractFixtures")
+        )
+        async with await PantographClient.create(fixture_env) as client:
             assert (await client.stat()).n_goals == 0
             async with client.state_scope() as scope:
                 original = await scope.start_goal("True")
-                # Explicit checks exhaust Lean's command heartbeat budget during execution.
-                tactic = (
-                    "set_option maxHeartbeats 1 in "
-                    'run_tac for _ in [:10000000] do Lean.Core.checkSystem "resource-test"'
-                )
+                # Native weak-head reduction exhausts the command budget.
+                tactic = "contract_heartbeat"
                 for _ in range(3):
                     with pytest.raises(PantographResourceError) as caught:
                         await scope.apply_tactic(original, tactic)
@@ -314,6 +314,31 @@ def test_native_heartbeat_rollback_keeps_original_state(live_env):
                 done = await scope.apply_tactic(original, "trivial")
                 assert (await scope.certify(done)).is_certified
             assert (await client.stat()).n_goals == 0
+        assert client.phase.value == "CLOSED"
+
+    asyncio.run(run())
+
+
+@pytest.mark.pantograph_live
+def test_native_fatal_error_retires_owned_states(live_env):
+    from pantograph_async import PantographRemoteInternalError, PantographStateError
+
+    async def run():
+        fixture_env = replace(
+            live_env, imports=(*live_env.imports, "Test.ContractFixtures")
+        )
+        async with await PantographClient.create(fixture_env) as client:
+            async with client.state_scope() as scope:
+                original = await scope.start_goal("True")
+                with pytest.raises(PantographRemoteInternalError) as failure:
+                    await scope.apply_tactic(original, "contract_internal_failure")
+                assert not client.is_usable and not client._allocated_ids
+                assert not scope._issued
+                with pytest.raises(PantographRemoteInternalError) as later:
+                    await client.stat()
+                assert later.value is failure.value
+                with pytest.raises(PantographStateError):
+                    await scope.apply_tactic(original, "trivial")
         assert client.phase.value == "CLOSED"
 
     asyncio.run(run())

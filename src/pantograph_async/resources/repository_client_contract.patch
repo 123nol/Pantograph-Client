@@ -1,3 +1,75 @@
+diff --git a/Main.lean b/Main.lean
+index b866711..349dba7 100644
+--- a/Main.lean
++++ b/Main.lean
+@@ -23,30 +23,33 @@ def parseCommand (s: String): Except String Command := do
+       return { cmd := s.take offset, payload := payload }
+   | .none => throw "Command is empty"
+ 
+-partial def loop : MainM Unit := do
+-  let state ← get
++/-- A failed write ends the process; it never triggers a second response. -/
++def writeResponse (bytes : String) : IO Unit := do
++  let stdout ← IO.getStdout
++  stdout.putStr (bytes ++ "\n")
++  stdout.flush
++
++partial def loop : MainM UInt32 := do
+   let command ← (← IO.getStdin).getLine
+-  if command.trim.length = 0 then return ()
++  if command.trim.length = 0 then return (0 : UInt32)
+   match parseCommand command with
+   | .error error =>
+-    let error  := Lean.toJson ({ error := "command", desc := error }: InteractionError)
+-    -- Using `Lean.Json.compress` here to prevent newline
+-    IO.println error.compress
++    let error := Lean.toJson ({ error := "command", desc := error.take 2048 } : InteractionError)
++    writeResponse error.compress
+   | .ok command =>
+-    let ret ← execute command
+-    let str := match state.options.printJsonPretty with
+-      | true => ret.pretty
+-      | false => ret.compress
+-    IO.println str
++    let result ← executeCommand command
++    writeResponse result.bytes
++    if result.fatal then
++      (← IO.getStderr).putStrLn "REPL command failed; session is unusable"
++      return (1 : UInt32)
+   loop
+ 
+-
+-unsafe def main (args: List String): IO Unit := do
++private unsafe def runRepl (args: List String): IO UInt32 := do
+   -- NOTE: A more sophisticated scheme of command line argument handling is needed.
+   -- Separate imports and options
+   if args == ["--version"] then do
+     println! s!"{Pantograph.version}"
+-    return
++    return (0 : UInt32)
+ 
+   Pantograph.initSearch ""
+ 
+@@ -57,10 +60,13 @@ unsafe def main (args: List String): IO Unit := do
+   let context: Context := {
+     imports
+   }
++  let coreM := loop.run context |>.run' {}
++  writeResponse "ready."
++  return (← coreM.toIO coreContext coreState).1
++
++unsafe def main (args : List String) : IO UInt32 := do
+   try
+-    let coreM := loop.run context |>.run' {}
+-    IO.println "ready."
+-    discard <| coreM.toIO coreContext coreState
+-  catch ex =>
+-    IO.println "Uncaught IO exception"
+-    IO.println ex.toString
++    runRepl args
++  catch _ =>
++    (← IO.getStderr).putStrLn "REPL startup or transport failure; session is unusable"
++    return (1 : UInt32)
 diff --git a/Pantograph.lean b/Pantograph.lean
 index 292efb9..4b5b506 100644
 --- a/Pantograph.lean
@@ -218,12 +290,13 @@ index 0000000..7b79fda
 +end Pantograph
 diff --git a/Pantograph/Diagnostics.lean b/Pantograph/Diagnostics.lean
 new file mode 100644
-index 0000000..80fa9ca
+index 0000000..eec1aeb
 --- /dev/null
 +++ b/Pantograph/Diagnostics.lean
-@@ -0,0 +1,58 @@
+@@ -0,0 +1,59 @@
 +import Pantograph.Protocol
 +import Lean
++import Pantograph.Resources
 +
 +namespace Pantograph
 +open Lean
@@ -241,7 +314,7 @@ index 0000000..80fa9ca
 +
 +/-- Render diagnostics without introducing source locations absent from Lean. -/
 +def renderMessages (log : MessageLog) : CoreM (Array Protocol.Message) := do
-+  log.toArray.mapM fun message => do
++  withCommandPhase "observe" <| log.toArray.mapM fun message => do
 +    let context ← read
 +    let known := message.pos.line > 0 && !context.fileMap.source.isEmpty && message.fileName == context.fileName
 +    let pos : Protocol.MessagePos := if known then
@@ -280,8 +353,202 @@ index 0000000..80fa9ca
 +    .error ((state.mkError "end of input").toErrorMsg context)
 +
 +end Pantograph
+diff --git a/Pantograph/Environment.lean b/Pantograph/Environment.lean
+index 37faf72..7dbdd83 100644
+--- a/Pantograph/Environment.lean
++++ b/Pantograph/Environment.lean
+@@ -139,7 +139,9 @@ def addDecl (args: Protocol.EnvAdd): CoreM (Protocol.CR Protocol.EnvAddResult) :
+           Lean.Elab.Term.synthesizeSyntheticMVarsNoPostponing
+           let expr ← instantiateMVars expr
+           pure $ expr
+-        catch ex => return .error (← ex.toMessageData.toString)
++        catch ex =>
++          rethrowInfrastructure ex
++          return .error (← withCommandPhase "observe" ex.toMessageData.toString)
+       | .error e => return .error e
+     pure $ .ok (type, value)
+   let (type, value) ← match ← tvM.run' (ctx := {}) |>.run' with
+diff --git a/Pantograph/Frontend/Basic.lean b/Pantograph/Frontend/Basic.lean
+index b82658d..5348769 100644
+--- a/Pantograph/Frontend/Basic.lean
++++ b/Pantograph/Frontend/Basic.lean
+@@ -1,5 +1,6 @@
+ import Lean.Parser
+ import Lean.Elab.Frontend
++import Pantograph.Resources
+ 
+ open Lean
+ 
+@@ -69,15 +70,25 @@ def processOneCommand: FrontendM (CompilationStep × Bool) := do
+   let ⟨_, fileName, fileMap⟩  := (← read).inputCtx
+   return ({ fileName, fileMap, src, stx, before, after, msgs, trees }, done)
+ 
+-partial def mapCompilationSteps { α } (f: CompilationStep → IO α) : FrontendM (List α) := do
+-  let (cmd, done) ← processOneCommand
+-  if done then
+-    if cmd.src.isEmpty then
+-      return []
+-    else
+-      return [← f cmd]
+-  else
+-    return (← f cmd) :: (← mapCompilationSteps f)
++/-- Native frontend commands receive only the remaining request allowance.
++    Observation stays in CoreM so restoring an info tree cannot reset its origin. -/
++partial def mapCompilationSteps { α } (context : Elab.Frontend.Context)
++    (state : Elab.Frontend.State) (f : CompilationStep → CoreM α) : CoreM (List α) := do
++  withCommandPhase "execute" do
++    let ctx ← read
++    let used := (← IO.getNumHeartbeats) - ctx.initHeartbeats
++    let remaining := (ctx.maxHeartbeats - used + 999) / 1000
++    -- Lean uses zero for unlimited, so exhaustion must throw before installing options.
++    if remaining == 0 then Core.throwMaxHeartbeat `frontend `maxHeartbeats ctx.maxHeartbeats
++    let state := { state with commandState := { state.commandState with
++      scopes := state.commandState.scopes.map fun scope =>
++        { scope with opts := scope.opts.setNat `maxHeartbeats remaining } } }
++    let ((step, done), next) ← processOneCommand.run context |>.run state
++    Core.checkMaxHeartbeats "frontend"
++    if done && step.src.isEmpty then return []
++    let observed ← withCommandPhase "observe" <| f step
++    if done then return [observed]
++    return observed :: (← mapCompilationSteps context next f)
+ 
+ 
+ @[export pantograph_frontend_find_source_path_m]
+diff --git a/Pantograph/Frontend/Elab.lean b/Pantograph/Frontend/Elab.lean
+index d4df66d..e3486da 100644
+--- a/Pantograph/Frontend/Elab.lean
++++ b/Pantograph/Frontend/Elab.lean
+@@ -88,6 +88,19 @@ structure TacticInvocation where
+   info : Elab.TacticInfo
+   ctx : Elab.ContextInfo
+   children : PersistentArray Elab.InfoTree
++/-- Observe an info-tree snapshot under the caller's command budget and restore its state. -/
++private def observeMeta (info : Elab.ContextInfo) (lctx : LocalContext) (action : MetaM α) : CoreM α := do
++  let outer ← get
++  try
++    modify fun s => { s with env := info.env, ngen := info.ngen, cache := {} }
++    withTheReader Core.Context (fun ctx => { ctx with
++      currNamespace := info.currNamespace, openDecls := info.openDecls,
++      fileName := "<InfoTree>", fileMap := info.fileMap }) <|
++      withOptions (fun _ => info.options) <|
++        withCommandPhase "observe" <| action.run' { lctx } { mctx := info.mctx }
++  finally
++    set outer
++
+ namespace TacticInvocation
+ 
+ /-- Return the range of the tactic, as a pair of file positions. -/
+@@ -95,33 +108,34 @@ namespace TacticInvocation
+ protected def range (t : TacticInvocation) : Position × Position := t.ctx.fileMap.stxRange t.info.stx
+ 
+ /-- Pretty print a tactic. -/
+-protected def pp (t : TacticInvocation) : IO Format :=
+-  t.ctx.runMetaM {} try
++protected def pp (t : TacticInvocation) : CoreM Format :=
++  observeMeta t.ctx {} try
+     Lean.PrettyPrinter.ppTactic ⟨t.info.stx⟩
+-  catch _ =>
++  catch ex =>
++    rethrowInfrastructure ex
+     pure "<failed to pretty print>"
+ 
+ /-- Run a tactic on the goals stored in a `TacticInvocation`. -/
+-protected def runMetaMGoalsBefore (t : TacticInvocation) (x : List MVarId → MetaM α) : IO α := do
+-  t.ctx.runMetaM {} <| Meta.withMCtx t.info.mctxBefore <| x t.info.goalsBefore
++protected def runMetaMGoalsBefore (t : TacticInvocation) (x : List MVarId → MetaM α) : CoreM α := do
++  observeMeta t.ctx {} <| Meta.withMCtx t.info.mctxBefore <| x t.info.goalsBefore
+ 
+ /-- Run a tactic on the after goals stored in a `TacticInvocation`. -/
+-protected def runMetaMGoalsAfter (t : TacticInvocation) (x : List MVarId → MetaM α) : IO α := do
+-  t.ctx.runMetaM {} <| Meta.withMCtx t.info.mctxAfter <| x t.info.goalsAfter
++protected def runMetaMGoalsAfter (t : TacticInvocation) (x : List MVarId → MetaM α) : CoreM α := do
++  observeMeta t.ctx {} <| Meta.withMCtx t.info.mctxAfter <| x t.info.goalsAfter
+ 
+ /-- Run a tactic on the main goal stored in a `TacticInvocation`. -/
+-protected def runMetaM (t : TacticInvocation) (x : MVarId → MetaM α) : IO α := do
++protected def runMetaM (t : TacticInvocation) (x : MVarId → MetaM α) : CoreM α := do
+   match t.info.goalsBefore.head? with
+-  | none => throw <| IO.userError s!"No goals at {← t.pp}"
++  | none => throwError "No goals at {← t.pp}"
+   | some g => t.runMetaMGoalsBefore fun _ => do g.withContext <| x g
+ 
+-protected def goalState (t : TacticInvocation) : IO (List Format) := do
++protected def goalState (t : TacticInvocation) : CoreM (List Format) := do
+   t.runMetaMGoalsBefore (fun gs => gs.mapM fun g => do Meta.ppGoal g)
+ 
+-protected def goalStateAfter (t : TacticInvocation) : IO (List Format) := do
++protected def goalStateAfter (t : TacticInvocation) : CoreM (List Format) := do
+   t.runMetaMGoalsAfter (fun gs => gs.mapM fun g => do Meta.ppGoal g)
+ 
+-protected def ppExpr (t : TacticInvocation) (e : Expr) : IO Format :=
++protected def ppExpr (t : TacticInvocation) (e : Expr) : CoreM Format :=
+   t.runMetaM (fun _ => do Meta.ppExpr (← instantiateMVars e))
+ 
+ end TacticInvocation
+@@ -250,10 +264,10 @@ private def outermostOwnedTerms (invocation : TacticInvocation) : List Elab.Term
+ 
+ private def serializeInvokedTerm
+     (invocation : TacticInvocation)
+-    (term : Elab.TermInfo) : IO Protocol.InvokedTerm := do
++    (term : Elab.TermInfo) : CoreM Protocol.InvokedTerm := do
+   let some (sourceStart, sourceEnd) := termRange term
+-    | throw <| IO.userError "Elaborated tactic term has no source range"
+-  invocation.ctx.runMetaM {} <| Meta.withMCtx invocation.info.mctxAfter <|
++    | throwError "Elaborated tactic term has no source range"
++  observeMeta invocation.ctx {} <| Meta.withMCtx invocation.info.mctxAfter <|
+     Meta.withLCtx term.lctx #[] do
+       let some goal := invocation.info.goalsBefore.head?
+         | throwError "Tactic invocation has no input goal"
+@@ -270,8 +284,8 @@ private def serializeInvokedTerm
+ 
+ private def serializeInvokedTacticSyntax
+     (invocation : TacticInvocation)
+-    (termInfos : List Elab.TermInfo) : IO String := do
+-  invocation.ctx.runMetaM {} <| Meta.withMCtx invocation.info.mctxAfter do
++    (termInfos : List Elab.TermInfo) : CoreM String := do
++  observeMeta invocation.ctx {} <| Meta.withMCtx invocation.info.mctxAfter do
+     let some goal := invocation.info.goalsBefore.head?
+       | throwError "Tactic invocation has no input goal"
+     let goalDecl ← goal.getDecl
+@@ -294,7 +308,7 @@ private partial def collectOriginalIdentifiers : Syntax → List Syntax
+   | .node _ _ args => args.toList.bind collectOriginalIdentifiers
+   | _ => []
+ 
+-private def newlyIntroducedUserNames (invocation : TacticInvocation) : IO (Array Name) := do
++private def newlyIntroducedUserNames (invocation : TacticInvocation) : CoreM (Array Name) := do
+   let beforeIds ← invocation.runMetaMGoalsBefore fun goals => do
+     let mut ids := #[]
+     for goal in goals do
+@@ -311,7 +325,7 @@ private def newlyIntroducedUserNames (invocation : TacticInvocation) : IO (Array
+     pure names
+ 
+ private def collectSyntaxArguments
+-    (invocation : TacticInvocation) : IO (Array Protocol.InvokedSyntaxArgument) := do
++    (invocation : TacticInvocation) : CoreM (Array Protocol.InvokedSyntaxArgument) := do
+   if !isBinderIntroducingTactic invocation.info.stx then
+     return #[]
+   let introducedNames ← newlyIntroducedUserNames invocation
+@@ -332,7 +346,7 @@ private def collectSyntaxArguments
+ 
+ @[export pantograph_frontend_collect_tactics_from_compilation_step_m]
+ def collectTacticsFromCompilationStep (step : CompilationStep)
+-    (options : Protocol.Options := {}) : IO (List Protocol.InvokedTactic) := do
++    (options : Protocol.Options := {}) : CoreM (List Protocol.InvokedTactic) := do
+   let tactics := step.trees.bind collectTactics |>.filter fun invocation =>
+     (Elab.Info.ofTacticInfo invocation.info).isOriginal
+   tactics.mapM λ invocation => do
+@@ -358,7 +372,8 @@ def collectTacticsFromCompilationStep (step : CompilationStep)
+         goalBefore, goalAfter, goalsBefore, goalsAfter, tactic, sourceSyntax, terms, syntaxArgs
+       }
+     catch e =>
+-      let captureError := toString e
++      rethrowInfrastructure e
++      let captureError ← withCommandPhase "observe" e.toMessageData.toString
+       return {
+         goalBefore,
+         goalAfter,
 diff --git a/Pantograph/Goal.lean b/Pantograph/Goal.lean
-index ad8f3bd..d102112 100644
+index ad8f3bd..ed3bb2f 100644
 --- a/Pantograph/Goal.lean
 +++ b/Pantograph/Goal.lean
 @@ -3,6 +3,7 @@ Functions for handling metavariables
@@ -384,7 +651,7 @@ index ad8f3bd..d102112 100644
      calcPrevRhs? := .none,
    }
  
-@@ -196,38 +220,74 @@ inductive TacticResult where
+@@ -196,38 +220,75 @@ inductive TacticResult where
    -- Goes to next state
    | success (state: GoalState)
    -- Tactic failed with messages
@@ -420,7 +687,8 @@ index ad8f3bd..d102112 100644
 +        pure (.success { next with savedState := { next.savedState with term } })
 +      | other => pure other
 +    catch exception => do
-+      let text ← exception.toMessageData.toString
++      rethrowInfrastructure exception
++      let text ← withCommandPhase "observe" exception.toMessageData.toString
 +      Elab.logException exception
 +      let messages ← renderMessages (← getThe Core.State).messages
 +      return TacticResult.failure #[text] (if messages.isEmpty then #[Protocol.Message.error text] else messages)
@@ -477,7 +745,7 @@ index ad8f3bd..d102112 100644
    let expr ← match Parser.runParserCategory
      (env := ← MonadEnv.getEnv)
      (catName := `term)
-@@ -235,13 +295,12 @@ protected def GoalState.tryAssign (state: GoalState) (goal: MVarId) (expr: Strin
+@@ -235,13 +296,12 @@ protected def GoalState.tryAssign (state: GoalState) (goal: MVarId) (expr: Strin
      (fileName := filename) with
      | .ok syn => pure syn
      | .error error => return .parseError error
@@ -493,7 +761,7 @@ index ad8f3bd..d102112 100644
    let type ← match Parser.runParserCategory
      (env := ← MonadEnv.getEnv)
      (catName := `term)
-@@ -249,16 +308,16 @@ protected def GoalState.tryLet (state: GoalState) (goal: MVarId) (binderName: St
+@@ -249,16 +309,16 @@ protected def GoalState.tryLet (state: GoalState) (goal: MVarId) (binderName: St
      (fileName := filename) with
      | .ok syn => pure syn
      | .error error => return .parseError error
@@ -513,7 +781,7 @@ index ad8f3bd..d102112 100644
  
      -- See Lean.Elab.Tactic.Conv.convTarget
      let convMVar ← Elab.Tactic.withMainContext do
-@@ -266,30 +325,29 @@ protected def GoalState.conv (state: GoalState) (goal: MVarId):
+@@ -266,30 +326,29 @@ protected def GoalState.conv (state: GoalState) (goal: MVarId):
        Elab.Tactic.replaceMainGoal [newGoal.mvarId!]
        pure rhs.mvarId!
      return (← MonadBacktrack.saveState, convMVar)
@@ -558,7 +826,7 @@ index ad8f3bd..d102112 100644
  
      -- Close all existing goals with `refl`
      for mvarId in (← Elab.Tactic.getGoals) do
-@@ -306,17 +364,17 @@ protected def GoalState.convExit (state: GoalState):
+@@ -306,17 +365,17 @@ protected def GoalState.convExit (state: GoalState):
        let proof ← instantiateMVars (.mvar convGoal)
        Elab.Tactic.liftMetaTactic1 fun mvarId => mvarId.replaceTargetEq targetNew proof
      MonadBacktrack.saveState
@@ -587,7 +855,7 @@ index ad8f3bd..d102112 100644
  
  protected def GoalState.calcPrevRhsOf? (state: GoalState) (goal: MVarId): Option Expr := do
    let (mvarId, rhs) ← state.calcPrevRhs?
-@@ -326,8 +384,7 @@ protected def GoalState.calcPrevRhsOf? (state: GoalState) (goal: MVarId): Option
+@@ -326,8 +385,7 @@ protected def GoalState.calcPrevRhsOf? (state: GoalState) (goal: MVarId): Option
      .none
  @[export pantograph_goal_state_try_calc_m]
  protected def GoalState.tryCalc (state: GoalState) (goal: MVarId) (pred: String):
@@ -597,7 +865,7 @@ index ad8f3bd..d102112 100644
    if state.convMVar?.isSome then
      return .invalidAction "Cannot initiate `calc` while in `conv` state"
    let `(term|$pred) ← match Parser.runParserCategory
-@@ -342,58 +399,58 @@ protected def GoalState.tryCalc (state: GoalState) (goal: MVarId) (pred: String)
+@@ -342,58 +400,58 @@ protected def GoalState.tryCalc (state: GoalState) (goal: MVarId) (pred: String)
    let decl ← goal.getDecl
    let target ← instantiateMVars decl.type
    let tag := decl.userName
@@ -708,10 +976,27 @@ index ad8f3bd..d102112 100644
  
  end Pantograph
 diff --git a/Pantograph/Library.lean b/Pantograph/Library.lean
-index 23a2046..6b2e10c 100644
+index 23a2046..9d6de0b 100644
 --- a/Pantograph/Library.lean
 +++ b/Pantograph/Library.lean
-@@ -124,11 +124,33 @@ def exprEcho (expr: String) (expectedType?: Option String := .none) (levels: Arr
+@@ -59,6 +59,8 @@ def createCoreContext (options: Array String): IO Core.Context := do
+   let options ← match options? with
+     | .ok options => pure options
+     | .error e => throw $ IO.userError s!"Options cannot be parsed: {e}"
++  if Lean.Core.getMaxHeartbeats options == 0 then
++    throw <| IO.userError "maxHeartbeats must be positive"
+   return {
+     currNamespace := Name.str .anonymous "Aniva"
+     openDecls := [],     -- No 'open' directives needed
+@@ -119,16 +121,40 @@ def exprEcho (expr: String) (expectedType?: Option String := .none) (levels: Arr
+           type := (← serializeExpression options type),
+           expr := (← serializeExpression options expr)
+       }
+-    catch exception =>
+-      return .error $ errorI "typing" (← exception.toMessageData.toString)
++    catch exception => do
++      rethrowInfrastructure exception
++      return .error $ errorI "typing" (← withCommandPhase "observe" exception.toMessageData.toString)
  
  @[export pantograph_goal_start_expr_m]
  def goalStartExpr (expr: String) (levels: Array String): CoreM (Protocol.CR GoalState) :=
@@ -740,8 +1025,9 @@ index 23a2046..6b2e10c 100644
 +        trustedEnv := outer.meta.core.env,
 +        rootType := ← instantiateMVars state.rootType,
 +        rootLevels := levels.toList.map (·.toName) }
-+    catch exception =>
-+      return .error (errorI "elab" (← exception.toMessageData.toString))
++    catch exception => do
++      rethrowInfrastructure exception
++      return .error (errorI "elab" (← withCommandPhase "observe" exception.toMessageData.toString))
 +    finally
 +      outer.restore (restoreInfo := true)
 +      modifyThe Meta.State fun _ => outer.meta.meta
@@ -750,7 +1036,17 @@ index 23a2046..6b2e10c 100644
  
  @[export pantograph_goal_resume]
  def goalResume (target: GoalState) (goals: Array String): Except String GoalState :=
-@@ -158,37 +180,35 @@ def goalTactic (state: GoalState) (goal:  MVarId) (tactic: String): CoreM Tactic
+@@ -140,8 +166,7 @@ def goalSerialize (state: GoalState) (options: @&Protocol.Options): CoreM (Array
+ 
+ @[export pantograph_goal_print_m]
+ def goalPrint (state: GoalState) (options: @&Protocol.Options): CoreM Protocol.GoalPrintResult :=
+-  runMetaM do
+-    state.restoreMetaM
++  runMetaM <| state.withMetaState do
+     return {
+       root? := ← state.rootExpr?.mapM (λ expr =>
+         state.withRootContext do
+@@ -158,37 +183,35 @@ def goalTactic (state: GoalState) (goal:  MVarId) (tactic: String): CoreM Tactic
  def goalAssign (state: GoalState) (goal: MVarId) (expr: String): CoreM TacticResult :=
    runTermElabM <| state.tryAssign goal expr
  @[export pantograph_goal_have_m]
@@ -807,10 +1103,50 @@ index 23a2046..6b2e10c 100644
  def goalLet (state: GoalState) (goal: MVarId) (binderName: String) (type: String): CoreM TacticResult :=
    runTermElabM <| state.tryLet goal binderName type
 diff --git a/Pantograph/Protocol.lean b/Pantograph/Protocol.lean
-index 781f4bf..8bc5122 100644
+index 781f4bf..1f1df08 100644
 --- a/Pantograph/Protocol.lean
 +++ b/Pantograph/Protocol.lean
-@@ -267,6 +267,51 @@ structure Message where
+@@ -11,9 +11,6 @@ namespace Pantograph.Protocol
+ 
+ /-- Main Option structure, placed here to avoid name collision -/
+ structure Options where
+-  -- When false, suppress newlines in Json objects. Useful for machine-to-machine interaction.
+-  -- This should be  false` by default to avoid any surprises with parsing.
+-  printJsonPretty: Bool    := false
+   -- When enabled, pretty print every expression
+   printExprPretty: Bool    := true
+   -- When enabled, print the raw AST of expressions
+@@ -99,6 +96,21 @@ structure InteractionError where
+   desc: String
+   deriving Lean.ToJson
+ 
++/-- Resource limits use Lean option units, which count thousands of heartbeats. -/
++structure ResourceDetails where
++  version : Nat := 1
++  kind : String := "heartbeats"
++  phase : String
++  limit : Nat
++  deriving Lean.ToJson
++
++structure CommandFailure where
++  error : String
++  desc : String
++  resource? : Option ResourceDetails := none
++  recovery : String
++  deriving Lean.ToJson
++
+ def errorIndex (desc: String): InteractionError := { error := "index", desc }
+ def errorExpr (desc: String): InteractionError := { error := "expr", desc }
+ 
+@@ -201,7 +213,6 @@ structure EnvAddResult where
+ 
+ /-- Set options; See `Options` struct above for meanings -/
+ structure OptionsSet where
+-  printJsonPretty?: Option Bool
+   printExprPretty?: Option Bool
+   printExprAST?: Option Bool
+   printExprModelAST?: Option Bool
+@@ -267,6 +278,53 @@ structure Message where
  /-- Helper to create an error message from a plain string -/
  def Message.error (s : String) : Message := { severity := "error", data := s }
  
@@ -818,7 +1154,9 @@ index 781f4bf..8bc5122 100644
 +  deriving Lean.FromJson
 +structure ProtocolDescriptor where
 +  protocol: String := "maths-ai-pantograph"
-+  protocolVersion: Nat := 2
++  protocolVersion: Nat := 3
++  resourceErrorVersion: Nat := 1
++  commandTransactionVersion: Nat := 1
 +  modelSexpVersion: Nat := 1
 +  transitionValidationVersion: Nat := 1
 +  transitionProvenanceVersion: Nat := 1
@@ -862,7 +1200,7 @@ index 781f4bf..8bc5122 100644
  structure GoalTacticResult where
    -- The next goal state id. Existence of this field shows success
    nextStateId?: Option Nat          := .none
-@@ -282,6 +327,9 @@ structure GoalTacticResult where
+@@ -282,6 +340,9 @@ structure GoalTacticResult where
    -- Structured diagnostic / error messages from execution
    messages: Array Message := #[]
  
@@ -872,7 +1210,7 @@ index 781f4bf..8bc5122 100644
    -- Soundness audit flags expected by modern clients
    hasSorry: Bool := false
    hasUnsafe: Bool := false
-@@ -319,6 +367,51 @@ structure GoalPrintResult where
+@@ -319,6 +380,51 @@ structure GoalPrintResult where
    parent?: Option Expression
    deriving Lean.ToJson
  
@@ -924,11 +1262,103 @@ index 781f4bf..8bc5122 100644
  -- Diagnostic Options, not available in REPL
  structure GoalDiag where
    printContext: Bool := true
+diff --git a/Pantograph/Resources.lean b/Pantograph/Resources.lean
+new file mode 100644
+index 0000000..4ff3b1c
+--- /dev/null
++++ b/Pantograph/Resources.lean
+@@ -0,0 +1,38 @@
++import Lean
++
++namespace Pantograph
++open Lean
++
++register_option pantograph.traceCommands : Bool := {
++  defValue := false
++  descr := "write bounded REPL request and outcome traces to stderr"
++}
++
++/-- The phase is attached before unwinding restored goal contexts. -/
++builtin_initialize commandResourceExceptionId : InternalExceptionId ←
++  registerInternalExceptionId `pantographCommandResource
++
++/-- Keep resource and unexpected internal exceptions out of ordinary user diagnostics. -/
++def rethrowInfrastructure [Monad m] [MonadExceptOf Exception m] (ex : Exception) : m Unit := do
++  match ex with
++  | .internal .. => throw ex
++  | _ => if ex.isRuntime then throw ex
++
++private def phaseCore (phase : String) (action : CoreM α) : CoreM α := do
++  tryCatchRuntimeEx (do
++    Core.checkMaxHeartbeats "pantograph"
++    let result ← action
++    Core.checkMaxHeartbeats "pantograph"
++    return result) fun ex => do
++      let ctx ← read
++      let used := (← IO.getNumHeartbeats) - ctx.initHeartbeats
++      if ex.isMaxHeartbeat && ctx.maxHeartbeats > 0 && used > ctx.maxHeartbeats then
++        throw <| .internal commandResourceExceptionId <|
++          ({} : KVMap).setString `phase phase |>.setNat `limit (ctx.maxHeartbeats / 1000)
++      throw ex
++
++/-- Account for work before and after each protected phase without resetting its budget. -/
++def withCommandPhase [Monad m] [MonadControlT CoreM m] (phase : String) (action : m α) : m α :=
++  controlAt CoreM fun run => phaseCore phase (run action)
++
++end Pantograph
 diff --git a/Pantograph/Serial.lean b/Pantograph/Serial.lean
-index 00766ca..c0f600e 100644
+index 00766ca..4254943 100644
 --- a/Pantograph/Serial.lean
 +++ b/Pantograph/Serial.lean
-@@ -531,8 +531,7 @@ protected def GoalState.serializeGoals
+@@ -38,12 +38,16 @@ def elabType (syn: Syntax): Elab.TermElabM (Except String Expr) := do
+   try
+     let expr ← Elab.Term.elabType syn
+     return .ok expr
+-  catch ex => return .error (← ex.toMessageData.toString)
++  catch ex =>
++    rethrowInfrastructure ex
++    return .error (← withCommandPhase "observe" ex.toMessageData.toString)
+ def elabTerm (syn: Syntax) (expectedType? : Option Expr := .none): Elab.TermElabM (Except String Expr) := do
+   try
+     let expr ← Elab.Term.elabTerm (stx := syn) expectedType?
+     return .ok expr
+-  catch ex => return .error (← ex.toMessageData.toString)
++  catch ex =>
++    rethrowInfrastructure ex
++    return .error (← withCommandPhase "observe" ex.toMessageData.toString)
+ 
+ 
+ --- Output Functions ---
+@@ -264,7 +268,8 @@ where
+       let args := app.getAppArgs
+       let info? ← try
+         pure (some (← Meta.getFunInfoNArgs fn args.size))
+-      catch _ =>
++      catch ex =>
++        rethrowInfrastructure ex
+         pure none
+       let explicitArgs := args.mapIdx (fun index arg =>
+         match info?.bind fun info => info.paramInfo[index.val]? with
+@@ -362,7 +367,8 @@ where
+       let args := app.getAppArgs
+       let info? ← try
+         pure (some (← Meta.getFunInfoNArgs fn args.size))
+-      catch _ =>
++      catch ex =>
++        rethrowInfrastructure ex
+         pure none
+       let fn' ← go currentCtx fn
+       let args' ← args.mapIdxM fun index arg => do
+@@ -407,7 +413,7 @@ where
+ def serializeExpression
+     (options: @&Protocol.Options)
+     (e: Expr)
+-    (modelCtx : ModelSexpContext := {}): MetaM Protocol.Expression := do
++    (modelCtx : ModelSexpContext := {}): MetaM Protocol.Expression := withCommandPhase "observe" do
+   let pp?: Option String ← match options.printExprPretty with
+     | true => pure $ .some $ toString $ ← Meta.ppExpr e
+     | false => pure $ .none
+@@ -531,8 +537,7 @@ protected def GoalState.serializeGoals
        (state: GoalState)
        (parent: Option GoalState := .none)
        (options: @&Protocol.Options := {}):
@@ -938,7 +1368,7 @@ index 00766ca..c0f600e 100644
    let goals := state.goals.toArray
    let parentDecl? := parent.bind (λ parentState => parentState.mctx.findDecl? state.parentMVar?.get!)
    goals.mapM fun goal => do
-@@ -545,8 +544,7 @@ protected def GoalState.serializeGoals
+@@ -545,8 +550,7 @@ protected def GoalState.serializeGoals
  /-- Print the metavariables in a readable format -/
  @[export pantograph_goal_state_diag_m]
  protected def GoalState.diag (goalState: GoalState) (parent?: Option GoalState := .none) (options: Protocol.GoalDiag := {}): CoreM String := do
@@ -1201,7 +1631,7 @@ index 0000000..5ea55e9
 +
 +end Pantograph
 diff --git a/Repl.lean b/Repl.lean
-index f031e47..88caa61 100644
+index f031e47..0b125f0 100644
 --- a/Repl.lean
 +++ b/Repl.lean
 @@ -1,5 +1,8 @@
@@ -1213,15 +1643,35 @@ index f031e47..88caa61 100644
  
  namespace Pantograph.Repl
  
-@@ -33,6 +36,7 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
-       | .error ierror => return Lean.toJson ierror
+@@ -8,6 +11,7 @@ structure Context where
+ 
+ /-- Stores state of the REPL -/
+ structure State where
++  usable : Bool := true
+   options: Protocol.Options := {}
+   nextId: Nat := 0
+   goalStates: Lean.HashMap Nat GoalState := Lean.HashMap.empty
+@@ -24,15 +28,16 @@ def runMetaInMainM { α } (metaM: Lean.MetaM α): MainM α :=
+ def runTermElabInMainM { α } (termElabM: Lean.Elab.TermElabM α) : MainM α :=
+   termElabM.run' (ctx := Condensed.elabContext) |>.run'
+ 
+-def execute (command: Protocol.Command): MainM Lean.Json := do
++private def dispatch (command: Protocol.Command): MainM Lean.Json := do
+   let run { α β: Type } [Lean.FromJson α] [Lean.ToJson β] (comm: α → MainM (CR β)): MainM Lean.Json :=
+     match Lean.fromJson? command.payload with
+     | .ok args => do
+       match (← comm args) with
+-      | .ok result =>  return Lean.toJson result
+-      | .error ierror => return Lean.toJson ierror
++      | .ok result => withCommandPhase "serialize" <| pure (Lean.toJson result)
++      | .error ierror => withCommandPhase "serialize" <| pure (Lean.toJson ierror)
      | .error error => return Lean.toJson $ errorCommand s!"Unable to parse json: {error}"
    match command.cmd with
 +  | "protocol.describe" => run protocol_describe
    | "reset"         => run reset
    | "stat"          => run stat
    | "expr.echo"     => run expr_echo
-@@ -45,6 +49,8 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+@@ -45,6 +50,8 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
    | "goal.tactic"   => run goal_tactic
    | "goal.continue" => run goal_continue
    | "goal.delete"   => run goal_delete
@@ -1230,7 +1680,7 @@ index f031e47..88caa61 100644
    | "goal.print"    => run goal_print
    | "frontend.process"  => run frontend_process
    | cmd =>
-@@ -62,6 +68,8 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+@@ -62,6 +69,8 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
        nextId := state.nextId + 1
      }
      return stateId
@@ -1239,6 +1689,28 @@ index f031e47..88caa61 100644
    -- Command Functions
    reset (_: Protocol.Reset): MainM (CR Protocol.StatResult) := do
      let state ← get
+@@ -73,11 +82,11 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+     let nGoals := state.goalStates.size
+     return .ok { nGoals }
+   env_catalog (args: Protocol.EnvCatalog): MainM (CR Protocol.EnvCatalogResult) := do
+-    let result ← Environment.catalog args
++    let result ← withCommandPhase "observe" <| Environment.catalog args
+     return .ok result
+   env_inspect (args: Protocol.EnvInspect): MainM (CR Protocol.EnvInspectResult) := do
+     let state ← get
+-    Environment.inspect args state.options
++    withCommandPhase "observe" <| Environment.inspect args state.options
+   env_add (args: Protocol.EnvAdd): MainM (CR Protocol.EnvAddResult) := do
+     Environment.addDecl args
+   expr_echo (args: Protocol.ExprEcho): MainM (CR Protocol.ExprEchoResult) := do
+@@ -89,7 +98,6 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+     set { state with
+       options := {
+         -- FIXME: This should be replaced with something more elegant
+-        printJsonPretty := args.printJsonPretty?.getD options.printJsonPretty,
+         printExprPretty := args.printExprPretty?.getD options.printExprPretty,
+         printExprAST := args.printExprAST?.getD options.printExprAST,
+         printExprModelAST := args.printExprModelAST?.getD options.printExprModelAST,
 @@ -110,7 +118,7 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
        | .none, .some copyFrom =>
          (match env.find? <| copyFrom.toName with
@@ -1264,16 +1736,19 @@ index f031e47..88caa61 100644
        let nextGoalState ← match autoMode, isConvExit with
          | true, false => do
            if goalState.convMVar?.isNone && nextGoalState.convMVar?.isNone then
-@@ -194,24 +204,21 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+@@ -194,24 +204,22 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
            let .ok result := nextGoalState.resume (nextGoalState.goals ++ dormantGoals) | throwError "Resuming known goals"
            pure result
          | false, _ => pure nextGoalState
--      let nextStateId ← newGoalState nextGoalState
-+      let checked ← match validateTransition goalState nextGoalState goal with
++      let validation ← withCommandPhase "validate" <| pure (validateTransition goalState nextGoalState goal)
++      let checked ← match validation with
 +        | .ok checked => pure checked
 +        | .error message => return .error (errorI "validation" message)
 +      let nextGoalState := checked.state
-       let goals ← nextGoalState.serializeGoals (parent := .some goalState) (options := state.options) |>.run'
++      let goals ← withCommandPhase "observe" <| nextGoalState.serializeGoals (parent := .some goalState) (options := state.options) |>.run'
++      let transition ← withCommandPhase "observe" <| pure (transitionProvenance state.options goalState nextGoalState goal produced)
+       let nextStateId ← newGoalState nextGoalState
+-      let goals ← nextGoalState.serializeGoals (parent := .some goalState) (options := state.options) |>.run'
 -      -- Fragment entry can leave the parent unassigned; parentExpr? handles it.
 -      -- Auditing the parent also catches sorry/unsafe use in partial branches.
 -      let env ← Lean.MonadEnv.getEnv
@@ -1284,8 +1759,6 @@ index f031e47..88caa61 100644
 -          (env.find? constName).map (·.isUnsafe) |>.getD false
 -        )
 -      ) |>.getD false
-+      let transition := transitionProvenance state.options goalState nextGoalState goal produced
-+      let nextStateId ← newGoalState nextGoalState
        return .ok {
          nextStateId? := .some nextStateId,
          goals? := .some goals,
@@ -1300,7 +1773,7 @@ index f031e47..88caa61 100644
        }
      | .ok (.parseError message) =>
        return .ok {
-@@ -220,10 +227,10 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+@@ -220,10 +228,10 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
        }
      | .ok (.invalidAction message) =>
        return .error $ errorI "invalid" message
@@ -1313,7 +1786,16 @@ index f031e47..88caa61 100644
        }
    goal_continue (args: Protocol.GoalContinue): MainM (CR Protocol.GoalContinueResult) := do
      let state ← get
-@@ -254,6 +261,26 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+@@ -244,7 +252,7 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+         goalStates := state.goalStates.insert nextStateId nextGoalState,
+         nextId := state.nextId + 1
+       }
+-      let goals ← goalSerialize nextGoalState (options := state.options)
++      let goals ← withCommandPhase "observe" <| goalSerialize nextGoalState (options := state.options)
+       return .ok {
+         nextStateId,
+         goals,
+@@ -254,63 +262,149 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
      let goalStates := args.stateIds.foldl (λ map id => map.erase id) state.goalStates
      set { state with goalStates }
      return .ok {}
@@ -1325,7 +1807,7 @@ index f031e47..88caa61 100644
 +      return .error <| errorI "arguments" "goals must be a nonempty list of distinct names"
 +    let mut obligations := #[]
 +    for name in args.goals do
-+      let some obligation ← runMetaInMainM <| inspectObligation goalState ⟨name.toName⟩ state.options |
++      let some obligation ← withCommandPhase "observe" <| runMetaInMainM <| inspectObligation goalState ⟨name.toName⟩ state.options |
 +        return .error $ errorIndex s!"Unknown obligation {name}"
 +      obligations := obligations.push obligation
 +    return .ok { obligations }
@@ -1340,6 +1822,178 @@ index f031e47..88caa61 100644
    goal_print (args: Protocol.GoalPrint): MainM (CR Protocol.GoalPrintResult) := do
      let state ← get
      let .some goalState := state.goalStates.find? args.stateId | return .error $ errorIndex s!"Invalid state index {args.stateId}"
+-    let result ← runMetaInMainM <| goalPrint goalState state.options
++    let result ← withCommandPhase "observe" <| runMetaInMainM <| goalPrint goalState state.options
+     return .ok result
+   frontend_process (args: Protocol.FrontendProcess): MainM (CR Protocol.FrontendProcessResult) := do
+     let options := (← get).options
+-    try
+-      let (fileName, file) ← match args.fileName?, args.file? with
+-        | .some fileName, .none => do
+-          let file ← IO.FS.readFile fileName
+-          pure (fileName, file)
+-        | .none, .some file =>
+-          pure ("<anonymous>", file)
+-        | _, _ => return .error <| errorI "arguments" "Exactly one of {fileName, file} must be supplied"
+-      let env?: Option Lean.Environment ← if args.fileName?.isSome then
++    let (fileName, file) ← match args.fileName?, args.file? with
++      | .some fileName, .none => do
++        let file ← IO.FS.readFile fileName
++        pure (fileName, file)
++      | .none, .some file =>
++        pure ("<anonymous>", file)
++      | _, _ => return .error <| errorI "arguments" "Exactly one of {fileName, file} must be supplied"
++    let env?: Option Lean.Environment ← if args.fileName?.isSome then
++        pure .none
++      else do
++        let env ← Lean.MonadEnv.getEnv
++        pure <| .some env
++    let (context, state) ← do Frontend.createContextStateFromFile file fileName env? (← Lean.getOptions)
++    let li ← Frontend.mapCompilationSteps context state λ step => do
++      let boundary := (step.src.startPos.byteIdx, step.src.stopPos.byteIdx)
++      let invocations?: Option (List Protocol.InvokedTactic) ← if args.invocations then
++          let invocations ← Frontend.collectTacticsFromCompilationStep step options
++          pure $ .some invocations
++        else
+           pure .none
++      let sorrys := if args.sorrys then
++          Frontend.collectSorrys step
++        else
++          []
++      let messages ← step.messageStrings
++      return (boundary, invocations?, sorrys, messages)
++    let units ← withCommandPhase "observe" <| li.mapM λ (boundary, invocations?, sorrys, messages) => do
++      let (goalStateId?, goals) ← if sorrys.isEmpty then do
++          pure (.none, #[])
+         else do
+-          let env ← Lean.MonadEnv.getEnv
+-          pure <| .some env
+-      let (context, state) ← do Frontend.createContextStateFromFile file fileName env? {}
+-      let frontendM := Frontend.mapCompilationSteps λ step => do
+-        let boundary := (step.src.startPos.byteIdx, step.src.stopPos.byteIdx)
+-        let invocations?: Option (List Protocol.InvokedTactic) ← if args.invocations then
+-            let invocations ← Frontend.collectTacticsFromCompilationStep step options
+-            pure $ .some invocations
+-          else
+-            pure .none
+-        let sorrys := if args.sorrys then
+-            Frontend.collectSorrys step
++          let goalState ← runMetaInMainM $ Frontend.sorrysToGoalState sorrys
++          let stateId ← newGoalState goalState
++          let goals ← goalSerialize goalState options
++          pure (.some stateId, goals)
++      return {
++        boundary,
++        invocations?,
++        goalStateId?,
++        goals,
++        messages,
++      }
++    let result : Protocol.FrontendProcessResult := { units }
++    if let some outputFile := args.outputFile? then
++      IO.FS.writeFile outputFile (Lean.Json.compress (Lean.toJson result))
++      return .ok { units := [] }
++    else
++      return .ok result
++
++/-- Bytes are fully encoded before the staged states become visible. -/
++structure CommandResult where
++  response : Lean.Json
++  bytes : String
++  fatal : Bool := false
++
++/-- A separate Core state reference owns all changes until encoding completes.
++    Failure discards that reference; restoration requires no Lean computation. -/
++def runTransaction (command : Protocol.Command) (action : MainM Lean.Json) : MainM CommandResult := do
++  let entry ← get
++  let coreEntry ← getThe Lean.Core.State
++  let ctx ← read
++  let coreCtx ← readThe Lean.Core.Context
++  let fail (error desc recovery : String) (resource? : Option Protocol.ResourceDetails := none) : CommandResult :=
++    let response := Lean.toJson ({ error, desc, resource?, recovery } : Protocol.CommandFailure)
++    { response, bytes := response.compress, fatal := recovery == "session-unusable" }
++  unless entry.usable do
++    return fail "internal" "Unexpected REPL command failure" "session-unusable"
++  let stagedAction : Lean.CoreM ((Lean.Json × String) × State) := Lean.withCurrHeartbeats do
++    withCommandPhase "execute" <| (do
++      let response ← action
++      let bytes ← withCommandPhase "serialize" <| pure response.compress
++      return (response, bytes)).run ctx |>.run entry
++  let started ← IO.getNumHeartbeats
++  let outcome ← (stagedAction.run coreCtx coreEntry).toBaseIO
++  if pantograph.traceCommands.get coreCtx.options then
++    let phase := match outcome with
++      | .error (.internal _ details) => details.getString `phase "unknown"
++      | _ => "complete"
++    let text := command.payload.getObjValAs? String "tactic" |>.toOption |>.getD ""
++    let selected := command.payload.getObjValAs? Nat "stateId" |>.toOption
++    let goal := command.payload.getObjValAs? Nat "goalId" |>.toOption
++    let trace := Lean.Json.mkObj [
++      ("command", .str (command.cmd.take 128)), ("tactic", .str (text.take 512)),
++      ("stateId", Lean.toJson selected), ("goalId", Lean.toJson goal),
++      ("phase", .str phase), ("heartbeats", Lean.toJson ((← IO.getNumHeartbeats) - started))]
++    (← IO.getStderr).putStrLn trace.compress
++  match outcome with
++  | .ok (((response, bytes), staged), coreStaged) =>
++    set staged
++    modifyThe Lean.Core.State fun _ => coreStaged
++    return { response, bytes }
++  | .error ex =>
++    let result := match ex with
++      | .internal id details =>
++        if id == commandResourceExceptionId && details.getNat `limit > 0 &&
++            ["execute", "validate", "observe", "serialize"].contains (details.getString `phase) then
++          if command.cmd == "goal.certify" then
++            let response := Lean.toJson ({
++              status := "inconclusive",
++              reason? := some "Lean command heartbeat budget exhausted" } : Protocol.GoalCertifyResult)
++            { response, bytes := response.compress }
+           else
+-            []
+-        let messages ← step.messageStrings
+-        return (boundary, invocations?, sorrys, messages)
+-      let li ← frontendM.run context |>.run' state
+-      let units ← li.mapM λ (boundary, invocations?, sorrys, messages) => do
+-        let (goalStateId?, goals) ← if sorrys.isEmpty then do
+-            pure (.none, #[])
+-          else do
+-            let goalState ← runMetaInMainM $ Frontend.sorrysToGoalState sorrys
+-            let stateId ← newGoalState goalState
+-            let goals ← goalSerialize goalState options
+-            pure (.some stateId, goals)
+-        return {
+-          boundary,
+-          invocations?,
+-          goalStateId?,
+-          goals,
+-          messages,
+-        }
+-      let result : Protocol.FrontendProcessResult := { units }
+-      if let some outputFile := args.outputFile? then
+-        IO.FS.writeFile outputFile (Lean.Json.compress (Lean.toJson result))
+-        return .ok { units := [] }
+-      else
+-        return .ok result
+-    catch e =>
+-      return .error $ errorI "frontend" (← e.toMessageData.toString)
++            -- Frontend imports and output files may have effects outside retained Lean state.
++            fail "resource" "Lean command heartbeat budget exhausted"
++              (if command.cmd == "frontend.process" then "session-unusable" else "command-rolled-back")
++              (some { phase := details.getString `phase, limit := details.getNat `limit })
++        else fail "internal" "Unexpected REPL command failure" "session-unusable"
++      | _ => fail "internal" "Unexpected REPL command failure" "session-unusable"
++    set { entry with usable := !result.fatal }
++    return result
++
++/-- Every dispatch path uses the same transaction and encoding boundary. -/
++def executeCommand (command : Protocol.Command) : MainM CommandResult :=
++  runTransaction command (dispatch command)
++
++/-- Native callers share the executable's transaction boundary. -/
++def execute (command : Protocol.Command) : MainM Lean.Json := do
++  return (← executeCommand command).response
+ 
+ end Pantograph.Repl
 diff --git a/Test/Common.lean b/Test/Common.lean
 index 699ea4e..559a611 100644
 --- a/Test/Common.lean
@@ -1355,10 +2009,10 @@ index 699ea4e..559a611 100644
    | .parseError error => s!".parseError {error}"
 diff --git a/Test/ContractFixtures.lean b/Test/ContractFixtures.lean
 new file mode 100644
-index 0000000..3ee0785
+index 0000000..4df8c11
 --- /dev/null
 +++ b/Test/ContractFixtures.lean
-@@ -0,0 +1,105 @@
+@@ -0,0 +1,125 @@
 +import Pantograph
 +
 +open Lean Elab Tactic
@@ -1464,6 +2118,52 @@ index 0000000..3ee0785
 +  addDecl (.thmDecl { name, levelParams := [], type := mkConst ``True, value := mkConst ``True.intro })
 +  goal.assign (mkConst name)
 +  setGoals []
++
++/-- Exercise Lean's native reduction heartbeat checks without completing the proof. -/
++elab "contract_heartbeat" : tactic => do
++  let mut expr := mkNatLit 0
++  for _ in [:1000000] do
++    expr := mkApp (mkConst ``Nat.succ) expr
++    discard <| Meta.whnf expr
++
++/-- Exercise a fatal exception at the executable transaction boundary. -/
++elab "contract_internal_failure" : tactic => do
++  throw <| Exception.internal Pantograph.commandResourceExceptionId
++
++/-- Spend allocations while a lazy diagnostic is rendered, after tactic execution. -/
++elab "contract_diagnostic_heartbeat" : tactic => do
++  let data := MessageData.ofLazy (fun _ => do
++    let values ← IO.mkRef (#[] : Array Nat)
++    for index in [:1000000] do
++      values.modify (·.push index)
++    return Dynamic.mk ("rendered" : MessageData)) (fun _ => false)
++  logInfo data
+diff --git a/Test/Frontend.lean b/Test/Frontend.lean
+index 4e55c77..a7a918e 100644
+--- a/Test/Frontend.lean
++++ b/Test/Frontend.lean
+@@ -9,9 +9,8 @@ namespace Pantograph.Test.Frontend
+ def collectSorrysFromSource (source: String) : MetaM (List GoalState) := do
+   let filename := "<anonymous>"
+   let (context, state) ← do Frontend.createContextStateFromFile source filename (← getEnv) {}
+-  let m := Frontend.mapCompilationSteps λ step => do
++  let li ← Frontend.mapCompilationSteps context state λ step => do
+     return Frontend.collectSorrys step
+-  let li ← m.run context |>.run' state
+   let goalStates ← li.filterMapM λ sorrys => do
+     if sorrys.isEmpty then
+       return .none
+@@ -22,9 +21,8 @@ def collectSorrysFromSource (source: String) : MetaM (List GoalState) := do
+ def collectInvocationsFromSource (source: String) : MetaM (List Protocol.InvokedTactic) := do
+   let filename := "<anonymous>"
+   let (context, state) ← do Frontend.createContextStateFromFile source filename (← getEnv) {}
+-  let m := Frontend.mapCompilationSteps fun step =>
++  let invocations ← Frontend.mapCompilationSteps context state fun step =>
+     Frontend.collectTacticsFromCompilationStep step { printExprModelAST := true }
+-  let invocations ← m.run context |>.run' state
+   return invocations.join
+ 
+ def findStructuredTerm? (invocations : List Protocol.InvokedTactic)
 diff --git a/Test/Integration.lean b/Test/Integration.lean
 index a45e6ce..5aae5f3 100644
 --- a/Test/Integration.lean
@@ -1558,28 +2258,30 @@ index a45e6ce..5aae5f3 100644
  
  def test_conv_protocol : Test :=
 diff --git a/Test/Main.lean b/Test/Main.lean
-index 0fde5fa..3504b48 100644
+index 0fde5fa..fdc0479 100644
 --- a/Test/Main.lean
 +++ b/Test/Main.lean
-@@ -6,7 +6,9 @@ import Test.Library
+@@ -6,7 +6,10 @@ import Test.Library
  import Test.Metavar
  import Test.Proofs
  import Test.Serial
 +import Test.Snapshot
  import Test.Tactic
++import Test.Transaction
 +import Test.Validation
  
  -- Test running infrastructure
  
-@@ -44,6 +46,7 @@ def main (args: List String) := do
+@@ -44,6 +47,8 @@ def main (args: List String) := do
      (trustLevel := 1)
  
    let suites: List (String × List (String × IO LSpec.TestSeq)) := [
++    ("Transaction", Transaction.suite env_default),
 +    ("Validation", Validation.suite env_default),
      ("Environment", Environment.suite),
      ("Frontend", Frontend.suite env_default),
      ("Integration", Integration.suite env_default),
-@@ -51,6 +54,7 @@ def main (args: List String) := do
+@@ -51,6 +56,7 @@ def main (args: List String) := do
      ("Metavar", Metavar.suite env_default),
      ("Proofs", Proofs.suite env_default),
      ("Serial", Serial.suite env_default),
@@ -1878,6 +2580,120 @@ index 132718a..60ef47e 100644
      addTest $ LSpec.check tactic  (message = s!"type mismatch\n  h\nhas type\n  a : Prop\nbut is expected to have type\n  {mainTarget} : Prop")
    | other => do
      addTest $ assertUnreachable $ other.toString
+diff --git a/Test/Transaction.lean b/Test/Transaction.lean
+new file mode 100644
+index 0000000..50bf197
+--- /dev/null
++++ b/Test/Transaction.lean
+@@ -0,0 +1,108 @@
++import Test.Common
++import Test.ContractFixtures
++import Repl
++
++namespace Pantograph.Test.Transaction
++open Lean Pantograph.Repl
++
++private def command (cmd : String) (fields : List (String × Json) := []) : Protocol.Command :=
++  { cmd, payload := Json.mkObj fields }
++
++private def field (response : Json) (key : String) : String :=
++  response.getObjValAs? String key |>.toOption |>.getD ""
++
++private def burn : CoreM Unit := do
++  for _ in [:1000000] do
++    discard <| Meta.whnf (mkApp (mkConst ``Nat.succ) (mkNatLit 0)) |>.run'
++
++private def tests : MainM LSpec.TestSeq := do
++  let mut tests := LSpec.TestSeq.done
++  let start ← execute (command "goal.start" [("expr", .str "True")])
++  let root := start.getObjValAs? Nat "stateId" |>.toOption |>.getD 99999
++  discard <| execute (command "env.add" [("name", .str "Transaction.kept"),
++    ("type", .str "True"), ("value", .str "True.intro"), ("isTheorem", .bool false)])
++  discard <| execute (command "goal.print" [("stateId", toJson root)])
++  tests := tests ++ LSpec.test "goal printing preserves subsequent environment additions"
++    ((← getEnv).contains `Transaction.kept)
++  let entry ← get
++  let env ← getEnv
++  let coreEntry ← getThe Core.State
++  let mut limits := #[]
++  for phase in ["execute", "validate", "observe", "serialize"] do
++    let result ← runTransaction (command "goal.start") do
++      -- Stage changes to all retained allocations, options, and the environment.
++      modify fun s => { s with
++        nextId := 99999, goalStates := {},
++        options := { s.options with printExprAST := true } }
++      let added ← Pantograph.Environment.addDecl {
++        name := "Transaction.staged", type := "True", value := "True.intro", isTheorem := false }
++      unless added.toOption.isSome && (← getEnv).contains `Transaction.staged do
++        throwError "staged declaration was not installed"
++      modifyEnv fun env => env.setMainModule `MustBeDiscarded
++      modifyThe Core.State fun s => { s with nextMacroScope := 99999 }
++      logInfo "discarded command message"
++      withCommandPhase phase do
++        burn
++        return Json.null
++    let resource := result.response.getObjVal? "resource" |>.toOption |>.getD Json.null
++    limits := limits.push (resource.getObjValAs? Nat "limit" |>.toOption |>.getD 0)
++    tests := tests ++ LSpec.test s!"{phase} has a single recoverable resource envelope"
++      (!result.fatal && field result.response "error" == "resource" &&
++        field result.response "recovery" == "command-rolled-back" && field resource "phase" == phase &&
++        (Json.parse result.bytes).toOption == some result.response && !result.bytes.contains '\n' &&
++        (result.response.getObjVal? "stateId").toOption.isNone)
++    tests := tests ++ LSpec.test s!"{phase} discards all staged mutations"
++      ((← get).nextId == entry.nextId && (← get).goalStates.size == entry.goalStates.size &&
++        !(← get).options.printExprAST && (← getEnv).mainModule == env.mainModule &&
++        !(← getEnv).contains `Transaction.staged && (← getEnv).contains `Transaction.kept &&
++        (← getThe Core.State).nextMacroScope == coreEntry.nextMacroScope &&
++        (← getThe Core.State).messages.toArray.size == coreEntry.messages.toArray.size)
++  tests := tests ++ LSpec.test "reported limits use option units" (limits.all (· == 100))
++  let deletion ← runTransaction (command "goal.delete") do
++    modify fun s => { s with goalStates := s.goalStates.erase root }
++    withCommandPhase "serialize" do
++      burn
++      return Json.null
++  tests := tests ++ LSpec.test "deletion remains staged until complete response encoding"
++    (!deletion.fatal && (← get).goalStates.contains root)
++  let rendering ← executeCommand (command "goal.tactic"
++    [("stateId", toJson root), ("tactic", .str "contract_diagnostic_heartbeat")])
++  let resource := rendering.response.getObjVal? "resource" |>.toOption |>.getD Json.null
++  tests := tests ++ LSpec.test "lazy diagnostic exhaustion is observed without replaying messages"
++    (!rendering.fatal && field resource "phase" == "observe" && (← get).goalStates.size == 1)
++  let usageStart ← IO.getNumHeartbeats
++  for _ in [:3000] do
++    let result ← executeCommand (command "stat")
++    unless !result.fatal && (result.response.getObjValAs? Nat "nGoals").toOption == some 1 do
++      throwError "cheap command failed"
++  let used := (← IO.getNumHeartbeats) - usageStart
++  tests := tests ++ LSpec.test "combined cheap work exceeds one request budget" (used > 100000)
++  let timedOut ← executeCommand (command "goal.tactic" [("stateId", toJson root), ("tactic", .str "contract_heartbeat")])
++  tests := tests ++ LSpec.test "native tactic timeout reaches the shared classifier"
++    (field timedOut.response "error" == "resource" && !timedOut.fatal)
++  let solved ← execute (command "goal.tactic" [("stateId", toJson root), ("tactic", .str "exact True.intro")])
++  let done := solved.getObjValAs? Nat "nextStateId" |>.toOption |>.getD 99999
++  let certified ← execute (command "goal.certify" [("stateId", toJson done)])
++  tests := tests ++ LSpec.test "the original retained state supports a certified proof after timeout"
++    (field certified "status" == "certified")
++  let exhausted ← runTransaction (command "goal.certify") do
++    burn
++    return Json.null
++  tests := tests ++ LSpec.test "outer certification exhaustion is inconclusive without a receipt"
++    (field exhausted.response "status" == "inconclusive" && !exhausted.fatal &&
++      (exhausted.response.getObjVal? "receipt").toOption.isNone)
++  let fatal ← runTransaction (command "stat") do
++    throwError "unexpected failure"
++  let after ← executeCommand (command "stat")
++  tests := tests ++ LSpec.test "unexpected failure ends the session and rejects later dispatch"
++    (fatal.fatal && after.fatal && field fatal.response "error" == "internal" &&
++      field fatal.response "recovery" == "session-unusable")
++  return tests
++
++def suite (_ : Environment) : List (String × IO LSpec.TestSeq) := [
++  ("Command rollback and native budgets", do
++    let env ← importModules #[{ module := `Test.ContractFixtures }] {} (trustLevel := 1)
++    runCoreMSeq env (tests.run { imports := ["Test.ContractFixtures"] } |>.run' {}) #["maxHeartbeats=100"])
++]
++
++end Pantograph.Test.Transaction
 diff --git a/Test/Validation.lean b/Test/Validation.lean
 new file mode 100644
 index 0000000..7612c84
@@ -2041,10 +2857,15 @@ index 0000000..7612c84
 +end Pantograph.Test.Validation
 diff --git a/doc/repository_client_contract.md b/doc/repository_client_contract.md
 new file mode 100644
-index 0000000..83b6eed
+index 0000000..6b8f938
 --- /dev/null
 +++ b/doc/repository_client_contract.md
-@@ -0,0 +1,84 @@
+@@ -0,0 +1,89 @@
++The current descriptor is revision 3. Complete command transactions, resource
++errors, and compact response framing are specified in
++[Transactional resource errors](transactional_resources.md). Earlier capture
++artifacts retain their original protocol revisions.
++
 +# Repository-owned client companion contract
 +
 +Stage 4 extends merged PR #1 at
@@ -2131,10 +2952,10 @@ index 0000000..83b6eed
 +or RL launch is part of Stage 4.
 diff --git a/doc/snapshot_protocol.md b/doc/snapshot_protocol.md
 new file mode 100644
-index 0000000..d853f12
+index 0000000..a7401d2
 --- /dev/null
 +++ b/doc/snapshot_protocol.md
-@@ -0,0 +1,117 @@
+@@ -0,0 +1,119 @@
 +# Retained snapshots: provenance, inspection and certification
 +
 +Protocol version 2 lets a client keep result states alive and run later
@@ -2143,7 +2964,7 @@ index 0000000..d853f12
 +input, a read-only view of obligations a state no longer lists, and a kernel
 +check of a complete root proof.
 +
-+`protocol.describe` reports `protocolVersion: 2` together with
++`protocol.describe` reports `protocolVersion: 3` together with
 +`transitionProvenanceVersion: 1`, `inspectionVersion: 1` and
 +`certificationVersion: 1`. The model S-expression version stays 1, and model
 +goal serialization is unchanged.
@@ -2252,6 +3073,286 @@ index 0000000..d853f12
 +new axiom, a rechecked auxiliary lemma, new and trusted-basis admissions, an
 +ill-typed assignment under `debug.skipKernelTC=true`, and a replaced root
 +statement.
++
++Resource errors and complete command rollback follow [the revision-3 transaction contract](transactional_resources.md).
+diff --git a/doc/transactional_resources.fixtures.json b/doc/transactional_resources.fixtures.json
+new file mode 100644
+index 0000000..222b09b
+--- /dev/null
++++ b/doc/transactional_resources.fixtures.json
+@@ -0,0 +1,62 @@
++[
++  {
++    "error": "resource",
++    "desc": "Lean command heartbeat budget exhausted",
++    "resource": {
++      "version": 1,
++      "kind": "heartbeats",
++      "phase": "execute",
++      "limit": 200000
++    },
++    "recovery": "command-rolled-back"
++  },
++  {
++    "error": "resource",
++    "desc": "Lean command heartbeat budget exhausted",
++    "resource": {
++      "version": 1,
++      "kind": "heartbeats",
++      "phase": "validate",
++      "limit": 200000
++    },
++    "recovery": "command-rolled-back"
++  },
++  {
++    "error": "resource",
++    "desc": "Lean command heartbeat budget exhausted",
++    "resource": {
++      "version": 1,
++      "kind": "heartbeats",
++      "phase": "observe",
++      "limit": 200000
++    },
++    "recovery": "command-rolled-back"
++  },
++  {
++    "error": "resource",
++    "desc": "Lean command heartbeat budget exhausted",
++    "resource": {
++      "version": 1,
++      "kind": "heartbeats",
++      "phase": "serialize",
++      "limit": 200000
++    },
++    "recovery": "command-rolled-back"
++  },
++  {
++    "error": "resource",
++    "desc": "Lean command heartbeat budget exhausted",
++    "resource": {
++      "version": 1,
++      "kind": "heartbeats",
++      "phase": "execute",
++      "limit": 200000
++    },
++    "recovery": "session-unusable"
++  },
++  {
++    "error": "internal",
++    "desc": "Unexpected REPL command failure",
++    "recovery": "session-unusable"
++  }
++]
+diff --git a/doc/transactional_resources.md b/doc/transactional_resources.md
+new file mode 100644
+index 0000000..92ca356
+--- /dev/null
++++ b/doc/transactional_resources.md
+@@ -0,0 +1,116 @@
++# Transactional resource errors: protocol revision 3
++
++`protocol.describe` reports `protocolVersion: 3`, `resourceErrorVersion: 1`, and
++`commandTransactionVersion: 1`. Model expressions, transition validation,
++transition provenance, inspection, messages, and certification keep their
++existing version-1 representations. Startup still emits `ready.`.
++
++Every subsequent response is one compact JSON line. Diagnostic newlines are
++escaped inside strings. The `printJsonPretty` option has been removed from both
++option structures and command handling. Clients must migrate to revision 3;
++there is no revision-2 negotiation or human-readable stdout parser.
++
++[The error schema](transactional_resources.schema.json) and
++[shared error fixtures](transactional_resources.fixtures.json) define the two
++new error envelopes. Error envelopes contain no allocation IDs, success flags,
++validation results, or certification receipts. Existing ordinary argument and
++tactic errors retain their representations. Human descriptions are bounded;
++clients classify errors through fields rather than descriptions.
++
++A resource error includes `resource.version: 1`, `resource.kind: "heartbeats"`,
++a phase (`execute`, `validate`, `observe`, or `serialize`), and a positive
++`resource.limit`. The limit uses Lean's `maxHeartbeats` option units: each unit
++counts one thousand underlying heartbeats. It does not measure elapsed seconds.
++Unexpected exceptions produce `error: "internal"` with
++`recovery: "session-unusable"`.
++
++## Command ownership and recovery
++
++All dispatch operations use `Repl.runTransaction`, including `goal.continue`,
++`env.add`, `frontend.process`, options, deletion, reset, and read-only commands.
++The runner copies the complete REPL state and gives the command a separate
++Lean Core state reference. The copies include the retained allocation table,
++allocation counter, options, environment, message log, caches, name generator,
++macro scopes, and information/trace state. Term and meta state live inside the
++retained snapshots or temporary command monads.
++
++Only successful response encoding publishes the staged REPL and Core states.
++Failure discards the staged references. Recovery requires no execution of
++restoration code under an exhausted Lean budget. Existing live IDs retain their
++snapshots, and a failed allocation cannot appear in `stat`. IDs may be reused
++when their staged allocation was never published; they never collide with a
++live allocation. Reset retains its established semantics of clearing all
++allocations and restarting IDs.
++
++A classified heartbeat failure returns `recovery: "command-rolled-back"` only
++when discarding the staged state establishes recovery. Ordinary failures may
++still return their established diagnostics. An unexpected exception makes the
++session unusable. Further native dispatch is refused, and the executable stops
++reading commands after writing the fatal response and exits nonzero.
++
++`frontend.process` can execute module initializers and write an output file.
++Its resource failures therefore use `session-unusable`, and unexpected frontend
++IO failures are fatal. Successful frontend operations retain their existing
++results. Rollback never promises to reverse arbitrary external IO performed
++by tactics. This protocol does not sandbox tactics.
++
++Response bytes exist before publication. Output uses one complete line followed
++by a flush. A failed or partial write ends the process without attempting a
++second response. Startup and transport failures use bounded stderr diagnostics.
++Native crashes and OS termination can prevent even a best-effort error response.
++
++## Budgets and phases
++
++Each transaction uses `Lean.withCurrHeartbeats` once. Saved goal contexts restore
++state, not the Core reader's heartbeat origin. Phase wrappers check the same
++finite budget before and after work; none resets that origin. Pure validation,
++transition construction, goal observation, diagnostic rendering, and compact
++JSON encoding are included. Pure/IO operations that do not poll Lean are checked
++when they return; this is a computation allowance, not preemptive cancellation.
++
++On the pinned Lean 4.10.0-rc1 toolchain, `Exception.isMaxHeartbeat` recognizes the
++exception produced by `Core.throwMaxHeartbeat`. The classifier additionally
++requires the current counter to exceed the current positive budget. It attaches
++the explicit phase and limit before unwinding the relevant context. It does not
++format an exception to classify it. Ambiguous failures terminate the session.
++
++Frontend info-tree observation now runs in CoreM under the caller's budget,
++instead of using `ContextInfo.runMetaM`, which re-entered IO with a new origin.
++Frontend compilation receives the remaining allowance for each source command,
++with checks between compilation and observation. Lean's own frontend can still
++create internal scopes, so outer checks enforce the total request allowance.
++All repository callers were migrated to the shared CoreM frontend interface.
++
++`goal.certify` keeps its positive, explicit kernel allowance and existing outcome
++schema. That allowance applies to each direct kernel declaration check, as in
++revision 2; it is not a new wall-clock deadline. If the outer command allowance
++is exhausted, the transaction discards staged state and returns a literal
++`inconclusive` certification result without a receipt. Neither kernel exhaustion
++nor outer exhaustion creates a certificate. Minimal error and inconclusive
++responses are constructed in IO without Lean pretty printing or type reduction.
++
++The existing native `--maxHeartbeats=<positive integer>` option configures the
++command allowance. Zero is rejected at startup. No application JSON budget
++setting was added. `--pantograph.traceCommands=true` emits bounded JSON traces
++to stderr, including command, truncated tactic, selected state/goal, phase, and
++underlying heartbeat usage. Tracing is off by default.
++
++## Verification and delivery
++
++Run `lake build repl test`, `lake test`, and
++`lake env python3 scripts/test_transactional_resources.py --capture pantograph_backport/transactional_resources/capture.json`.
++The native suite exercises staged mutation failures in every phase, request
++accounting, retained state reuse, and fatal refusal. The raw executable harness
++uses genuine Lean reduction exhaustion and lazy diagnostic rendering, then
++certifies a simple proof in the same session. It also checks failed starts,
++cleanup, compact multiline diagnostics, bounded stderr tracing, fatal shutdown,
++frontend exhaustion, and a broken stdout pipe.
++
++Discarding an isolated state reference removes the restoration procedure whose
++failure would otherwise need fault injection. Tests mutate staged state before
++exhaustion and confirm that original state remains available. Unexpected internal
++exceptions still exercise the fatal path. Phase injection supplements the real
++native heartbeat reproduction; it does not replace it.
++
++See [the deployment handoff](../pantograph_backport/transactional_resources/README.md)
++for identities, evidence limits, and remaining companion/deployment gates.
+diff --git a/doc/transactional_resources.schema.json b/doc/transactional_resources.schema.json
+new file mode 100644
+index 0000000..8380e7b
+--- /dev/null
++++ b/doc/transactional_resources.schema.json
+@@ -0,0 +1,82 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "title": "Pantograph revision 3 command failure",
++  "oneOf": [
++    {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "error",
++        "desc",
++        "resource",
++        "recovery"
++      ],
++      "properties": {
++        "error": {
++          "const": "resource"
++        },
++        "desc": {
++          "type": "string",
++          "maxLength": 2048
++        },
++        "recovery": {
++          "enum": [
++            "command-rolled-back",
++            "session-unusable"
++          ]
++        },
++        "resource": {
++          "type": "object",
++          "additionalProperties": false,
++          "required": [
++            "version",
++            "kind",
++            "phase",
++            "limit"
++          ],
++          "properties": {
++            "version": {
++              "const": 1
++            },
++            "kind": {
++              "const": "heartbeats"
++            },
++            "phase": {
++              "enum": [
++                "execute",
++                "validate",
++                "observe",
++                "serialize"
++              ]
++            },
++            "limit": {
++              "type": "integer",
++              "minimum": 1
++            }
++          }
++        }
++      }
++    },
++    {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "error",
++        "desc",
++        "recovery"
++      ],
++      "properties": {
++        "error": {
++          "const": "internal"
++        },
++        "desc": {
++          "type": "string",
++          "maxLength": 2048
++        },
++        "recovery": {
++          "const": "session-unusable"
++        }
++      }
++    }
++  ]
++}
 diff --git a/scripts/capture_repository_client_contract.py b/scripts/capture_repository_client_contract.py
 new file mode 100644
 index 0000000..925b77b
@@ -2474,6 +3575,164 @@ index 0000000..925b77b
 +    parser.add_argument("--mathlib", type=Path, required=True)
 +    parser.add_argument("--output", type=Path, required=True)
 +    asyncio.run(capture(parser.parse_args()))
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/scripts/test_transactional_resources.py b/scripts/test_transactional_resources.py
+new file mode 100644
+index 0000000..76e5ef0
+--- /dev/null
++++ b/scripts/test_transactional_resources.py
+@@ -0,0 +1,152 @@
++#!/usr/bin/env python3
++"""Raw executable regression and revision-3 capture; no application client required."""
++import argparse
++import hashlib
++import json
++from pathlib import Path
++import selectors
++import subprocess
++import tempfile
++
++ROOT = Path(__file__).resolve().parents[1]
++
++
++class Session:
++    def __init__(self, entries, *options):
++        self.entries = entries
++        self.stderr = tempfile.TemporaryFile(mode="w+t")
++        self.proc = subprocess.Popen(
++            ["lake", "env", str(ROOT / ".lake/build/bin/repl"), "Init",
++             "Test.ContractFixtures", *options], cwd=ROOT, text=True,
++            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.stderr)
++        self.read = selectors.DefaultSelector()
++        self.read.register(self.proc.stdout, selectors.EVENT_READ)
++        assert self.line() == "ready."
++
++    def line(self):
++        assert self.read.select(20), "REPL response timed out"
++        return self.proc.stdout.readline().rstrip("\n")
++
++    def call(self, command, payload, record=True):
++        request = command + " " + json.dumps(payload, separators=(",", ":"))
++        self.proc.stdin.write(request + "\n")
++        self.proc.stdin.flush()
++        line = self.line()
++        response = json.loads(line)
++        assert "Uncaught IO exception" not in line
++        if record:
++            self.entries.append(dict(command=command, request=payload,
++                                     request_line=request, response_line=line, response=response))
++        return response
++
++    def close(self, fatal=False):
++        self.proc.stdin.close()
++        status = self.proc.wait(timeout=20)
++        assert (status != 0) if fatal else (status == 0), status
++        assert self.proc.stdout.read() == "", "unsolicited or duplicate stdout"
++        self.stderr.seek(0)
++        stderr = self.stderr.read()
++        self.stderr.close()
++        self.read.close()
++        return stderr
++
++
++def run():
++    entries = []
++    session = Session(entries, "--maxHeartbeats=100", "--pantograph.traceCommands=true")
++    descriptor = session.call("protocol.describe", {})
++    assert descriptor["protocolVersion"] == 3
++    assert descriptor["resourceErrorVersion"] == descriptor["commandTransactionVersion"] == 1
++    root = session.call("goal.start", {"expr": "True"})
++    for _ in range(3000):
++        assert session.call("stat", {}, record=False) == {"nGoals": 1}
++    for tactic, phase in [("contract_heartbeat", "execute"),
++                          ("contract_diagnostic_heartbeat", "observe")]:
++        error = session.call("goal.tactic", {"stateId": root["stateId"], "tactic": tactic})
++        assert error == dict(error="resource", desc="Lean command heartbeat budget exhausted",
++                             recovery="command-rolled-back", resource=dict(
++                                 version=1, kind="heartbeats", phase=phase, limit=100))
++        assert session.call("stat", {}) == {"nGoals": 1}
++    failed = session.call("goal.start", {"expr": "by contract_heartbeat"})
++    assert failed["error"] == "resource" and failed["recovery"] == "command-rolled-back"
++    assert session.call("stat", {}) == {"nGoals": 1}
++    ordinary = session.call("goal.tactic", {"stateId": root["stateId"],
++                                            "tactic": 'fail "first line\\nsecond line"'})
++    assert "tacticErrors" in ordinary and any("\n" in text for text in ordinary["tacticErrors"])
++    continued = session.call("goal.continue", {"target": root["stateId"], "goals": [root["root"]]})
++    done = session.call("goal.tactic", {"stateId": root["stateId"], "tactic": "exact True.intro"})
++    certificate = session.call("goal.certify", {"stateId": done["nextStateId"]})
++    assert certificate["status"] == "certified"
++    session.call("goal.delete", {"stateIds": [root["stateId"], continued["nextStateId"], done["nextStateId"]]})
++    assert session.call("stat", {}) == {"nGoals": 0}
++    traces = [json.loads(line) for line in session.close().splitlines()]
++    assert any(trace["phase"] == "observe" for trace in traces)
++    assert all(len(trace["tactic"]) <= 512 and trace["heartbeats"] > 0 for trace in traces)
++
++    fatal = Session(entries, "--maxHeartbeats=100")
++    root = fatal.call("goal.start", {"expr": "True"})
++    # Queue a second command before the fatal response. It must never execute.
++    fatal.proc.stdin.write('goal.tactic {"stateId":0,"tactic":"contract_internal_failure"}\nstat {}\n')
++    fatal.proc.stdin.flush()
++    line = fatal.line()
++    response = json.loads(line)
++    assert response == dict(error="internal", desc="Unexpected REPL command failure",
++                            recovery="session-unusable")
++    entries.append(dict(command="goal.tactic", request=dict(stateId=0, tactic="contract_internal_failure"),
++                        response_line=line, response=response))
++    assert "session is unusable" in fatal.close(fatal=True)
++
++    kernel = Session(entries, "--maxHeartbeats=50000", "--maxRecDepth=10000")
++    # Distinct leaves prevent shared subexpressions from making the kernel check trivial.
++    nodes = [(f"({index} = ({index} : Nat))", f"(Eq.refl {index})") for index in range(512)]
++    while len(nodes) > 1:
++        nodes = [(f"({left} ∧ {right})", f"(And.intro {lp} {rp})")
++                 for (left, lp), (right, rp) in zip(nodes[::2], nodes[1::2])]
++    root = kernel.call("goal.start", {"expr": nodes[0][0]})
++    done = kernel.call("goal.tactic", {"stateId": root["stateId"], "expr": nodes[0][1]})
++    exhausted = kernel.call("goal.certify", {"stateId": done["nextStateId"], "maxHeartbeats": 1})
++    assert exhausted["status"] == "inconclusive" and "receipt" not in exhausted
++    assert kernel.call("stat", {}) == {"nGoals": 2}
++    assert kernel.call("goal.certify", {"stateId": done["nextStateId"]})["status"] == "certified"
++    kernel.close()
++
++    frontend = Session(entries, "--maxHeartbeats=100")
++    response = frontend.call("frontend.process", {"file": "example : True := by contract_heartbeat", "invocations": False, "sorrys": False})
++    assert response["error"] == "resource" and response["recovery"] == "session-unusable", response
++    frontend.close(fatal=True)
++
++    broken = Session([], "--maxHeartbeats=100")
++    broken.proc.stdout.close()
++    broken.proc.stdin.write("stat {}\n")
++    broken.proc.stdin.flush()
++    broken.proc.stdin.close()
++    assert broken.proc.wait(timeout=20) != 0
++    broken.read.close()
++    broken.stderr.close()
++
++    startup = subprocess.run(["lake", "env", str(ROOT / ".lake/build/bin/repl"), "--maxHeartbeats=0"],
++                             cwd=ROOT, text=True, capture_output=True, timeout=20)
++    assert startup.returncode != 0 and startup.stdout == "" and startup.stderr
++    return entries
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--capture", type=Path)
++    args = parser.parse_args()
++    entries = run()
++    if args.capture:
++        binary = ROOT / ".lake/build/bin/repl"
++        result = dict(protocol_version=3, source_base=subprocess.check_output(
++            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
++            source_dirty=bool(subprocess.check_output(["git", "diff", "--name-only"], cwd=ROOT)),
++            binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
++            toolchain=(ROOT / "lean-toolchain").read_text().strip(),
++            imports=["Init", "Test.ContractFixtures"], mathlib=None, exchanges=entries)
++        args.capture.parent.mkdir(parents=True, exist_ok=True)
++        args.capture.write_text(json.dumps(result, indent=2) + "\n")
++    print(f"PASS: native recovery, certification, framing, fatal shutdown, tracing, and broken output ({len(entries)} captured exchanges)")
 +
 +
 +if __name__ == "__main__":

@@ -1,0 +1,15 @@
+{
+  "kind": "transactional-resource-capture-provenance",
+  "companion_commit": "5cab95e132bcdd1d3cb715505d1694ac7bb0e0d6",
+  "checkout_commit": "0dd5d2225e2d093f66a4b6231c1aa35004f2c8f3",
+  "repl_sha256": "1c29397e4c0e9d3af499b6d18872cf9562c64fde3fc4c0bc59cec5494c772f30",
+  "toolchain": "leanprover/lean4:v4.10.0-rc1",
+  "captured_exchanges": 22,
+  "cumulative_requests": 3000,
+  "files_sha256": {
+    "schema.json": "97e00eb158ca69230a36a13d71f516fa4e1ad79e17dc74fbccf5d6f6df9bce71",
+    "fixtures.json": "394881fd33dd66f07a936fb70b8272806bc37b332f2e9eaa55085b00577386fd",
+    "capture.json": "2177cc5b27712d9107d7b7edc5561bb10df0a5d09733ebe83074b49e6b63aad5"
+  },
+  "scope": "Fresh native executable exchanges from the verified base-plus-patch build. Raw harness also checks tracing, broken stdout and invalid startup budget."
+}

@@ -143,9 +143,12 @@ def test_goal_start_levels_are_sent_only_when_declared():
     assert encode_request("goal.start", {"expr": "True"}) == (
         b'goal.start {"expr":"True"}\n'
     )
-    assert encode_request(
-        "goal.start", {"expr": "Sort u_1 → Type v", "levels": ["u_1", "v", "w'"]}
-    ) == 'goal.start {"expr":"Sort u_1 → Type v","levels":["u_1","v","w\'"]}\n'.encode()
+    assert (
+        encode_request(
+            "goal.start", {"expr": "Sort u_1 → Type v", "levels": ["u_1", "v", "w'"]}
+        )
+        == 'goal.start {"expr":"Sort u_1 → Type v","levels":["u_1","v","w\'"]}\n'.encode()
+    )
 
 
 def test_request_options_and_deletions():
@@ -210,9 +213,17 @@ def test_all_response_variants():
     assert decode_response("goal.delete", {}) == CommandAcknowledgement("goal.delete")
     assert decode_response("options.set", {}) == CommandAcknowledgement("options.set")
     assert decode_response("stat", {"nGoals": 0}) == PantographStats(0)
-    options = decode_response("options.print", CAPTURES["options_print"]["response"])
+    current = dict(REQUIRED_OPTIONS)
+    current.update(
+        printDependentMVars=False,
+        printAuxDecls=False,
+        printImplementationDetailHyps=False,
+    )
+    options = decode_response("options.print", current)
     assert isinstance(options, SessionOptions)
-    assert options.to_dict() == CAPTURES["options_print"]["response"]
+    assert options.to_dict() == current
+    with pytest.raises(PantographProtocolError):
+        decode_response("options.print", CAPTURES["options_print"]["response"])
 
 
 @pytest.mark.parametrize("key", list(PROTOCOL_DESCRIPTION))
@@ -826,7 +837,10 @@ def test_stage4_companion_capture_is_preserved_but_not_accepted():
     assert capture["subprocess_reaped"] is True
     for entry in capture["interactions"]:
         assert decode_json_response(entry["response_line"]) == entry["response"]
-        if entry["command"] == "protocol.describe" or "nextStateId" in entry["response"]:
+        if (
+            entry["command"] == "protocol.describe"
+            or "nextStateId" in entry["response"]
+        ):
             with pytest.raises(PantographProtocolError):
                 decode_response(entry["command"], entry["response"])
 
@@ -876,7 +890,12 @@ def test_transition_provenance_decodes_and_partitions_the_goals():
         {"direct": ["_uniq.22", "_uniq.23"], "siblings": ["_uniq.23"]},
         {"direct": ["_uniq.22", "_uniq.23", "_uniq.24"]},
         {"direct": ["_uniq.22", "_uniq.22", "_uniq.23"]},
-        {"selected": "_uniq.22", "direct": ["_uniq.23"], "extra": ["_uniq.22"], "introduced": [[]]},
+        {
+            "selected": "_uniq.22",
+            "direct": ["_uniq.23"],
+            "extra": ["_uniq.22"],
+            "introduced": [[]],
+        },
         {"closed": ["_uniq.23"]},
         {"closed": ["_selected"]},
         {"closed": ["_uniq.5"], "dormant": ["_uniq.5"]},
@@ -906,7 +925,12 @@ def test_success_without_provenance_is_rejected():
 
 
 def obligation(**changes):
-    value = {"name": "_uniq.12", "status": "complete", "holes": [], "universeHoles": False}
+    value = {
+        "name": "_uniq.12",
+        "status": "complete",
+        "holes": [],
+        "universeHoles": False,
+    }
     value.update(changes)
     return value
 
@@ -919,7 +943,9 @@ def test_inspection_decodes_each_status():
             "obligations": [
                 obligation(status="active", goal=goal),
                 obligation(name="_uniq.3", status="assigned", holes=["_uniq.4"]),
-                obligation(name="_uniq.5", status="delayed", universeHoles=True, holes=[]),
+                obligation(
+                    name="_uniq.5", status="delayed", universeHoles=True, holes=[]
+                ),
                 obligation(name="_uniq.6"),
             ]
         },
@@ -1014,3 +1040,17 @@ def test_snapshot_requests_encode_canonically():
     assert encode_request("goal.certify", {"stateId": 3}) == (
         b'goal.certify {"stateId":3}\n'
     )
+
+
+def test_removed_pretty_json_option_is_rejected():
+    with pytest.raises(PantographProtocolError):
+        encode_request("options.set", {"printJsonPretty": False})
+    options = dict(REQUIRED_OPTIONS)
+    options.update(
+        printDependentMVars=False,
+        printAuxDecls=False,
+        printImplementationDetailHyps=False,
+    )
+    assert isinstance(decode_response("options.print", options), SessionOptions)
+    with pytest.raises(PantographProtocolError):
+        decode_response("options.print", {**options, "printJsonPretty": False})

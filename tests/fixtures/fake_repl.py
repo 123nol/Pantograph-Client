@@ -75,7 +75,6 @@ def main():
     if scenario == "unsolicited":
         send({"unexpected": True})
     options = {
-        "printJsonPretty": False,
         "printExprPretty": True,
         "printExprAST": True,
         "printExprModelAST": True,

@@ -1,7 +1,11 @@
 # Standalone Pantograph client resource errors and recovery
 
 Status: standalone client implementation completed in the working tree on
-2026-11-04; coordinated native/application/release gates remain pending.
+2026-11-04. The subsequent
+[companion live-gate repair](revision3_companion_live_gate.md) completes matched
+native validation; application/release delivery gates remain pending.
+The implementation notes below record the original standalone handoff before
+that follow-up.
 
 Implementation notes:
 

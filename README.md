@@ -121,10 +121,10 @@ never overwritten.
 
 ## Compatibility
 
-This development version requires protocol version 3. The bundled companion
-patch and native captures are historical protocol-version-2 evidence and cannot
-start a session with this client. Native revision-3 validation, application
-migration, and matched deployment remain release requirements. See
+This development version requires protocol version 3. The bundled patch reproduces
+transactional companion commit `5cab95e132bcdd1d3cb715505d1694ac7bb0e0d6`.
+Native recovery and snapshot exchanges are verified against that build.
+Application migration and matched deployment remain delivery requirements. See
 [compatibility](docs/compatibility.md).
 
 
@@ -161,13 +161,13 @@ patch = compatibility.companion_patch()  # bytes, checked against its digest
 compatibility.verify_companion_sources("/path/to/Pantograph")  # after applying
 ```
 
-For historical reproduction only, check out the Pantograph fork at
+Check out the Pantograph fork at
 `companion_base()["source_commit"]`, or apply the
 patch to `companion_base()["base_commit"]`, verify the patched files, and build
 `repl` with Lake. Lean source development
 stays in that fork. [docs/compatibility.md](docs/compatibility.md) has the full
-procedure and what each pin means. A revision-3 companion must replace these
-historical pins before release.
+procedure and what each pin means. The manifest and codec must agree with the
+companion descriptor before its build pins can be used.
 
 ## Development
 

@@ -1,5 +1,5 @@
 {
-  "status": "resource-recovery-client-implemented-native-and-application-validation-pending",
+  "status": "revision-3-native-validated-application-and-deployment-pending",
   "descriptor": {
     "protocol": "maths-ai-pantograph",
     "protocolVersion": 3,
@@ -15,7 +15,6 @@
     "commandTransactionVersion": 1
   },
   "required_options": {
-    "printJsonPretty": false,
     "printExprPretty": true,
     "printExprAST": true,
     "printExprModelAST": true,
@@ -106,7 +105,7 @@
   "baseline_provenance": "../tests/fixtures/pantograph/baseline/provenance.json",
   "complete_theorem_certification": true,
   "contract_revision": 4,
-  "reconciled_on": "2026-10-26",
+  "reconciled_on": "2026-11-04",
   "implementation_status": {
     "stage0": "Rebaselined on upstream PR #1; live unextended captures recorded.",
     "stage1": "Revision-2 codec, authored fixtures and pure tests implemented; Stage 1 exit gate passed on 2026-10-08.",
@@ -118,7 +117,7 @@
     "stage6": "Atomic factory, reasoner, pool, inference and translator migration implemented. Real factory/executor checks passed with two independent CPU workers. No upstream Python imports or selectable old-client route remain.",
     "stage4": "Companion Lean extension implemented on client_centric_repo over the merged PR #1 base; Stage 4 exit gate passed on 2026-10-10. 299 Lean assertions, 316 Python regressions, 61 raw Mathlib exchanges and four exact canonical graph goldens passed.",
     "snapshot_operations": "Revision-3 codec, typed inspect/certify scope operations, provenance linkage checks and reclaimable issued-state records implemented against the snapshot companion build.",
-    "resource_recovery": "Standalone codec, transport and ownership implemented; native companion, application migration and deployment pending."
+    "resource_recovery": "Client codec, transport, ownership and exact companion build validated against protocol version 3. Application migration and deployment pending."
   },
   "upstream": {
     "branch": "gnn-sexpr-v410",
@@ -211,14 +210,14 @@
   "descriptor_revision_note": "protocolVersion 3 requires resourceErrorVersion 1 and commandTransactionVersion 1. Older servers are rejected.",
   "companion_patch": {
     "file": "repository_client_contract.patch",
-    "sha256": "18a973b6ab69190e8343ee8461ff1e4d4235f9c555ff0338299dce89d6ad0c54",
-    "provenance": "../docs/evidence/snapshot_companion.provenance.json",
-    "repl_sha256": "9b549ad2d5e8aa33f5c39eb124c7452ad0dd52fce8df605dd0060f15a6c9e198",
-    "live_capture": "../tests/fixtures/snapshot_companion/capture.json",
+    "sha256": "0914f6587b1d31ab1a293bb68f6ff911726f5adc609e9e4cc7e64f867865dd79",
+    "provenance": "../docs/evidence/transactional_companion.provenance.json",
+    "repl_sha256": "1c29397e4c0e9d3af499b6d18872cf9562c64fde3fc4c0bc59cec5494c772f30",
+    "live_capture": "../tests/fixtures/transactional_snapshot_companion/capture.json",
     "previous": {
-      "sha256": "ca9921913281f0c53f11cdde59afe15cf38f70a08f59068cd7b96f3ab1f2d021",
-      "repl_sha256": "fd507703303d05fb2ad97b8b11962a06d649741bfafb3b3a93b65dc9fda5a198",
-      "live_capture": "../tests/fixtures/stage4_companion/capture.json"
+      "sha256": "18a973b6ab69190e8343ee8461ff1e4d4235f9c555ff0338299dce89d6ad0c54",
+      "repl_sha256": "9b549ad2d5e8aa33f5c39eb124c7452ad0dd52fce8df605dd0060f15a6c9e198",
+      "live_capture": "../tests/fixtures/snapshot_companion/capture.json"
     }
   },
   "transition_provenance": {

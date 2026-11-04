@@ -36,7 +36,6 @@ PROTOCOL_DESCRIPTION = MappingProxyType(
 )
 REQUIRED_OPTIONS = MappingProxyType(
     {
-        "printJsonPretty": False,
         "printExprPretty": True,
         "printExprAST": True,
         "printExprModelAST": True,

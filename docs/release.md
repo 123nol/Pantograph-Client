@@ -15,11 +15,11 @@ patch releases.
 
 ## Current release gate
 
-Version 0.3.0 requires a revision-3 transactional REPL. The bundled patch and
-native captures still describe protocol version 2. Do not release using those
-historical pins. Record the reviewed companion source/binary identities and
-native recovery captures, run the native heartbeat test and full live suite,
-and complete the application's resource-outcome migration before deployment.
+Version 0.3.0 requires the pinned revision-3 transactional REPL. The bundled
+patch reproduces published commit `5cab95e132bcdd1d3cb715505d1694ac7bb0e0d6`;
+source/binary identities and native recovery evidence are recorded in
+`docs/evidence/transactional_companion.provenance.json`. Complete the application's
+resource-outcome migration and validate the matched deployment before rollout.
 
 ## Checklist
 

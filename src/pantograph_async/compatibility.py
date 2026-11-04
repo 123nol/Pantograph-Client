@@ -47,7 +47,8 @@ def companion_patch() -> bytes:
 
 
 def companion_base() -> dict[str, str]:
-    """Recorded companion pins; consult manifest validation_status before release."""
+    """Pins for the companion implementing the current client contract."""
+    verify_contract()
     data = manifest()
     return {
         "contract_revision": data["contract_revision"],
@@ -66,13 +67,17 @@ def companion_files() -> frozenset[str]:
 
 
 def verify_companion_sources(root: str | Path) -> None:
-    """Check recorded source hashes, independently of runtime protocol compatibility."""
+    """Require source hashes for the companion implementing the current contract."""
+    verify_contract()
     root = Path(root)
     data = manifest()
     mismatched = []
     for name, digest in sorted(data["companion"]["patched_sources_sha256"].items()):
         path = root / name
-        if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+        if (
+            not path.is_file()
+            or hashlib.sha256(path.read_bytes()).hexdigest() != digest
+        ):
             mismatched.append(name)
     if mismatched:
         raise PantographConfigurationError(
@@ -109,6 +114,7 @@ def verify_contract() -> None:
     data = manifest()
     if (
         data["descriptor"] != shipped["descriptor"]
+        or data["companion"]["descriptor"] != shipped["descriptor"]
         or data["contract_revision"] != shipped["contract_revision"]
     ):
         raise PantographConfigurationError(

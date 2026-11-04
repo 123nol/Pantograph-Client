@@ -31,10 +31,12 @@ Startup, under one deadline:
 
    The protocol name keeps its historical application name. Renaming the Python
    package does not change it.
-2. `options.set` applies the required options (`printJsonPretty=false`,
-   `printExprPretty`, `printExprAST`, `printExprModelAST`, `automaticMode` true,
+2. `options.set` applies the required options (`printExprPretty`, `printExprAST`, `printExprModelAST`, `automaticMode` true,
    `noRepeat=false`). Conflicting values are rejected before any request.
 3. `options.print` must report every requested option as applied.
+
+Revision 3 always emits compact JSON lines. `printJsonPretty` is removed from
+both option requests and responses; the client rejects it.
 
 ## Commands
 

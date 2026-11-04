@@ -115,7 +115,10 @@ jobs:
           git checkout --detach "$BASE"
           python -c "import sys; from pantograph_async import compatibility; sys.stdout.buffer.write(compatibility.companion_patch())" | git apply -
           python -c "from pantograph_async import compatibility; compatibility.verify_companion_sources('.')"
-          lake build repl
+          lake build repl test
+          lake test
+          lake env python3 scripts/test_transactional_resources.py \
+            --capture "$RUNNER_TEMP/transactional_resources.json"
       - name: Live gate
         env:
           PANTOGRAPH_TEST_SOURCE_ROOT: ${{ runner.temp }}/Pantograph

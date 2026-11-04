@@ -66,7 +66,9 @@ assert not {{name.split('.')[0] for name in sys.modules}} & FORBIDDEN
 
 def test_contract_resources_agree_with_the_codec():
     compatibility.verify_contract()
-    assert compatibility.contract()["descriptor"]["modelSexpVersion"] == MODEL_SEXP_VERSION
+    assert (
+        compatibility.contract()["descriptor"]["modelSexpVersion"] == MODEL_SEXP_VERSION
+    )
     assert compatibility.manifest()["descriptor"] == dict(PROTOCOL_DESCRIPTION)
     assert PROTOCOL_DESCRIPTION["protocol"] == "maths-ai-pantograph"
 
@@ -104,16 +106,19 @@ def test_companion_source_verification(tmp_path):
     reason="Set PANTOGRAPH_TEST_COMPANION_SOURCE to a patched Pantograph checkout.",
 )
 def test_patched_checkout_matches_the_validated_companion():
-    compatibility.verify_companion_sources(os.environ["PANTOGRAPH_TEST_COMPANION_SOURCE"])
+    compatibility.verify_companion_sources(
+        os.environ["PANTOGRAPH_TEST_COMPANION_SOURCE"]
+    )
 
 
 def test_report_hashes_cover_every_installed_module():
     hashes = diagnostics.installed_sources()
     package = Path(pantograph_async.__file__).parent
     assert set(hashes) == {path.name for path in package.glob("*.py")}
-    assert hashes["client.py"] == hashlib.sha256(
-        (package / "client.py").read_bytes()
-    ).hexdigest()
+    assert (
+        hashes["client.py"]
+        == hashlib.sha256((package / "client.py").read_bytes()).hexdigest()
+    )
 
 
 def test_cli_refuses_to_overwrite_reports(tmp_path):
@@ -182,3 +187,15 @@ def test_wheel_metadata_declares_no_runtime_dependencies():
     entry_points = {entry.name for entry in distribution.entry_points}
     assert entry_points == {"pantograph-client"}
     assert compatibility.manifest()["client_version"] == distribution.version
+
+
+def test_companion_descriptor_must_match_before_building(monkeypatch):
+    from copy import deepcopy
+
+    manifest = deepcopy(compatibility.manifest())
+    manifest["companion"]["descriptor"]["protocolVersion"] = 2
+    monkeypatch.setattr(compatibility, "manifest", lambda: manifest)
+    with pytest.raises(PantographConfigurationError, match="different contract"):
+        compatibility.verify_contract()
+    with pytest.raises(PantographConfigurationError, match="different contract"):
+        compatibility.companion_base()

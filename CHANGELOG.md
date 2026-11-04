@@ -10,8 +10,14 @@
   cleanup fails, preserving the original operation exception.
 - Bound exception payloads and include offending stdout, command, session and
   phase in protocol diagnostics.
-- Native revision-3 companion validation, application migration and deployment
-  remain pending. The bundled companion patch is historical protocol version 2.
+- Pin the published transactional companion `5cab95e`, reproduce its sources
+  with the bundled patch, and record native recovery and snapshot exchanges.
+  Remove the obsolete `printJsonPretty` option; revision 3 always uses compact JSON.
+- Verify the companion descriptor against the codec before exposing build pins.
+  CI builds and runs the Lean tests and raw resource harness before the client gate.
+- Use the companion's native reduction fixture for heartbeat recovery and test
+  fatal internal shutdown against the real executable.
+- Application migration and deployment remain pending.
 
 ## 0.2.0 (unreleased)
 
