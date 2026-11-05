@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.5.0 (unreleased)
+
+- Require transition validation version 3 and the exact
+  `execution-closure-and-representation-aware-audit` scope. Reject validation
+  versions 1 and 2 during startup and response decoding. Overall protocol remains
+  version 3. Client contract revision is 6.
+- Pin companion `fc740c2`, which reads compiler-stage environment entries by
+  their representation. Tactics that compile an on-demand match splitter, such as
+  `unfold Nat.pow`, no longer end the session; compiler-only entries are never
+  proof dependencies.
+- Refresh the reproducible patch and native source/binary identities, and add
+  current `compiler_aware_*` captures; all earlier captures stay historical.
+- Check compiler-producing transitions, continuation, inspection and kernel
+  certification against the native companion, including the pinned Mathlib gate,
+  and startup rejection of the validation-version-2 executable.
+- Validation integrity failures remain terminal. Application and deployment
+  migration remain separate stages.
+
 ## 0.4.0 (unreleased)
 
 - Require transition validation version 2 and the exact

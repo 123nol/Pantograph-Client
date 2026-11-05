@@ -1,0 +1,26 @@
+{
+  "kind": "compiler-aware-validation-capture-provenance",
+  "companion_commit": "fc740c26a1e832ecb571859af24a5c632a351bd9",
+  "checkout_commit": "fc740c26a1e832ecb571859af24a5c632a351bd9",
+  "repl_sha256": "6cba4f74fdf2bc8ba7060603e7bc11feffb7229dd8c288ec7c3c0ba2e9c2ef29",
+  "toolchain": "leanprover/lean4:v4.10.0-rc1",
+  "core_exchanges": 44,
+  "mathlib_exchanges": 40,
+  "mathlib_source_verification": {
+    "reference_commit": "29dcec074de168ac2bf835a77ef68bbe069194c5",
+    "checked_files": 4737,
+    "missing_or_different": [],
+    "local_extra_lean_files": []
+  },
+  "files_sha256": {
+    "schema.json": "1784d046264b9e66adf35f1855935d43535702220496bd2ae687247169b01975",
+    "fixtures.json": "94629dd054eb88acd142ef74bd30c6d2f8a9b213a2d7313f730af369cfb0c15b",
+    "capture.json": "79eda17b267fddbab78f4f02e2bef47e69b67a761aacc73b010fa0f10b75922c",
+    "client_capture.json": "0c49f24de90cf84adb819b643f33df9bb4a3a76201a08f634bc0406e7b5595ea"
+  },
+  "scope": "Committed REPL schema and fixtures plus fresh executable exchanges, including compiler-producing tactics and their certification; the client lifecycle checks are recorded separately.",
+  "client_configured_exchanges": {
+    "core": 52,
+    "mathlib": 42
+  }
+}

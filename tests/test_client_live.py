@@ -278,6 +278,56 @@ def test_a_protocol_version_1_binary_is_rejected_at_startup(live_env):
 
 
 @pytest.mark.pantograph_live
+def test_a_validation_version_2_binary_is_rejected_at_startup(live_env):
+    old = os.environ.get("PANTOGRAPH_TEST_VALIDATION2_REPL")
+    if not old:
+        pytest.skip("PANTOGRAPH_TEST_VALIDATION2_REPL not configured.")
+
+    async def run():
+        with pytest.raises(PantographProtocolError, match="transitionValidationVersion"):
+            await PantographClient.create(replace(live_env, pantograph_repl=Path(old)))
+
+    asyncio.run(run())
+
+
+@pytest.mark.pantograph_live
+def test_compiler_producing_tactics_keep_a_usable_state_and_certify(live_env):
+    """`unfold Nat.pow` compiles the match splitter; version 2 ended the session."""
+    from pantograph_async import TRANSITION_VALIDATION_VERSION
+
+    async def run():
+        async with await PantographClient.create(live_env) as client:
+            async with client.state_scope() as scope:
+                root = await scope.start_goal("∀ m n : Nat, Nat.pow m n = Nat.pow m n")
+                middle = await scope.apply_tactic(root, "intro m n")
+                unfolded = await scope.apply_tactic(middle, "unfold Nat.pow")
+                assert unfolded.validation.version == TRANSITION_VALIDATION_VERSION
+                assert not unfolded.validation.is_rejection and unfolded.goals
+                inspected = await scope.inspect(unfolded, [root.root])
+                assert not inspected[0].is_complete
+                split = await scope.apply_tactic(unfolded, "split")
+                assert len(split.goals) == 2
+                first = await scope.apply_tactic(split, "rfl")
+                done = await scope.apply_tactic(first, "rfl")
+                assert not done.goals and scope._validate_state(done)
+                certificate = await scope.certify(done)
+                assert certificate.status == "certified"
+                assert any("splitter" in name for name in certificate.receipt.auxiliary)
+                assert not any("_cstage" in name for name in certificate.receipt.auxiliary)
+                # A rewrite through generated equations on another root, same session.
+                other = await scope.start_goal(
+                    "∀ m n : Nat, Nat.pow m (n+1) = Nat.pow m n * m"
+                )
+                opened = await scope.apply_tactic(other, "intro m n")
+                rewritten = await scope.apply_tactic(opened, "rw [Nat.pow]")
+                assert not rewritten.validation.is_rejection and rewritten.goals
+                assert client.is_usable
+            assert (await client.stat()).n_goals == 0
+
+    asyncio.run(run())
+
+
+@pytest.mark.pantograph_live
 def test_a_tactic_that_leaves_the_goal_open_keeps_the_session(live_env):
     async def run():
         async with await PantographClient.create(live_env) as client:
@@ -434,7 +484,7 @@ def mathlib_env(live_env, request):
 def test_native_mathlib_tauto_retains_owned_state_and_certifies(
     mathlib_env, statement, intro, levels
 ):
-    from pantograph_async import TRANSITION_VALIDATION_SCOPE
+    from pantograph_async import TRANSITION_VALIDATION_SCOPE, TRANSITION_VALIDATION_VERSION
 
     async def run():
         async with await PantographClient.create(mathlib_env) as client:
@@ -449,7 +499,7 @@ def test_native_mathlib_tauto_retains_owned_state_and_certifies(
                 )
                 done = await scope.apply_tactic(middle, "tauto")
                 assert scope._validate_state(done)
-                assert done.validation.version == 2
+                assert done.validation.version == TRANSITION_VALIDATION_VERSION
                 assert done.validation.scope == TRANSITION_VALIDATION_SCOPE
                 assert done.validation.checked and not done.validation.is_rejection
                 assert not done.goals

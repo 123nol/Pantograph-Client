@@ -84,10 +84,10 @@ index 292efb9..4b5b506 100644
  import Pantograph.Version
 diff --git a/Pantograph/Certify.lean b/Pantograph/Certify.lean
 new file mode 100644
-index 0000000..811bf0e
+index 0000000..1aac15f
 --- /dev/null
 +++ b/Pantograph/Certify.lean
-@@ -0,0 +1,206 @@
+@@ -0,0 +1,209 @@
 +/-
 +Kernel certification of a state's complete root proof.
 +
@@ -123,6 +123,9 @@ index 0000000..811bf0e
 +  let (trusted, final) ← read
 +  let some info := final.find? name | problem s!"Missing dependency {name}"
 +  let isNew := !trusted.contains name
++  if isNew && isCompilerRepresentation final trusted name then
++    problem s!"Compiler-only declaration {name} is not a proof dependency"
++    return
 +  if name == ``sorryAx then problem "Proof depends on an admission (sorryAx)"
 +  if info.isUnsafe then problem s!"Unsafe dependency {name}"
 +  let scanExpr (expr : Expr) : ScanM Unit := expr.getUsedConstants.forM scanConstant
@@ -292,6 +295,99 @@ index 0000000..811bf0e
 +      auxiliary := evidence.auxiliary.map (·.toString),
 +    }
 +  }
++
++end Pantograph
+diff --git a/Pantograph/DeclarationAudit.lean b/Pantograph/DeclarationAudit.lean
+new file mode 100644
+index 0000000..391b329
+--- /dev/null
++++ b/Pantograph/DeclarationAudit.lean
+@@ -0,0 +1,87 @@
++/-
++Representation of retained environment entries.
++
++The pinned code generator stores its intermediate stages in the environment as
++ordinary constants: `owner._cstage1` (after lambda lifting) and `owner._cstage2`
++(after erasure). They are unsafe definitions added without a kernel check, and
++stage-2 types and values use the compiler's own sentinels (`_obj`, `_neutral`,
++`_unreachable`), which are not constants. Reading them with the kernel grammar
++fails on the first sentinel; exempting them by name would let any declaration
++with that spelling skip the strict audit.
++
++Classification therefore uses the compiler's registry: an entry is a compiler
++representation only if the compiler registered IR for its owner in this
++environment and not in the trusted one. Every other entry, including one that is
++only named like a stage, is a kernel declaration and keeps the strict audit. A
++compiler representation is never a proof dependency.
++-/
++import Lean
++
++namespace Pantograph
++open Lean
++
++/-- How the expressions of an untrusted environment entry must be read. -/
++inductive Representation where
++  | kernel
++  /-- Code-generator output for `owner`, at stage 1 or 2. -/
++  | compiler (stage : Nat) (owner : Name)
++  deriving BEq, Inhabited
++
++/-- The constants the pinned code generator writes into stage-2 representations.
++    Established from every imported stage entry of the toolchain (`Init`, `Lean`):
++    no other unresolved reference occurs. -/
++def compilerSentinels : List Name := [`_obj, `_neutral, `_unreachable]
++
++private def stageOf : String → Option Nat
++  | "_cstage1" => some 1
++  | "_cstage2" => some 2
++  | _ => none
++
++/-- Classify an entry that is not in the trusted environment.
++
++    Compiler representation requires all of: a stage name, an unsafe definition,
++    no universe parameters at stage 2, and fresh IR registered by the compiler for
++    the owner. Stage-1 owners are always constants. Anything that fails one of
++    these is a kernel declaration. -/
++def classifyEntry (env trusted : Environment) (name : Name) (info : ConstantInfo) : Representation :=
++  match name, info with
++  | .str owner suffix, .defnInfo value =>
++    match stageOf suffix with
++    | none => .kernel
++    | some stage =>
++      let freshIR := (IR.findEnvDecl env owner).isSome && (IR.findEnvDecl trusted owner).isNone
++      let shaped := value.safety == .unsafe &&
++        (stage == 1 && env.contains owner || stage == 2 && value.levelParams.isEmpty)
++      if !trusted.contains name && freshIR && shaped then .compiler stage owner else .kernel
++  | _, _ => .kernel
++
++/-- Representation of an untrusted name, or `none` for trusted or missing names. -/
++def classifyName (env trusted : Environment) (name : Name) : Option Representation :=
++  if trusted.contains name then none
++  else (env.find? name).map (classifyEntry env trusted name)
++
++/-- Whether `name` is fresh compiler data, which is never a proof dependency. -/
++def isCompilerRepresentation (env trusted : Environment) (name : Name) : Bool :=
++  match classifyName env trusted name with
++  | some (.compiler ..) => true
++  | _ => false
++
++/-- The integrity problems of a compiler representation, empty when it holds.
++
++    The entry must be closed and every reference must resolve: to a constant, to
++    a declaration the compiler registered IR for, or at stage 2 to a sentinel.
++    This checks the stored representation; it does not verify generated code. -/
++def compilerEntryProblems (env : Environment) (stage : Nat) (info : ConstantInfo) : Array String := Id.run do
++  let mut problems := #[]
++  let parts := #[("type", info.type)] ++ (info.value?.map (fun v => #[("value", v)]) |>.getD #[])
++  for (part, expr) in parts do
++    if expr.hasFVar then problems := problems.push s!"{part} has a free variable"
++    if expr.hasMVar then problems := problems.push s!"{part} has a metavariable"
++    if expr.hasLooseBVars then problems := problems.push s!"{part} has a loose bound variable"
++    for used in expr.getUsedConstants do
++      let resolved := env.contains used || (IR.findEnvDecl env used).isSome ||
++        (stage == 2 && compilerSentinels.contains used)
++      unless resolved do problems := problems.push s!"{part} has unresolved compiler reference {used}"
++  return problems
 +
 +end Pantograph
 diff --git a/Pantograph/Diagnostics.lean b/Pantograph/Diagnostics.lean
@@ -1177,7 +1273,7 @@ index 23a2046..7d8b849 100644
  
  end Pantograph
 diff --git a/Pantograph/Protocol.lean b/Pantograph/Protocol.lean
-index 781f4bf..b6796e2 100644
+index 781f4bf..7b1f0b7 100644
 --- a/Pantograph/Protocol.lean
 +++ b/Pantograph/Protocol.lean
 @@ -11,9 +11,6 @@ namespace Pantograph.Protocol
@@ -1232,7 +1328,7 @@ index 781f4bf..b6796e2 100644
 +  resourceErrorVersion: Nat := 1
 +  commandTransactionVersion: Nat := 1
 +  modelSexpVersion: Nat := 1
-+  transitionValidationVersion: Nat := 2
++  transitionValidationVersion: Nat := 3
 +  transitionProvenanceVersion: Nat := 1
 +  inspectionVersion: Nat := 1
 +  certificationVersion: Nat := 1
@@ -1242,8 +1338,8 @@ index 781f4bf..b6796e2 100644
 +  deriving Lean.ToJson
 +
 +structure TransitionValidation where
-+  version: Nat := 2
-+  scope: String := "execution-closure-and-transition-audit"
++  version: Nat := 3
++  scope: String := "execution-closure-and-representation-aware-audit"
 +  checked: Bool
 +  deriving Lean.ToJson
 +
@@ -1573,11 +1669,12 @@ index 0000000..f009377
 +end Pantograph
 diff --git a/Pantograph/Validation.lean b/Pantograph/Validation.lean
 new file mode 100644
-index 0000000..a80ccbc
+index 0000000..dfe181f
 --- /dev/null
 +++ b/Pantograph/Validation.lean
-@@ -0,0 +1,360 @@
+@@ -0,0 +1,376 @@
 +import Pantograph.Goal
++import Pantograph.DeclarationAudit
 +
 +namespace Pantograph
 +open Lean
@@ -1604,6 +1701,7 @@ index 0000000..a80ccbc
 +  nextScope : Nat := 0
 +  mvars : HashSet (MVarId × ValidationPurpose) := {}
 +  constants : HashSet (Name × ValidationPurpose) := {}
++  compilerEntries : HashSet Name := {}
 +  fvars : HashSet (Nat × FVarId × ValidationPurpose) := {}
 +  activeLocals : HashSet (Nat × FVarId × ValidationPurpose) := {}
 +  activeMVars : HashSet (MVarId × ValidationPurpose) := {}
@@ -1699,12 +1797,26 @@ index 0000000..a80ccbc
 +      inspectExpr purpose o (path ++ "/projection") depth body
 +    | .lit _ => pure ()
 +
++  /-- `audit` marks the environment enumeration; every other call is a reference
++      from an expression. -/
 +  private partial def inspectConstant (purpose : ValidationPurpose) (o : ExpressionOwner)
-+      (path : String) (name : Name) : ScanM Unit := do
++      (path : String) (name : Name) (audit : Bool := false) : ScanM Unit := do
 +    poll
++    let ctx ← read
++    -- Classification precedes memoization, so an entry audited as compiler data is
++    -- still rejected when an expression later reaches it.
++    if let some (.compiler stage producer) := classifyName ctx.state.env ctx.trusted name then
++      unless audit do problem purpose o path s!"Compiler-only declaration {name} is not a proof dependency"
++      unless (← get).compilerEntries.contains name do
++        modify fun s => { s with compilerEntries := s.compilerEntries.insert name }
++        let some info := ctx.state.env.find? name | problem purpose o path s!"Missing compiler declaration {name}"
++        let problems := compilerEntryProblems ctx.state.env stage info
++        unless problems.isEmpty do
++          let entry ← owner s!"compiler stage {stage} of {producer}" {}
++          problem .execution entry (path ++ s!"/compiler {name}") (String.intercalate "; " problems.toList)
++      return
 +    unless (← get).constants.contains (name, purpose) do
 +      modify fun s => { s with constants := s.constants.insert (name, purpose) }
-+      let ctx ← read
 +      let some info := ctx.state.env.find? name | problem purpose o path s!"Missing proof dependency {name}"
 +      if info.isUnsafe then modify fun s => { s with hasUnsafe := true }
 +      unless ctx.trusted.contains name do
@@ -1854,7 +1966,7 @@ index 0000000..a80ccbc
 +  let additions := ctx.state.env.constants.foldStage2 (fun acc name _ =>
 +    if ctx.trusted.contains name then acc else name :: acc) []
 +  let closed ← owner "retained environment additions" {}
-+  for name in additions do inspectConstant .auxiliary closed "environment audit" name
++  for name in additions do inspectConstant .auxiliary closed "environment audit" name (audit := true)
 +  for info in ctx.state.savedState.term.elab.mvarErrorInfos do
 +    if let .implicitArg expression := info.kind then
 +      let lctx := (ctx.state.mctx.findDecl? info.mvarId).map (·.lctx) |>.getD {}
@@ -2332,6 +2444,268 @@ index 699ea4e..559a611 100644
      let messages := "\n".intercalate messages.toList
      s!".failure {messages}"
    | .parseError error => s!".parseError {error}"
+diff --git a/Test/CompilerDiagnostic.lean b/Test/CompilerDiagnostic.lean
+new file mode 100644
+index 0000000..9ae4b65
+--- /dev/null
++++ b/Test/CompilerDiagnostic.lean
+@@ -0,0 +1,102 @@
++import Pantograph
++
++open Lean Pantograph
++
++/-! Provenance of the environment entries that compiler-producing tactics add.
++
++This walk is diagnostic evidence for the classifier, not the production audit. -/
++
++private def kindOf : ConstantInfo → String
++  | .axiomInfo _ => "axiom" | .defnInfo _ => "definition" | .thmInfo _ => "theorem"
++  | .opaqueInfo _ => "opaque" | .quotInfo _ => "quotient" | .inductInfo _ => "inductive"
++  | .ctorInfo _ => "constructor" | .recInfo _ => "recursor"
++
++private def safetyOf : ConstantInfo → String
++  | .defnInfo v => match v.safety with | .safe => "safe" | .unsafe => "unsafe" | .partial => "partial"
++  | info => if info.isUnsafe then "unsafe" else "safe"
++
++private def describe (env : Environment) (trusted : Environment) (name : Name) (info : ConstantInfo) : Json :=
++  let used := info.type.getUsedConstants ++ (info.value?.map Expr.getUsedConstants |>.getD #[])
++  let used := used.toList.eraseDups
++  let unresolved := used.filter fun n => !env.contains n
++  Json.mkObj [
++    ("name", toJson name.toString), ("kind", kindOf info), ("safety", safetyOf info),
++    ("levelParams", toJson (info.levelParams.map toString)),
++    ("hasIR", toJson (IR.findEnvDecl env name).isSome),
++    ("prefix", toJson name.getPrefix.toString),
++    ("prefixHasIR", toJson (IR.findEnvDecl env name.getPrefix).isSome),
++    ("prefixIsConstant", toJson (env.contains name.getPrefix)),
++    ("prefixTrusted", toJson (trusted.contains name.getPrefix)),
++    ("typeHasFVar", toJson info.type.hasFVar), ("typeHasMVar", toJson info.type.hasMVar),
++    ("valueHasFVar", toJson (info.value?.any Expr.hasFVar)), ("valueHasMVar", toJson (info.value?.any Expr.hasMVar)),
++    ("unresolved", toJson (unresolved.map toString)),
++    ("unresolvedWithIR", toJson ((unresolved.filter fun n => (IR.findEnvDecl env n).isSome).map toString)),
++    ("type", toJson ((toString info.type).take 300))]
++
++private def run (expr : String) (tactics : List String) : CoreM Json := do
++  let .ok root ← goalStartExpr expr #[] | throwError "start failed"
++  let mut state := root
++  let mut outcomes := #[]
++  for tactic in tactics do
++    match ← runTermElabM (state.tryTactic state.goals.head! tactic) with
++    | .success next => state := next; outcomes := outcomes.push (toJson s!"{tactic}: success")
++    | _ => outcomes := outcomes.push (toJson s!"{tactic}: not a success"); break
++  let env := state.env
++  let trusted := root.trustedEnv
++  let additions := env.constants.foldStage2 (fun acc name info =>
++    if trusted.contains name then acc else (name, info) :: acc) []
++  let extra := env.extraConstNames.toList.filter fun n => !trusted.contains n
++  let checked ← validateSnapshot state
++  return Json.mkObj [
++    ("goal", toJson expr), ("tactics", toJson outcomes),
++    ("additions", toJson ((additions.reverse.map fun (n, i) => describe env trusted n i).toArray)),
++    ("extraConstNames", toJson (extra.map toString)),
++    ("extraWithIR", toJson ((extra.filter fun n => (IR.findEnvDecl env n).isSome).map toString)),
++    ("validator", match checked with | .ok _ => "accepted" | .error message => toJson message)]
++
++/-- Every imported compiler stage entry, built by the same pinned compiler: which references
++    are neither constants nor IR declarations, and which shapes occur. -/
++private def inventory : CoreM Json := do
++  let env ← getEnv
++  let mut sentinels : HashMap String Nat := {}
++  let mut shapes : HashMap String Nat := {}
++  let mut count := 0
++  let mut withFVars : Array Json := #[]
++  for (name, info) in env.constants.toList do
++    let .str owner stage := name | continue
++    unless stage == "_cstage1" || stage == "_cstage2" do continue
++    count := count + 1
++    let shape := s!"{stage} {kindOf info} {safetyOf info} ownerIR={(IR.findEnvDecl env owner).isSome} ownerConst={env.contains owner} levels={!info.levelParams.isEmpty} looseBVars={info.type.hasLooseBVars || info.value?.any Expr.hasLooseBVars} fvar={info.type.hasFVar || info.value?.any Expr.hasFVar} mvar={info.type.hasMVar || info.value?.any Expr.hasMVar}"
++    shapes := shapes.insert shape (shapes.findD shape 0 + 1)
++    if (info.type.hasFVar || info.value?.any Expr.hasFVar) && withFVars.size < 16 then
++      let fvars := (Lean.collectFVars {} info.type).fvarIds ++ (info.value?.map (Lean.collectFVars {} · |>.fvarIds) |>.getD #[])
++      withFVars := withFVars.push <| Json.mkObj [("name", toJson name.toString),
++        ("module", toJson ((env.getModuleIdxFor? name).bind (env.header.moduleNames.get? ·.toNat) |>.map toString)),
++        ("fvars", toJson (fvars.map (·.name.toString)))]
++    let used := info.type.getUsedConstants ++ (info.value?.map Expr.getUsedConstants |>.getD #[])
++    for n in used do
++      unless env.contains n || (IR.findEnvDecl env n).isSome do
++        let key := s!"{stage} {n}"
++        sentinels := sentinels.insert key (sentinels.findD key 0 + 1)
++  return Json.mkObj [("entries", toJson count), ("withFreeVariables", toJson withFVars),
++    ("shapes", toJson (shapes.toList.map fun (k, v) => s!"{v} × {k}")),
++    ("unresolved", toJson (sentinels.toList.map fun (k, v) => s!"{v} × {k}"))]
++
++unsafe def main (args : List String) : IO Unit := do
++  Pantograph.initSearch ""
++  let ctx ← createCoreContext #[]
++  let inventoryMode := args.head? == some "--inventory"
++  let args := if inventoryMode then args.tail! else args
++  let imports := if args.isEmpty then #["Init"] else args.toArray
++  let state ← createCoreState imports
++  if inventoryMode then
++    let (result, _) ← inventory.toIO ctx state
++    IO.println result.pretty
++    return
++  let cases := [
++    ("∀ m n : Nat, Nat.pow m (n+1) = Nat.pow m n * m", ["intro m n", "unfold Nat.pow"]),
++    ("∀ l : List Nat, List.length (0 :: l) = l.length + 1", ["intro l", "simp only [List.length]"]),
++    ("∀ n : Nat, Nat.pred (n+1) = n", ["intro n", "unfold Nat.pred"])]
++  for (expr, tactics) in cases do
++    let (result, _) ← (run expr tactics).toIO ctx state
++    IO.println result.pretty
+diff --git a/Test/CompilerValidation.lean b/Test/CompilerValidation.lean
+new file mode 100644
+index 0000000..75334a9
+--- /dev/null
++++ b/Test/CompilerValidation.lean
+@@ -0,0 +1,148 @@
++import Test.Common
++import Pantograph.DeclarationAudit
++import Pantograph.Validation
++import Pantograph.Certify
++
++/-! Compiler-producing tactics and the representation-aware audit.
++
++`unfold Nat.pow` generates the match splitter for `Nat.pow.match_1`, which is
++compiled on demand; the code generator then stores its stage entries
++(`_private.0.Nat.pow.match_1.splitter._cstage1`, `…splitter._cstage2`,
++`…splitter._rarg._cstage2`) in the retained environment. -/
++
++namespace Pantograph.Test.CompilerValidation
++open Lean
++
++private def withEnv (state : GoalState) (env : Environment) : GoalState :=
++  { state with savedState := { state.savedState with term := { state.savedState.term with
++    meta := { state.savedState.term.meta with core := { state.savedState.term.meta.core with env } } } } }
++
++private def withMCtx (state : GoalState) (mctx : MetavarContext) : GoalState :=
++  { state with savedState := { state.savedState with term := { state.savedState.term with
++    meta := { state.savedState.term.meta with meta := { state.metaState with mctx } } } } }
++
++private def rejects (result : Except String CheckedTransition) : Bool := result.toOption.isNone
++
++private def rejectsWith (fragment : String) (result : Except String CheckedTransition) : Bool :=
++  match result with
++  | .error message => (message.splitOn fragment).length > 1
++  | .ok _ => false
++
++/-- Add a declaration as the code generator does: without a kernel check. -/
++private def addUnchecked (state : GoalState) (decl : Declaration) : Elab.TermElabM GoalState := do
++  match state.env.addDeclWithoutChecking decl with
++  | .ok env => return withEnv state env
++  | .error _ => throwError "unchecked addition failed"
++
++private def unsafeDefinition (name : Name) (type value : Expr) : Declaration :=
++  .defnDecl { name, levelParams := [], type, value, hints := .opaque, safety := .unsafe, all := [name] }
++
++private def safeDefinition (name : Name) (type value : Expr) : Declaration :=
++  .defnDecl { name, levelParams := [], type, value, hints := .opaque, safety := .safe, all := [name] }
++
++private def additions (state : GoalState) : List Name :=
++  state.env.constants.foldStage2 (fun acc name _ => if state.trustedEnv.contains name then acc else name :: acc) []
++
++private def tactic (state : GoalState) (text : String) (goal? : Option MVarId := none) :
++    Elab.TermElabM (GoalState × Except String CheckedTransition) := do
++  let some goal := goal?.orElse fun _ => state.goals.head? | throwError s!"{text}: no goal"
++  -- The REPL runs each tactic in a fresh elaboration context over the saved state.
++  let .success next ← (runTermElabM (state.tryTactic goal text) : CoreM _) | throwError s!"{text} failed"
++  return (next, ← validateTransition state next goal)
++
++private def splitter : Name := Name.mkNum `_private 0 ++ `Nat.pow.match_1.splitter
++
++private def tests : Elab.TermElabM LSpec.TestSeq := do
++  let mut tests := LSpec.TestSeq.done
++  let .ok root ← goalStartExpr "∀ m n : Nat, Nat.pow m n = Nat.pow m n" #[] | throwError "start failed"
++  let (intro, checked) ← tactic root "intro m n"
++  let some intro := checked.toOption.map (·.state) | throwError "intro rejected"
++  let (unfolded, checked) ← tactic intro "unfold Nat.pow"
++  let compiled := (additions unfolded).filter fun name =>
++    isCompilerRepresentation unfolded.env unfolded.trustedEnv name
++  tests := tests ++ LSpec.test "the unfold leaves fresh compiler stage entries in the environment"
++    (compiled.length == 3 && compiled.contains (splitter.str "_cstage2") && compiled.contains ((splitter.str "_rarg").str "_cstage2"))
++  tests := tests ++ LSpec.test "a compiler-producing transition is accepted without hazards"
++    (checked.toOption.any fun c => !c.hasSorry && !c.hasUnsafe && c.state.goals.length == 1)
++  let some unfolded := checked.toOption.map (·.state) | throwError "unfold rejected"
++  tests := tests ++ LSpec.test "the splitter itself is a kernel declaration"
++    (classifyName unfolded.env unfolded.trustedEnv splitter == some .kernel)
++  tests := tests ++ LSpec.test "inspection of the retained output validates"
++    ((← validateSnapshot unfolded unfolded.goals).toOption.isSome)
++  let (split, checked) ← tactic unfolded "split"
++  tests := tests ++ LSpec.test "a later tactic continues the compiler-producing state"
++    (checked.toOption.any (·.state.goals.length == 2))
++  let some split := checked.toOption.map (·.state) | throwError "split rejected"
++  let [_, sibling] := split.goals | throwError "split goals"
++  let (_, checked) ← tactic split "rfl"
++  let some first := checked.toOption.map (·.state) | throwError "first rfl rejected"
++  -- The REPL resumes the dormant sibling; here it is selected explicitly.
++  let (_, checked) ← tactic first "rfl" sibling
++  let some done := checked.toOption.map (·.state) | throwError "second rfl rejected"
++  let certificate ← certifyRoot done 200000
++  let auxiliary := certificate.receipt?.map (·.auxiliary) |>.getD #[]
++  tests := tests ++ LSpec.test "the original root certifies with kernel auxiliaries only"
++    (certificate.status == "certified" && auxiliary.contains splitter.toString &&
++      auxiliary.all fun name => (name.splitOn "_cstage").length == 1)
++
++  -- A compiler entry is runtime data, never a proof dependency.
++  let stage2 := splitter.str "_cstage2"
++  let leaked := withMCtx done { done.mctx with eAssignment := done.mctx.eAssignment.insert done.root (mkConst stage2) }
++  tests := tests ++ LSpec.test "the root proof cannot reference a compiler entry"
++    (rejectsWith "Compiler-only declaration" (← validateSnapshot leaked))
++  tests := tests ++ LSpec.test "certification rejects a compiler entry in the proof"
++    ((← certifyRoot leaked 200000).status == "rejected")
++  let user ← addUnchecked done (safeDefinition `Uses.compiler (mkConst ``Nat) (mkConst stage2))
++  tests := tests ++ LSpec.test "a kernel declaration cannot reach compiler data after it was audited"
++    (rejectsWith "Compiler-only declaration" (← validateSnapshot user))
++
++  -- The exemption needs the compiler's registration, not the spelling.
++  let named ← addUnchecked done (unsafeDefinition `Fake._cstage2 (mkConst `_obj) (mkConst `_neutral))
++  tests := tests ++ LSpec.test "a stage-named entry without compiler IR keeps the kernel audit"
++    (classifyName named.env named.trustedEnv `Fake._cstage2 == some .kernel &&
++      rejectsWith "Missing proof dependency _obj" (← validateSnapshot named))
++  let ordinary ← addUnchecked done (safeDefinition `Ordinary._cstage2 (mkConst ``Nat) (mkNatLit 0))
++  tests := tests ++ LSpec.test "a well-formed kernel declaration named like a stage is checked, not exempted"
++    (classifyName ordinary.env ordinary.trustedEnv `Ordinary._cstage2 == some .kernel &&
++      (← validateSnapshot ordinary).toOption.isSome)
++  let sentinel := withMCtx intro { intro.mctx with eAssignment := intro.mctx.eAssignment.insert intro.goals.head! (mkConst `_obj) }
++  tests := tests ++ LSpec.test "a compiler sentinel in an ordinary kernel expression rejects"
++    (rejectsWith "Missing proof dependency _obj" (← validateSnapshot sentinel))
++
++  -- Registered compiler data still has to be well formed.
++  let boxed := (splitter.str "_rarg").str "_boxed"
++  let malformed ← addUnchecked done (unsafeDefinition (boxed.str "_cstage2") (mkConst `_obj) (mkConst `Missing.runtime))
++  tests := tests ++ LSpec.test "registered compiler data with an unresolved reference is an integrity failure"
++    (classifyName malformed.env malformed.trustedEnv (boxed.str "_cstage2") == some (.compiler 2 boxed) &&
++      rejectsWith "unresolved compiler reference Missing.runtime" (← validateSnapshot malformed))
++  let open_ ← addUnchecked done (unsafeDefinition (boxed.str "_cstage2") (mkConst `_obj) (.bvar 0))
++  tests := tests ++ LSpec.test "registered compiler data must be closed"
++    (rejectsWith "loose bound variable" (← validateSnapshot open_))
++  tests := tests ++ LSpec.test "stage-1 representations cannot use stage-2 sentinels"
++    (compilerEntryProblems done.env 1 (.defnInfo { name := `x, levelParams := [], type := mkConst `_obj, value := mkConst ``Nat, hints := .opaque, safety := .unsafe, all := [] }) != #[])
++
++  -- Hazard accounting is unchanged for proof dependencies.
++  let admission := mkApp2 (mkConst ``sorryAx [.zero]) done.rootType (mkConst ``Bool.false)
++  let admitted := withMCtx done { done.mctx with eAssignment := done.mctx.eAssignment.insert done.root admission }
++  tests := tests ++ LSpec.test "an admission in a compiler-producing proof is still reported"
++    ((← validateSnapshot admitted).toOption.any (·.hasSorry) &&
++      (← certifyRoot admitted 200000).status == "rejected")
++  return tests
++
++/-- The same transition on a session that has already run an unrelated tactic. -/
++private def warmed : Elab.TermElabM LSpec.TestSeq := do
++  let .ok warm ← goalStartExpr "True ∧ True" #[] | throwError "warm start failed"
++  let .success _ ← warm.tryTactic warm.root "simp" | throwError "warm simp failed"
++  let .ok root ← goalStartExpr "∀ m n : Nat, Nat.pow m (n+1) = Nat.pow m n * m" #[] | throwError "start failed"
++  let (_, checked) ← tactic root "intro m n"
++  let some intro := checked.toOption.map (·.state) | throwError "intro rejected"
++  let (_, checked) ← tactic intro "rw [Nat.pow]"
++  return LSpec.test "a rewrite with generated equations is accepted after earlier history"
++    (checked.toOption.any fun c => !c.hasUnsafe && c.state.goals.length == 1)
++
++def suite (env : Environment) : List (String × IO LSpec.TestSeq) := [
++  ("Compiler-producing transitions", runTermElabMSeq env tests),
++  ("Warmed session history", runTermElabMSeq env warmed)
++]
++
++end Pantograph.Test.CompilerValidation
 diff --git a/Test/ContractFixtures.lean b/Test/ContractFixtures.lean
 new file mode 100644
 index 0000000..6715532
@@ -2602,10 +2976,16 @@ index a45e6ce..5aae5f3 100644
  
  def test_conv_protocol : Test :=
 diff --git a/Test/Main.lean b/Test/Main.lean
-index 0fde5fa..2be409f 100644
+index 0fde5fa..4955616 100644
 --- a/Test/Main.lean
 +++ b/Test/Main.lean
-@@ -6,7 +6,11 @@ import Test.Library
+@@ -1,4 +1,5 @@
+ import LSpec
++import Test.CompilerValidation
+ import Test.Environment
+ import Test.Frontend
+ import Test.Integration
+@@ -6,7 +7,11 @@ import Test.Library
  import Test.Metavar
  import Test.Proofs
  import Test.Serial
@@ -2617,16 +2997,17 @@ index 0fde5fa..2be409f 100644
  
  -- Test running infrastructure
  
-@@ -44,6 +48,8 @@ def main (args: List String) := do
+@@ -44,6 +49,9 @@ def main (args: List String) := do
      (trustLevel := 1)
  
    let suites: List (String × List (String × IO LSpec.TestSeq)) := [
 +    ("Transaction", Transaction.suite env_default),
 +    ("Validation", Validation.suite env_default),
++    ("CompilerValidation", CompilerValidation.suite env_default),
      ("Environment", Environment.suite),
      ("Frontend", Frontend.suite env_default),
      ("Integration", Integration.suite env_default),
-@@ -51,6 +57,8 @@ def main (args: List String) := do
+@@ -51,6 +59,8 @@ def main (args: List String) := do
      ("Metavar", Metavar.suite env_default),
      ("Proofs", Proofs.suite env_default),
      ("Serial", Serial.suite env_default),
@@ -3589,24 +3970,130 @@ index 0000000..0734f60
 +]
 +
 +end Pantograph.Test.Validation
+diff --git a/doc/compiler_aware_validation.md b/doc/compiler_aware_validation.md
+new file mode 100644
+index 0000000..2ea955a
+--- /dev/null
++++ b/doc/compiler_aware_validation.md
+@@ -0,0 +1,99 @@
++# Representation-aware environment audit, validation version 3
++
++Tactics that generate equations or match splitters compile them on demand. The
++pinned code generator then stores its intermediate stages in the retained
++environment as constants. Validation version 2 read every new constant with the
++kernel grammar, so the first compiler sentinel ended the session:
++
++```text
++execution owner=declaration _private.0.Nat.pow.match_1.splitter._rarg._cstage2
++path=environment audit/declaration-type/binder-type:
++Missing proof dependency _obj
++```
++
++`unfold Nat.pow`, `simp only [Nat.pow]` and `rw [Nat.pow]` reproduce it with only
++`Init` imported, in a fresh process and after earlier history
++([evidence](../pantograph_backport/compiler_aware_validation/README.md)).
++
++## Contract
++
++`protocol.describe` reports `transitionValidationVersion: 3`. Successful tactic
++responses include exactly:
++
++```json
++{"version":3,"scope":"execution-closure-and-representation-aware-audit","checked":true}
++```
++
++Protocol version 3, transition provenance, model expressions, inspection,
++certification, and transactional resources keep their versions. There is no
++version-2 fallback: the two versions audit different boundaries. A validation
++failure is still `error: "validation"`, allocates nothing, and ends the session.
++[The schema](scope_aware_validation.schema.json) and
++[fixtures](scope_aware_validation.fixtures.json) are the strict contract.
++
++## What the compiler stores
++
++Lean 4.10's code generator registers, for a compiled declaration `owner`:
++
++| Entry | Form | References |
++| --- | --- | --- |
++| `owner._cstage1` | unsafe definition, added without a kernel check | constants and IR declarations |
++| `owner._cstage2` | unsafe definition, no universe parameters | also `_obj`, `_neutral`, `_unreachable` |
++| `owner` IR, `owner._rarg`, `owner._boxed`, … | IR declarations in `declMapExt`; names without constants are in `extraConstNames` | — |
++
++The sentinel set and shapes come from every imported stage entry: 145,488 with
++`Init` and `Lean`, 461,882 with the pinned Mathlib. Stage-2 entries reference no
++other unresolved names and stage-1 entries none at all. No entry has
++metavariables or loose bound variables. Five Mathlib stage-1 entries contain
++free variables named `_kernel_fresh.N`, left by the code generator; they are
++imported, so the audit never reads them. A fresh entry of that form is still an
++integrity failure. That is deliberate and can be revisited if a compiler-producing
++tactic is found to emit one.
++
++## Classification
++
++The shared module `Pantograph/DeclarationAudit.lean` classifies each entry that
++is not in the trusted environment:
++
++- **Compiler representation**: a `_cstage1` or `_cstage2` name, an unsafe
++  definition, no universe parameters at stage 2, a stage-1 owner that is a
++  constant, and IR for the owner that the compiler registered in this
++  environment but not in the trusted one.
++- **Kernel declaration**: everything else, including an entry that is only
++  spelled like a stage. It keeps the strict execution audit, so an unregistered
++  `Fake._cstage2` that uses `_obj` still fails.
++
++Neither the spelling, `isUnsafe`, nor membership in the newly added map segment
++is a classifier on its own; the compiler's IR registration is the provenance.
++
++## Audits by role
++
++- A compiler representation found by the environment enumeration is audited as
++  compiler data: closed, and every reference resolves to a constant, an IR
++  declaration, or (stage 2) a sentinel. It does not set `hasUnsafe`: it is
++  runtime machinery, not a proof hazard. This checks the stored representation;
++  it does not verify generated code.
++- Any expression reference to a compiler representation is rejected:
++  `Compiler-only declaration … is not a proof dependency`. The check runs before
++  memoization, so an entry already audited as compiler data cannot satisfy a
++  later kernel reference.
++- Certification's dependency scan applies the same rule, and compiler entries
++  are never copied into the kernel environment that checks the root. Kernel
++  auxiliaries such as the splitter itself are reconstructed and checked as
++  before.
++
++Kernel declarations, retained locals, admissions, unsafe proof dependencies, new
++axioms, and the root-statement identity keep the version-2 checks. Polling,
++bounded diagnostics, cycle detection, and transactional rollback are unchanged.
++
++## Verification
++
++- `lake test`: 410 assertions, including `CompilerValidation` (compiler
++  transitions, continuation, inspection, certification, name-only and
++  malformed entries, compiler references from proofs and kernel declarations,
++  sentinels in kernel expressions, warmed history).
++- `lake env python3 scripts/test_scope_aware_validation.py`: core and pinned
++  Mathlib exchanges, including `unfold Nat.pow` → `split` → `rfl` → `rfl` with a
++  kernel receipt and `cases n <;> simp [Nat.pow]` under Mathlib.
++- `.lake/build/bin/compiler_diagnostic [--inventory] Init Lean`: the provenance
++  table and the sentinel inventory above.
 diff --git a/doc/repository_client_contract.md b/doc/repository_client_contract.md
 new file mode 100644
-index 0000000..f3ffaa2
+index 0000000..63d0d22
 --- /dev/null
 +++ b/doc/repository_client_contract.md
-@@ -0,0 +1,66 @@
+@@ -0,0 +1,68 @@
 +# Repository-owned REPL contract
 +
 +`protocol.describe {}` identifies `maths-ai-pantograph`, protocol version 3,
-+transition validation version 2, and the existing version-1 model expressions,
++transition validation version 3, and the existing version-1 model expressions,
 +transition provenance, inspection, certification, messages, resource errors, and
 +command transactions. Goal selection is `explicit-focused-v1`; tactic errors use
 +`string-array-v1`.
 +
 +Successful `goal.tactic` responses retain `nextStateId`, `goals`, `messages`,
 +`hasSorry`, and `hasUnsafe`. Validation metadata is exactly
-+`{version: 2, scope: "execution-closure-and-transition-audit", checked: true}`.
-+See [the scope-aware contract](scope_aware_validation.md) and
++`{version: 3, scope: "execution-closure-and-representation-aware-audit", checked: true}`.
++See [the scope-aware contract](scope_aware_validation.md),
++[the representation-aware audit](compiler_aware_validation.md) and
 +[the ownership inventory](scope_aware_ownership.md).
 +
 +A positive admission or unsafe flag remains a successful allocation for the
@@ -3657,8 +4144,9 @@ index 0000000..f3ffaa2
 +retain their existing representations. See [retained snapshots](snapshot_protocol.md).
 +
 +Current native evidence and separate Mathlib controls are recorded in
-+[the scope-aware handoff](../pantograph_backport/scope_aware_validation/README.md).
-+Historical Stage 4 and transactional-resource captures retain their original
++[the representation-aware handoff](../pantograph_backport/compiler_aware_validation/README.md).
++The [scope-aware handoff](../pantograph_backport/scope_aware_validation/README.md),
++Stage 4 and transactional-resource captures retain their original
 +validation versions and source/binary identities. Their old application codec
 +and graph results are not current-client acceptance evidence.
 diff --git a/doc/scope_aware_ownership.md b/doc/scope_aware_ownership.md
@@ -3759,14 +4247,14 @@ index 0000000..3be5d53
 +calling the kernel. Unresolved universes still prevent certification.
 diff --git a/doc/scope_aware_validation.fixtures.json b/doc/scope_aware_validation.fixtures.json
 new file mode 100644
-index 0000000..0c77b3b
+index 0000000..155001e
 --- /dev/null
 +++ b/doc/scope_aware_validation.fixtures.json
 @@ -0,0 +1,11 @@
 +{
 +  "validation": {
-+    "version": 2,
-+    "scope": "execution-closure-and-transition-audit",
++    "version": 3,
++    "scope": "execution-closure-and-representation-aware-audit",
 +    "checked": true
 +  },
 +  "integrityError": {
@@ -3776,29 +4264,32 @@ index 0000000..0c77b3b
 +}
 diff --git a/doc/scope_aware_validation.md b/doc/scope_aware_validation.md
 new file mode 100644
-index 0000000..07e92da
+index 0000000..98b891d
 --- /dev/null
 +++ b/doc/scope_aware_validation.md
-@@ -0,0 +1,143 @@
-+# Scope-aware transition validation, version 2
+@@ -0,0 +1,146 @@
++# Scope-aware transition validation
 +
 +The shared validator accepts inert elaboration residue while requiring valid
 +owners for executable references. A missing local in an orphan assignment does
 +not establish a dangling reference in the retained proof. It also does not grant
 +the record an exemption when a later operation makes it executable.
 +
-+`protocol.describe` reports `transitionValidationVersion: 2`. Successful tactic
++Version 2 introduced this boundary. Version 3 keeps it and reads compiler-stage
++environment entries by their representation; see
++[the representation-aware audit](compiler_aware_validation.md).
++`protocol.describe` reports `transitionValidationVersion: 3`. Successful tactic
 +responses include exactly:
 +
 +```json
-+{"version":2,"scope":"execution-closure-and-transition-audit","checked":true}
++{"version":3,"scope":"execution-closure-and-representation-aware-audit","checked":true}
 +```
 +
 +This object is the `validation` field. Protocol version 3, compact framing,
 +resource errors, provenance, inspection, and certification keep their existing
 +versions. [The schema](scope_aware_validation.schema.json) and
-+[fixtures](scope_aware_validation.fixtures.json) are the strict version-2 contract.
-+Current client consumers must migrate together; no version-1 fallback exists.
++[fixtures](scope_aware_validation.fixtures.json) are the strict version-3 contract.
++Current client consumers must migrate together; no earlier-version fallback exists.
 +
 +## Ownership and traversal
 +
@@ -3925,13 +4416,13 @@ index 0000000..07e92da
 +and fatal rollback. See [the evidence handoff](../pantograph_backport/scope_aware_validation/README.md).
 diff --git a/doc/scope_aware_validation.schema.json b/doc/scope_aware_validation.schema.json
 new file mode 100644
-index 0000000..def1654
+index 0000000..ece107b
 --- /dev/null
 +++ b/doc/scope_aware_validation.schema.json
 @@ -0,0 +1,51 @@
 +{
 +  "$schema": "https://json-schema.org/draft/2020-12/schema",
-+  "title": "Pantograph transition validation version 2",
++  "title": "Pantograph transition validation version 3",
 +  "$defs": {
 +    "validation": {
 +      "type": "object",
@@ -3943,10 +4434,10 @@ index 0000000..def1654
 +      ],
 +      "properties": {
 +        "version": {
-+          "const": 2
++          "const": 3
 +        },
 +        "scope": {
-+          "const": "execution-closure-and-transition-audit"
++          "const": "execution-closure-and-representation-aware-audit"
 +        },
 +        "checked": {
 +          "const": true
@@ -3982,7 +4473,7 @@ index 0000000..def1654
 +}
 diff --git a/doc/snapshot_protocol.md b/doc/snapshot_protocol.md
 new file mode 100644
-index 0000000..31b1e7f
+index 0000000..1441d1e
 --- /dev/null
 +++ b/doc/snapshot_protocol.md
 @@ -0,0 +1,120 @@
@@ -3997,7 +4488,7 @@ index 0000000..31b1e7f
 +`protocol.describe` reports `protocolVersion: 3` together with
 +`transitionProvenanceVersion: 1`, `inspectionVersion: 1` and
 +`certificationVersion: 1`. Transition validation uses
-+[version 2](scope_aware_validation.md). The model S-expression version stays 1, and model
++[version 3](compiler_aware_validation.md). The model S-expression version stays 1, and model
 +goal serialization is unchanged.
 +
 +Names below are metavariable and free-variable IDs (`_uniq.N`). They identify
@@ -4176,7 +4667,7 @@ index 0000000..222b09b
 +]
 diff --git a/doc/transactional_resources.md b/doc/transactional_resources.md
 new file mode 100644
-index 0000000..57dc6a7
+index 0000000..af39b7b
 --- /dev/null
 +++ b/doc/transactional_resources.md
 @@ -0,0 +1,118 @@
@@ -4185,7 +4676,7 @@ index 0000000..57dc6a7
 +`protocol.describe` reports `protocolVersion: 3`, `resourceErrorVersion: 1`, and
 +`commandTransactionVersion: 1`. Model expressions, transition provenance,
 +inspection, messages, and certification keep their version-1 representations.
-+Transition validation now uses [version 2](scope_aware_validation.md). Startup still emits `ready.`.
++Transition validation now uses [version 3](compiler_aware_validation.md). Startup still emits `ready.`.
 +
 +Every subsequent response is one compact JSON line. Diagnostic newlines are
 +escaped inside strings. The `printJsonPretty` option has been removed from both
@@ -4387,10 +4878,10 @@ index 0000000..8380e7b
 +  ]
 +}
 diff --git a/lakefile.lean b/lakefile.lean
-index e29fa0e..16e9537 100644
+index e29fa0e..751f28e 100644
 --- a/lakefile.lean
 +++ b/lakefile.lean
-@@ -27,3 +27,9 @@ lean_exe test {
+@@ -27,3 +27,15 @@ lean_exe test {
    -- Solves the native symbol not found problem
    supportInterpreter := true
  }
@@ -4398,6 +4889,12 @@ index e29fa0e..16e9537 100644
 +/-- Runtime Mathlib diagnostic; Mathlib is supplied explicitly through LEAN_PATH. -/
 +lean_exe scope_diagnostic {
 +  root := `Test.ScopeDiagnostic
++  supportInterpreter := true
++}
++
++/-- Provenance of compiler-produced environment entries; diagnostic evidence only. -/
++lean_exe compiler_diagnostic {
++  root := `Test.CompilerDiagnostic
 +  supportInterpreter := true
 +}
 diff --git a/scripts/capture_repository_client_contract.py b/scripts/capture_repository_client_contract.py
@@ -4628,12 +5125,12 @@ index 0000000..925b77b
 +    main()
 diff --git a/scripts/test_scope_aware_validation.py b/scripts/test_scope_aware_validation.py
 new file mode 100644
-index 0000000..b09be8e
+index 0000000..8c5c109
 --- /dev/null
 +++ b/scripts/test_scope_aware_validation.py
-@@ -0,0 +1,241 @@
+@@ -0,0 +1,284 @@
 +#!/usr/bin/env python3
-+"""Native scope-aware validation controls; Mathlib is an explicit separate gate."""
++"""Native validation controls, including compiler-producing tactics; Mathlib is an explicit separate gate."""
 +import argparse
 +import hashlib
 +import json
@@ -4644,7 +5141,8 @@ index 0000000..b09be8e
 +import tempfile
 +
 +ROOT = Path(__file__).resolve().parents[1]
-+SCOPE = "execution-closure-and-transition-audit"
++SCOPE = "execution-closure-and-representation-aware-audit"
++VERSION = 3
 +MATHLIB_PIN = "29dcec074de168ac2bf835a77ef68bbe069194c5"
 +
 +
@@ -4690,7 +5188,7 @@ index 0000000..b09be8e
 +        if "nextStateId" in response:
 +            self.ids.add(response["nextStateId"])
 +            if command == "goal.tactic":
-+                assert response["validation"] == dict(version=2, scope=SCOPE, checked=True)
++                assert response["validation"] == dict(version=VERSION, scope=SCOPE, checked=True)
 +                self.roots[response["nextStateId"]] = self.roots[payload["stateId"]]
 +            elif command == "goal.continue":
 +                self.roots[response["nextStateId"]] = self.roots[payload["target"]]
@@ -4765,7 +5263,7 @@ index 0000000..b09be8e
 +    imports = ["Init", "Test.ContractFixtures"]
 +    with Session(entries, env, imports) as session:
 +        descriptor = session.call("protocol.describe", {})
-+        assert descriptor["protocolVersion"] == 3 and descriptor["transitionValidationVersion"] == 2
++        assert descriptor["protocolVersion"] == 3 and descriptor["transitionValidationVersion"] == VERSION
 +        root = session.start("True")
 +        done = session.tactic(root["stateId"], "contract_inert_residue")
 +        assert not done["goals"] and not done["hasSorry"] and not done["hasUnsafe"]
@@ -4785,6 +5283,7 @@ index 0000000..b09be8e
 +        solved = session.tactic(frontend["goalStateId"], "exact a")
 +        assert session.certify(solved["nextStateId"])["receipt"]["levels"] == ["u"]
 +        session.finish()
++    compiler_controls(entries, env, imports)
 +    with Session(entries, env, imports) as session:
 +        root = session.start("True")
 +        session.proc.stdin.write('goal.tactic {"stateId":0,"tactic":"contract_invalid_mutation"}\nstat {}\n')
@@ -4799,6 +5298,41 @@ index 0000000..b09be8e
 +        assert session.proc.wait(timeout=30) != 0
 +        assert session.proc.stdout.read() == "", "accepted input after integrity failure"
 +    return entries
++
++
++def compiler_sequence(session, statement):
++    """`unfold Nat.pow` compiles the match splitter; the state must stay usable and certify."""
++    root = session.start(statement)
++    middle = session.tactic(root["stateId"], "intro m n")
++    unfolded = session.tactic(middle["nextStateId"], "unfold Nat.pow")
++    assert unfolded["goals"] and not unfolded["hasSorry"] and not unfolded["hasUnsafe"], unfolded
++    inspected = session.call("goal.inspect", dict(stateId=unfolded["nextStateId"], goals=[root["root"]]))
++    assert inspected["obligations"][0]["status"] != "complete", inspected
++    split = session.tactic(unfolded["nextStateId"], "split")
++    assert len(split["goals"]) == 2, split
++    first = session.tactic(split["nextStateId"], "rfl")
++    last = session.tactic(first["nextStateId"], "rfl")
++    assert not last["goals"] and not last["hasSorry"] and not last["hasUnsafe"]
++    receipt = session.certify(last["nextStateId"])["receipt"]
++    assert "_cstage" not in " ".join(receipt["auxiliary"]) and any("splitter" in name for name in receipt["auxiliary"])
++
++
++def compiler_controls(entries, env, imports):
++    statement = "∀ m n : Nat, Nat.pow m n = Nat.pow m n"
++    with Session(entries, env, imports) as session:
++        compiler_sequence(session, statement)
++        session.finish()
++    # Warmed history: an earlier simp and a rewrite through generated equations.
++    with Session(entries, env, imports) as session:
++        warm = session.start("True ∧ True")
++        session.certify(session.tactic(warm["stateId"], "simp")["nextStateId"])
++        root = session.start("∀ m n : Nat, Nat.pow m (n+1) = Nat.pow m n * m")
++        middle = session.tactic(root["stateId"], "intro m n")
++        for text in ["rw [Nat.pow]", "simp only [Nat.pow]"]:
++            rewritten = session.tactic(middle["nextStateId"], text)
++            assert rewritten["goals"] and not rewritten["hasUnsafe"], rewritten
++        compiler_sequence(session, statement)
++        session.finish()
 +
 +
 +def mathlib_gate(mathlib, env):
@@ -4839,6 +5373,12 @@ index 0000000..b09be8e
 +        assert {value["status"] for value in inspected["obligations"]} == {"active", "complete"}
 +        last = session.tactic(first["nextStateId"], "tauto")
 +        session.certify(last["nextStateId"])
++        # The reported search context: compiler-producing simp under Mathlib.
++        compiler_sequence(session, "∀ m n : Nat, Nat.pow m n = Nat.pow m n")
++        root = session.start("∀ m n : Nat, 0 < Nat.pow (m+1) n")
++        middle = session.tactic(root["stateId"], "intro m n")
++        simp = session.tactic(middle["nextStateId"], "cases n <;> simp [Nat.pow]")
++        assert not simp["hasSorry"] and not simp["hasUnsafe"]
 +        session.finish()
 +    diagnostic = subprocess.run([str(ROOT / ".lake/build/bin/scope_diagnostic")], cwd=ROOT,
 +                                env=env, text=True, capture_output=True, timeout=180)
@@ -4868,7 +5408,7 @@ index 0000000..b09be8e
 +                    toolchain=(ROOT / "lean-toolchain").read_text().strip(), core=core, mathlib=math,
 +                    diagnostic=diagnostic, ordinary_lean=ordinary, mathlib_source_verification=source_verification)
 +        (args.capture / "capture.json").write_text(json.dumps(data, indent=2) + "\n")
-+    print(f"PASS: {len(core)} core and {len(math)} Mathlib exchanges; validation version 2, kernel receipts, lifecycle, and fatal integrity failures")
++    print(f"PASS: {len(core)} core and {len(math)} Mathlib exchanges; validation version {VERSION}, compiler-producing transitions, kernel receipts, lifecycle, and fatal integrity failures")
 +
 +
 +if __name__ == "__main__":

@@ -1,10 +1,10 @@
 {
-  "status": "scope-aware-validation-2-native-validated-application-migration-pending",
+  "status": "representation-aware-validation-3-native-validated-application-migration-pending",
   "descriptor": {
     "protocol": "maths-ai-pantograph",
     "protocolVersion": 3,
     "modelSexpVersion": 1,
-    "transitionValidationVersion": 2,
+    "transitionValidationVersion": 3,
     "transitionProvenanceVersion": 1,
     "inspectionVersion": 1,
     "certificationVersion": 1,
@@ -65,8 +65,8 @@
     ]
   },
   "transition_validation": {
-    "version": 2,
-    "scope": "execution-closure-and-transition-audit",
+    "version": 3,
+    "scope": "execution-closure-and-representation-aware-audit",
     "checked": true
   },
   "message_schema": {
@@ -107,7 +107,7 @@
   },
   "baseline_provenance": "../tests/fixtures/pantograph/baseline/provenance.json",
   "complete_theorem_certification": true,
-  "contract_revision": 5,
+  "contract_revision": 6,
   "reconciled_on": "2026-11-05",
   "implementation_status": {
     "stage0": "Rebaselined on upstream PR #1; live unextended captures recorded.",
@@ -121,7 +121,8 @@
     "stage4": "Companion Lean extension implemented on client_centric_repo over the merged PR #1 base; Stage 4 exit gate passed on 2026-10-10. 299 Lean assertions, 316 Python regressions, 61 raw Mathlib exchanges and four exact canonical graph goldens passed.",
     "snapshot_operations": "Revision-3 codec, typed inspect/certify scope operations, provenance linkage checks and reclaimable issued-state records implemented against the snapshot companion build.",
     "resource_recovery": "Client codec, transport, ownership and exact companion build validated against protocol version 3. Application migration and deployment pending.",
-    "scope_aware_validation": "Stage 3: strict validation version 2, execution-closure-and-transition-audit, owned native tauto and fatal integrity lifecycle verified. Application stages 4-6 remain separate."
+    "scope_aware_validation": "Stage 3: strict validation version 2, execution-closure-and-transition-audit, owned native tauto and fatal integrity lifecycle verified. Application stages 4-6 remain separate.",
+    "compiler_aware_validation": "Strict validation version 3, execution-closure-and-representation-aware-audit; compiler-producing tactics, continuation, inspection and certification verified against the native companion. Application migration remains separate."
   },
   "upstream": {
     "branch": "gnn-sexpr-v410",
@@ -211,17 +212,17 @@
   "upstream_live_capture": "../tests/fixtures/pantograph/upstream_pr1/capture.json",
   "revision1_fixture": "../tests/fixtures/pantograph/historical_revision1/future_contract.json",
   "authored_target_fixture": "../tests/fixtures/pantograph/future_contract.json",
-  "descriptor_revision_note": "Protocol version 3 with transitionValidationVersion 2 requires execution-closure-and-transition-audit; validation version 1 is rejected.",
+  "descriptor_revision_note": "Protocol version 3 with transitionValidationVersion 3 requires execution-closure-and-representation-aware-audit; validation versions 1 and 2 are rejected.",
   "companion_patch": {
     "file": "repository_client_contract.patch",
-    "sha256": "12572873c1c2ea24757da3c50365a30b4e585004cb5821ec8af76bcf6146a777",
-    "provenance": "../docs/evidence/scope_aware_companion.provenance.json",
-    "repl_sha256": "e3c11038b1d0fa463f6ef439788dd4d70ed425a9928b67d3942546614939dd78",
-    "live_capture": "../tests/fixtures/scope_aware_snapshot_companion/capture.json",
+    "sha256": "0611ea2f9fe12c81bc788deda7f3300890bb9762d8df31cd6bf5db6b7306e0c6",
+    "provenance": "../docs/evidence/compiler_aware_companion.provenance.json",
+    "repl_sha256": "6cba4f74fdf2bc8ba7060603e7bc11feffb7229dd8c288ec7c3c0ba2e9c2ef29",
+    "live_capture": "../tests/fixtures/compiler_aware_snapshot_companion/capture.json",
     "previous": {
-      "sha256": "0914f6587b1d31ab1a293bb68f6ff911726f5adc609e9e4cc7e64f867865dd79",
-      "repl_sha256": "1c29397e4c0e9d3af499b6d18872cf9562c64fde3fc4c0bc59cec5494c772f30",
-      "live_capture": "../tests/fixtures/transactional_snapshot_companion/capture.json"
+      "sha256": "12572873c1c2ea24757da3c50365a30b4e585004cb5821ec8af76bcf6146a777",
+      "repl_sha256": "e3c11038b1d0fa463f6ef439788dd4d70ed425a9928b67d3942546614939dd78",
+      "live_capture": "../tests/fixtures/scope_aware_snapshot_companion/capture.json"
     }
   },
   "transition_provenance": {
