@@ -1,6 +1,6 @@
 # Wire protocol
 
-The client speaks exactly one contract, revision 5 of the custom REPL
+The client speaks exactly one contract, revision 6 of the custom REPL
 (`src/pantograph_async/resources/contract.json`). The codec in
 `pantograph_async.protocol` rejects anything else; there is no fallback schema.
 
@@ -21,7 +21,7 @@ Startup, under one deadline:
    | `resourceErrorVersion` | 1 |
    | `commandTransactionVersion` | 1 |
    | `modelSexpVersion` | 1 |
-   | `transitionValidationVersion` | 2 |
+   | `transitionValidationVersion` | 3 |
    | `transitionProvenanceVersion` | 1 |
    | `inspectionVersion` | 1 |
    | `certificationVersion` | 1 |
@@ -68,7 +68,7 @@ or obligation index on `goal.tactic`, `goal.inspect` or `goal.certify` maps to
 Exactly one of three variants, each with `messages`, `hasSorry` and `hasUnsafe`:
 
 - success: `nextStateId`, `goals`, `transition` (below), and `validation` =
-  `{"version": 2, "scope": "execution-closure-and-transition-audit", "checked": true}`.
+  `{"version": 3, "scope": "execution-closure-and-representation-aware-audit", "checked": true}`.
   A logged error message cannot accompany a success.
 - `parseError`: a nonempty string.
 - `tacticErrors`: a nonempty string array.
@@ -175,12 +175,12 @@ stdout prefix, pending command, session identity, session phase, and stderr tail
 Exception messages and wire payload context are bounded to 4096 characters;
 resource descriptions are bounded to 2048 characters.
 
-## Scope-aware transition checking
+## Representation-aware transition checking
 
-`TRANSITION_VALIDATION_VERSION` is 2 and `TRANSITION_VALIDATION_SCOPE` is
-`execution-closure-and-transition-audit`. The decoder requires both values and
-`checked: true`. Validation version 1, the old scope, missing fields, booleans in
-integer fields, and unknown metadata fields are rejected. Protocol version 3
+`TRANSITION_VALIDATION_VERSION` is 3 and `TRANSITION_VALIDATION_SCOPE` is
+`execution-closure-and-representation-aware-audit`. The decoder requires both values and
+`checked: true`. Validation versions 1 and 2, the older scopes, missing fields,
+booleans in integer fields, and unknown metadata fields are rejected. Protocol version 3
 and the resource, transaction, model, provenance, inspection and certification
 versions are unchanged.
 
@@ -188,6 +188,17 @@ The REPL strictly checks the executable dependency closure under each expression
 owner and audits auxiliary retained syntax for hazards. An inert elaboration
 record can contain an unresolved local outside that closure without invalidating
 a valid tactic. This does not exempt future executable uses of that record.
+
+Version 3 also reads compiler-stage environment entries by their representation.
+Tactics that generate equations or match splitters (`unfold Nat.pow`,
+`simp only [Nat.pow]`, `rw [Nat.pow]`) compile them, and the code generator stores
+`_cstage1`/`_cstage2` entries in the retained environment. The REPL accepts such
+an entry only when the compiler registered IR for its owner, audits it as runtime
+data, and never lets a proof depend on it. Compiler-only entries are not proof
+constants and never appear in a certificate's auxiliary declarations; kernel
+certification of the original root remains authoritative. The client does not
+classify compiler data itself. A version-2 executable ended the session on those
+tactics, and its validation error remains a terminal `PantographProtocolError`.
 The client accepts the checked response through its existing allocation owner.
 
 A genuine `error: validation` remains `PantographProtocolError`. Snapshot

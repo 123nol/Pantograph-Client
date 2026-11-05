@@ -9,22 +9,22 @@ that agreement before returning build pins.
 
 | Item | Value |
 | --- | --- |
-| Distribution | `pantograph-async-client` 0.4.0 |
-| Client contract revision | 5 |
+| Distribution | `pantograph-async-client` 0.5.0 |
+| Client contract revision | 6 |
 | Protocol version | 3 |
-| Transition validation | 2, `execution-closure-and-transition-audit` |
+| Transition validation | 3, `execution-closure-and-representation-aware-audit` |
 | Resource and command-transaction versions | 1 |
-| Companion commit | `ba2c3dd8383f90b4b5327e31a645a53411f385e4` |
+| Companion commit | `fc740c26a1e832ecb571859af24a5c632a351bd9` |
 | Patch base | `0dd5d2225e2d093f66a4b6231c1aa35004f2c8f3` |
-| Patch SHA-256 | `12572873c1c2ea24757da3c50365a30b4e585004cb5821ec8af76bcf6146a777` |
-| Reference executable SHA-256 | `e3c11038b1d0fa463f6ef439788dd4d70ed425a9928b67d3942546614939dd78` |
+| Patch SHA-256 | `0611ea2f9fe12c81bc788deda7f3300890bb9762d8df31cd6bf5db6b7306e0c6` |
+| Reference executable SHA-256 | `6cba4f74fdf2bc8ba7060603e7bc11feffb7229dd8c288ec7c3c0ba2e9c2ef29` |
 | Lean | `leanprover/lean4:v4.10.0-rc1` |
 | Native Mathlib source | `29dcec074de168ac2bf835a77ef68bbe069194c5` |
 | Platform | Linux, Python 3.11+, GNU coreutils `stdbuf` |
 
 Model expressions, resource errors, command transactions, transition provenance,
 inspection and certification keep their previous versions. Protocol version 3
-with transition validation version 1 is incompatible and fails startup. No older
+with transition validation version 1 or 2 is incompatible and fails startup. No older
 validation decoder or disabled-check option is provided.
 
 ## Reproducing the native build
@@ -32,16 +32,16 @@ validation decoder or disabled-check option is provided.
 ```bash
 git clone https://github.com/123nol/Pantograph.git
 cd Pantograph
-git checkout --detach ba2c3dd8383f90b4b5327e31a645a53411f385e4
+git checkout --detach fc740c26a1e832ecb571859af24a5c632a351bd9
 python -c "from pantograph_async import compatibility as c; c.verify_companion_sources('.')"
-lake build repl test scope_diagnostic
+lake build repl test scope_diagnostic compiler_diagnostic
 lake test
 lake env python3 scripts/test_transactional_resources.py --capture /tmp/resource-exchanges.json
 lake env python3 scripts/test_scope_aware_validation.py --capture /tmp/scope-exchanges
 ```
 
 The CI live job checks out the recorded patch base, applies the bundled patch,
-and verifies all 41 changed source hashes before building. It runs the ordinary
+and verifies all 45 changed source hashes before building. It runs the ordinary
 Lean tests and both executable harnesses without requiring Mathlib.
 Native builds can differ between machines; the recorded binary hash identifies
 this tested build, while source verification and the live gate validate rebuilds.

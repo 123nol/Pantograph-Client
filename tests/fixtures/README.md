@@ -2,7 +2,7 @@
 
 Wire evidence from successive companion builds. Historical captures are never
 rewritten to describe a newer executable. Current success responses must carry
-validation version 2; earlier descriptors and validation metadata are rejected.
+validation version 3; earlier descriptors and validation metadata are rejected.
 
 | Path | What it is | Accepted by the codec |
 | --- | --- | --- |
@@ -12,7 +12,7 @@ validation version 2; earlier descriptors and validation metadata are rejected.
 | `historical_revision2/` | Authored fixtures for contract revision 2 (protocol version 1) | No |
 | `stage4_companion/` | Live capture from the Stage 4 companion build (protocol version 1) | Failure variants only |
 | `snapshot_companion/` | Live capture from the snapshot companion build (protocol version 2), with its provenance | Non-transition operations only; descriptor and version-1 transitions rejected |
-| `future_contract.json` | Authored contract-revision-5 responses used by the fake REPL and codec tests | Yes |
+| `future_contract.json` | Authored contract-revision-6 responses used by the fake REPL and codec tests | Yes |
 | `fake_repl.py` | Diagnostic child process for real-process transport tests; never used at runtime | n/a |
 
 Canonical graph goldens belong to the consuming application, not here.
@@ -24,17 +24,23 @@ recovery exchanges. Artifact hashes and the source/binary identity are recorded
 in `docs/evidence/transactional_companion.provenance.json`. Historical captures
 are preserved unchanged.
 
-Current Stage 3 evidence uses these directories:
+Current evidence uses these directories:
 
-- `scope_aware_snapshot_companion/`: snapshot and options exchanges, source pin,
+- `compiler_aware_snapshot_companion/`: snapshot and options exchanges, source pin,
   binary identity, certification and zero-allocation cleanup.
-- `scope_aware_resources/`: unchanged shared resource schema/fixtures and fresh
-  native resource exchanges against the validation-version-2 executable.
-- `scope_aware_validation/`: exact shared validation schema/fixtures from
-  `ba2c3dd`, fresh core and Mathlib exchanges, owner/residue diagnostics and
-  pinned Mathlib source verification. `capture.json` preserves the raw harness
-  default serialization options. `client_capture.json` enables client-required
-  model expressions and is checked by the full response decoder.
+- `compiler_aware_resources/`: unchanged shared resource schema/fixtures and fresh
+  native resource exchanges against the validation-version-3 executable.
+- `compiler_aware_validation/`: exact shared validation schema/fixtures from
+  `fc740c2`, fresh core and Mathlib exchanges, including compiler-producing
+  tactics (`unfold Nat.pow`, `rw [Nat.pow]`, `simp only [Nat.pow]`) and their
+  certificates, owner/residue diagnostics and pinned Mathlib source
+  verification. `capture.json` preserves the raw harness default serialization
+  options. `client_capture.json` enables client-required model expressions and
+  is checked by the full response decoder.
 
-`docs/evidence/scope_aware_companion.provenance.json` records the matched pair
-and artifact hashes. Prior directories retain their original bytes and identities.
+`docs/evidence/compiler_aware_companion.provenance.json` records the matched pair
+and artifact hashes.
+
+The `scope_aware_*` directories are the validation-version-2 evidence from
+companion `ba2c3dd`, recorded in `docs/evidence/scope_aware_companion.provenance.json`.
+They and the other prior directories retain their original bytes and identities.
