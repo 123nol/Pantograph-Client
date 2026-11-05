@@ -34,7 +34,9 @@ def live_env(request):
     source = os.environ.get("PANTOGRAPH_TEST_SOURCE_ROOT")
     repl = os.environ.get("PANTOGRAPH_TEST_REPL")
     if not source or not repl:
-        if request.config.getoption("--run-pantograph-live"):
+        if request.config.getoption(
+            "--run-pantograph-live"
+        ) or request.config.getoption("--run-pantograph-mathlib"):
             pytest.fail(
                 "Required live run needs PANTOGRAPH_TEST_SOURCE_ROOT and PANTOGRAPH_TEST_REPL."
             )
@@ -340,5 +342,152 @@ def test_native_fatal_error_retires_owned_states(live_env):
                 with pytest.raises(PantographStateError):
                     await scope.apply_tactic(original, "trivial")
         assert client.phase.value == "CLOSED"
+
+    asyncio.run(run())
+
+
+@pytest.mark.pantograph_live
+def test_native_auxiliary_residue_is_owned_inspectable_and_certified(live_env):
+    from pantograph_async import (
+        TRANSITION_VALIDATION_VERSION,
+        TRANSITION_VALIDATION_SCOPE,
+    )
+
+    async def run():
+        fixture_env = replace(
+            live_env, imports=(*live_env.imports, "Test.ContractFixtures")
+        )
+        async with await PantographClient.create(fixture_env) as client:
+            async with client.state_scope() as scope:
+                root = await scope.start_goal("True")
+                done = await scope.apply_tactic(root, "contract_inert_residue")
+                assert done.validation.version == TRANSITION_VALIDATION_VERSION
+                assert done.validation.scope == TRANSITION_VALIDATION_SCOPE
+                assert done.validation.checked and not done.validation.is_rejection
+                assert not done.goals
+                assert scope._validate_state(done)
+                inspected = await scope.inspect(done, [root.root])
+                assert inspected[0].is_complete
+                receipt = await scope.certify(done)
+                assert receipt.is_certified and receipt.receipt.root == root.root
+                # An alternative still executes against the retained original input.
+                alternative = await scope.apply_tactic(root, "trivial")
+                assert (await scope.certify(alternative)).is_certified
+            assert (await client.stat()).n_goals == 0
+            assert not client._allocated_ids
+
+    asyncio.run(run())
+
+
+@pytest.mark.pantograph_live
+def test_native_dangling_execution_reference_is_terminal(live_env):
+    from pantograph_async import PantographStateError
+
+    async def run():
+        fixture_env = replace(
+            live_env, imports=(*live_env.imports, "Test.ContractFixtures")
+        )
+        async with await PantographClient.create(fixture_env) as client:
+            async with client.state_scope() as scope:
+                root = await scope.start_goal("True")
+                with pytest.raises(PantographProtocolError) as failure:
+                    await scope.apply_tactic(root, "contract_invalid_mutation")
+                assert failure.value.payload["error"] == "validation"
+                assert "owner=" in str(failure.value) and "path=" in str(failure.value)
+                assert not scope._issued and not client._allocated_ids
+                assert not client.is_usable
+                with pytest.raises(PantographProtocolError) as later:
+                    await client.stat()
+                assert later.value is failure.value
+                with pytest.raises(PantographStateError):
+                    await scope.apply_tactic(root, "trivial")
+            assert client.phase.value == "CLOSED"
+
+    asyncio.run(run())
+
+
+@pytest.fixture
+def mathlib_env(live_env, request):
+    root = os.environ.get("PANTOGRAPH_TEST_MATHLIB_ROOT")
+    if not root:
+        if request.config.getoption("--run-pantograph-mathlib"):
+            pytest.fail("Required Mathlib run needs PANTOGRAPH_TEST_MATHLIB_ROOT.")
+        pytest.skip("Separate pinned Mathlib build not configured.")
+    return replace(live_env, source_root=Path(root), imports=("Mathlib",))
+
+
+@pytest.mark.pantograph_live
+@pytest.mark.parametrize(
+    "statement,intro,levels",
+    [
+        ("∀ (p q : Prop), p ∧ q → q ∧ p", "intro p q", ()),
+        ("∀ (p q : Prop), p ∨ q → q ∨ p", "intro p q", ()),
+        (
+            "∀ (α : Type u_1) (β : Type u_2) (γ : Type u_3) [DecidableEq α] "
+            "(s t u v : Finset α) (a b : α), "
+            "a ∉ s → ((∀ a ∈ t, a ∉ s) ↔ ∀ ⦃a : α⦄, a ∈ s → a ∉ t)",
+            "intro α β γ inst s t u v a b",
+            ("u_1", "u_2", "u_3"),
+        ),
+    ],
+)
+def test_native_mathlib_tauto_retains_owned_state_and_certifies(
+    mathlib_env, statement, intro, levels
+):
+    from pantograph_async import TRANSITION_VALIDATION_SCOPE
+
+    async def run():
+        async with await PantographClient.create(mathlib_env) as client:
+            async with client.state_scope() as scope:
+                root = await scope.start_goal(statement, levels=levels)
+                middle = await scope.apply_tactic(root, intro)
+                assert middle.goals
+                selected = middle.goals[0].goal_name
+                assert any(
+                    item.status == "active"
+                    for item in await scope.inspect(middle, [root.root, selected])
+                )
+                done = await scope.apply_tactic(middle, "tauto")
+                assert scope._validate_state(done)
+                assert done.validation.version == 2
+                assert done.validation.scope == TRANSITION_VALIDATION_SCOPE
+                assert done.validation.checked and not done.validation.is_rejection
+                assert not done.goals
+                assert all(
+                    item.is_complete
+                    for item in await scope.inspect(done, [root.root, selected])
+                )
+                certificate = await scope.certify(done)
+                assert (
+                    certificate.is_certified and certificate.receipt.root == root.root
+                )
+                alternative = await scope.apply_tactic(middle, "tauto")
+                assert (await scope.certify(alternative)).is_certified
+                assert scope._validate_state(middle)
+            assert (await client.stat()).n_goals == 0
+            assert not client._allocated_ids
+
+    asyncio.run(run())
+
+
+@pytest.mark.pantograph_live
+def test_native_mathlib_tauto_keeps_sibling_obligations_visible(mathlib_env):
+    async def run():
+        async with await PantographClient.create(mathlib_env) as client:
+            async with client.state_scope() as scope:
+                root = await scope.start_goal(
+                    "∀ (p q : Prop), (p ∧ q → q ∧ p) ∧ (p ∨ q → q ∨ p)"
+                )
+                split = await scope.apply_tactic(root, "intro p q; constructor")
+                names = [goal.goal_name for goal in split.goals]
+                assert len(names) == 2
+                partial = await scope.apply_tactic(split, "tauto", goal_index=1)
+                statuses = {item.status for item in await scope.inspect(partial, names)}
+                assert statuses == {"active", "complete"}
+                assert (await scope.certify(partial)).status == "incomplete"
+                done = await scope.apply_tactic(partial, "tauto")
+                receipt = await scope.certify(done)
+                assert receipt.is_certified and receipt.receipt.root == root.root
+            assert (await client.stat()).n_goals == 0
 
     asyncio.run(run())

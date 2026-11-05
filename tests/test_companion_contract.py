@@ -20,8 +20,8 @@ from pantograph_async.protocol import (
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
-SHARED = FIXTURES / "transactional_resources"
-SNAPSHOTS = FIXTURES / "transactional_snapshot_companion"
+SHARED = FIXTURES / "scope_aware_resources"
+SNAPSHOTS = FIXTURES / "scope_aware_snapshot_companion"
 CAPTURE = json.loads((SHARED / "capture.json").read_text())
 SNAPSHOT_CAPTURE = json.loads((SNAPSHOTS / "capture.json").read_text())
 

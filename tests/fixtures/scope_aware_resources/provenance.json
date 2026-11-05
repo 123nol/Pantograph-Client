@@ -1,0 +1,15 @@
+{
+  "kind": "scope-aware-resource-capture-provenance",
+  "companion_commit": "ba2c3dd8383f90b4b5327e31a645a53411f385e4",
+  "checkout_commit": "0dd5d2225e2d093f66a4b6231c1aa35004f2c8f3",
+  "repl_sha256": "e3c11038b1d0fa463f6ef439788dd4d70ed425a9928b67d3942546614939dd78",
+  "toolchain": "leanprover/lean4:v4.10.0-rc1",
+  "captured_exchanges": 22,
+  "cumulative_requests": 3000,
+  "files_sha256": {
+    "schema.json": "97e00eb158ca69230a36a13d71f516fa4e1ad79e17dc74fbccf5d6f6df9bce71",
+    "fixtures.json": "394881fd33dd66f07a936fb70b8272806bc37b332f2e9eaa55085b00577386fd",
+    "capture.json": "f1a8eca85da67642826e5a3b054d06951580207ff93a308cbe38dc4600797957"
+  },
+  "scope": "Fresh native transactional-resource exchanges against the scope-aware validator; no historical captures rewritten."
+}

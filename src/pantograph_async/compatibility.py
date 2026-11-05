@@ -16,6 +16,8 @@ from .protocol import (
     COMMAND_ERROR_CATEGORIES,
     PROTOCOL_DESCRIPTION,
     REQUIRED_OPTIONS,
+    TRANSITION_VALIDATION_VERSION,
+    TRANSITION_VALIDATION_SCOPE,
     PantographConfigurationError,
 )
 
@@ -95,6 +97,11 @@ def verify_contract() -> None:
     shipped = contract()
     codec = {
         "descriptor": dict(PROTOCOL_DESCRIPTION),
+        "transition_validation": {
+            "version": TRANSITION_VALIDATION_VERSION,
+            "scope": TRANSITION_VALIDATION_SCOPE,
+            "checked": True,
+        },
         "required_options": dict(REQUIRED_OPTIONS),
         "commands": {
             name: sorted(codes) for name, codes in COMMAND_ERROR_CATEGORIES.items()
@@ -102,6 +109,7 @@ def verify_contract() -> None:
     }
     actual = {
         "descriptor": shipped["descriptor"],
+        "transition_validation": shipped["transition_validation"],
         "required_options": shipped["required_options"],
         "commands": {
             name: sorted(codes) for name, codes in shipped["commands"].items()

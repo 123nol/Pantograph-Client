@@ -1,0 +1,26 @@
+{
+  "kind": "scope-aware-validation-capture-provenance",
+  "companion_commit": "ba2c3dd8383f90b4b5327e31a645a53411f385e4",
+  "checkout_commit": "0dd5d2225e2d093f66a4b6231c1aa35004f2c8f3",
+  "repl_sha256": "e3c11038b1d0fa463f6ef439788dd4d70ed425a9928b67d3942546614939dd78",
+  "toolchain": "leanprover/lean4:v4.10.0-rc1",
+  "core_exchanges": 17,
+  "mathlib_exchanges": 29,
+  "mathlib_source_verification": {
+    "reference_commit": "29dcec074de168ac2bf835a77ef68bbe069194c5",
+    "checked_files": 4737,
+    "missing_or_different": [],
+    "local_extra_lean_files": []
+  },
+  "files_sha256": {
+    "schema.json": "1e2d7320dfbd60df8578a52e0d271307b4b86ca4a9fd0a2c911d85dfa68c0605",
+    "fixtures.json": "2db9b61a21a95b7eee265dc64b7f5050acac2e2fa18c058d26b3b25b9a34264b",
+    "capture.json": "d1626dee3f643b7a416928fbaa494dd16a7bedf1385d343601110b0b9b27b0e5",
+    "client_capture.json": "78f5c51595a601891d2162afe8efe2ddfb5954db53ec63ca86b9857d05643e69"
+  },
+  "scope": "Committed REPL schema and fixtures plus fresh executable and direct diagnostic evidence; the client lifecycle checks are recorded separately.",
+  "client_configured_exchanges": {
+    "core": 21,
+    "mathlib": 31
+  }
+}

@@ -330,7 +330,9 @@ def test_validation_fields_are_required(field):
     "field,value",
     [
         ("version", True),
-        ("version", 2),
+        ("version", 1),
+        ("version", 3),
+        ("scope", "transition-expressions"),
         ("scope", "root-proof"),
         ("checked", False),
         ("checked", 1),
@@ -564,7 +566,7 @@ def test_immutable_containers():
 def test_baseline_evidence_is_not_final_contract_evidence():
     assert BASELINE["kind"] == "unmodified-custom-repl-baseline"
     assert FUTURE["kind"] == "authored-future-contract"
-    assert FUTURE["contract_revision"] == 4
+    assert FUTURE["contract_revision"] == 5
     assert BASELINE["readiness_line"] == "ready."
     for entry in BASELINE["interactions"]:
         assert json.loads(entry["response_line"]) == entry["response"]
@@ -589,7 +591,7 @@ def test_frozen_contract_descriptor_matches_the_codec():
         COMMAND_ERROR_CATEGORIES
     )
     assert contract["complete_theorem_certification"] is True
-    assert contract["contract_revision"] == FUTURE["contract_revision"] == 4
+    assert contract["contract_revision"] == FUTURE["contract_revision"] == 5
     assert contract["transition_validation"] == success()["validation"]
     assert set(contract["tactic_responses"]["success"]["required"]) == set(success())
     for variant, fixture in [
@@ -851,7 +853,7 @@ def test_historical_snapshot_capture_preserves_operations_but_rejects_descriptor
     decoded = {}
     for entry in capture["interactions"]:
         assert decode_json_response(entry["response_line"]) == entry["response"]
-        if entry["command"] == "protocol.describe":
+        if entry["command"] == "protocol.describe" or "validation" in entry["response"]:
             with pytest.raises(PantographProtocolError):
                 decode_response(entry["command"], entry["response"])
             continue
@@ -859,7 +861,10 @@ def test_historical_snapshot_capture_preserves_operations_but_rejects_descriptor
     assert decoded["certificate"].is_certified
     assert decoded["partial_certificate"].status == "incomplete"
     assert "Classical.choice" in decoded["classical_certificate"].receipt.axioms
-    assert decoded["shared_assignment"].transition.changed
+    assert any(
+        e["label"] == "shared_assignment" and e["response"]["transition"]["changed"]
+        for e in capture["interactions"]
+    )
     assert [item.status for item in decoded["witness_inspection"].obligations] == [
         "complete",
         "complete",

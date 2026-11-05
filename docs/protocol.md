@@ -1,6 +1,6 @@
 # Wire protocol
 
-The client speaks exactly one contract, revision 4 of the custom REPL
+The client speaks exactly one contract, revision 5 of the custom REPL
 (`src/pantograph_async/resources/contract.json`). The codec in
 `pantograph_async.protocol` rejects anything else; there is no fallback schema.
 
@@ -18,10 +18,10 @@ Startup, under one deadline:
    | --- | --- |
    | `protocol` | `maths-ai-pantograph` |
    | `protocolVersion` | 3 |
-| `resourceErrorVersion` | 1 |
-| `commandTransactionVersion` | 1 |
+   | `resourceErrorVersion` | 1 |
+   | `commandTransactionVersion` | 1 |
    | `modelSexpVersion` | 1 |
-   | `transitionValidationVersion` | 1 |
+   | `transitionValidationVersion` | 2 |
    | `transitionProvenanceVersion` | 1 |
    | `inspectionVersion` | 1 |
    | `certificationVersion` | 1 |
@@ -68,7 +68,7 @@ or obligation index on `goal.tactic`, `goal.inspect` or `goal.certify` maps to
 Exactly one of three variants, each with `messages`, `hasSorry` and `hasUnsafe`:
 
 - success: `nextStateId`, `goals`, `transition` (below), and `validation` =
-  `{"version": 1, "scope": "transition-expressions", "checked": true}`.
+  `{"version": 2, "scope": "execution-closure-and-transition-audit", "checked": true}`.
   A logged error message cannot accompany a success.
 - `parseError`: a nonempty string.
 - `tacticErrors`: a nonempty string array.
@@ -174,3 +174,24 @@ after a possible write remain terminal. Protocol diagnostics include a bounded
 stdout prefix, pending command, session identity, session phase, and stderr tail.
 Exception messages and wire payload context are bounded to 4096 characters;
 resource descriptions are bounded to 2048 characters.
+
+## Scope-aware transition checking
+
+`TRANSITION_VALIDATION_VERSION` is 2 and `TRANSITION_VALIDATION_SCOPE` is
+`execution-closure-and-transition-audit`. The decoder requires both values and
+`checked: true`. Validation version 1, the old scope, missing fields, booleans in
+integer fields, and unknown metadata fields are rejected. Protocol version 3
+and the resource, transaction, model, provenance, inspection and certification
+versions are unchanged.
+
+The REPL strictly checks the executable dependency closure under each expression's
+owner and audits auxiliary retained syntax for hazards. An inert elaboration
+record can contain an unresolved local outside that closure without invalidating
+a valid tactic. This does not exempt future executable uses of that record.
+The client accepts the checked response through its existing allocation owner.
+
+A genuine `error: validation` remains `PantographProtocolError`. Snapshot
+validation can fail on start, tactic, inspection or certification. The session
+is retired and all handles are invalidated; no candidate-rejection or resource
+exception is substituted. Kernel certification of the original root remains the
+proof-success boundary.

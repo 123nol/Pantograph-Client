@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.0 (unreleased)
+
+- Require transition validation version 2 and the exact
+  `execution-closure-and-transition-audit` scope. Reject validation version 1
+  during startup and response decoding. Overall protocol remains version 3.
+- Pin published companion `ba2c3dd`, refresh the reproducible patch and native
+  source/binary identities, and preserve all earlier captures as historical.
+- Verify owned `tauto` transitions, inspection, alternative and sibling execution,
+  root certification, and lexical cleanup against pinned Mathlib.
+- Keep dangling execution references terminal, preserve allocation ownership and
+  transactional resource recovery, and check the shared validation fixtures.
+- Add a separate opt-in Mathlib client gate; core CI has no Mathlib dependency.
+  Application and deployment migration remain separate stages.
+
 ## 0.3.0 (unreleased)
 
 - Require protocol version 3 with resource-error and command-transaction versions

@@ -2,7 +2,7 @@
 
 ## Versioning
 
-- The distribution version (`pantograph-async-client`, `0.3.0`) identifies a
+- The distribution version (`pantograph-async-client`, `0.4.0`) identifies a
   library release.
 - The descriptor's protocol, model-expression, transition-validation and message
   versions identify wire semantics.
@@ -15,11 +15,11 @@ patch releases.
 
 ## Current release gate
 
-Version 0.3.0 requires the pinned revision-3 transactional REPL. The bundled
-patch reproduces published commit `5cab95e132bcdd1d3cb715505d1694ac7bb0e0d6`;
-source/binary identities and native recovery evidence are recorded in
-`docs/evidence/transactional_companion.provenance.json`. Complete the application's
-resource-outcome migration and validate the matched deployment before rollout.
+Version 0.4.0 requires protocol version 3 and transition validation version 2. The bundled
+patch reproduces published commit `ba2c3dd8383f90b4b5327e31a645a53411f385e4`;
+source/binary identities and native scope-aware evidence are recorded in
+`docs/evidence/scope_aware_companion.provenance.json`. Complete the application's
+validation-version migration and validate the matched deployment before rollout.
 
 ## Checklist
 

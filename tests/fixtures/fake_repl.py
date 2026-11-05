@@ -145,7 +145,7 @@ def main():
                 "resourceErrorVersion": 1,
                 "commandTransactionVersion": 1,
                 "modelSexpVersion": 1,
-                "transitionValidationVersion": 1,
+                "transitionValidationVersion": 2,
                 "transitionProvenanceVersion": 1,
                 "inspectionVersion": 1,
                 "certificationVersion": 1,
@@ -153,6 +153,8 @@ def main():
                 "goalSelection": "explicit-focused-v1",
                 "tacticErrorsFormat": "string-array-v1",
             }
+            if scenario == "old_validation_descriptor":
+                result["transitionValidationVersion"] = 1
             if scenario == "bad_descriptor":
                 result["protocolVersion"] = 99
             if scenario == "unextended":
@@ -249,6 +251,7 @@ def main():
                         "trivial": "valid_truth",
                         "sorry": "admission",
                         "missing_validation": "identity_intro",
+                        "old_validation": "identity_intro",
                         "conv": "identity_intro",
                     }.get(tactic, tactic)
                     result = deepcopy(fixtures["successes"][key])
@@ -261,6 +264,12 @@ def main():
                     roots[next_id] = roots[args["stateId"]]
                     listed[next_id] = result["goals"]
                     next_id += 1
+                    if tactic == "old_validation":
+                        result["validation"] = {
+                            "version": 1,
+                            "scope": "transition-expressions",
+                            "checked": True,
+                        }
                     if tactic == "missing_validation":
                         result.pop("validation")
                     if tactic == "conv":

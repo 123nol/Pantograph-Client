@@ -119,6 +119,8 @@ jobs:
           lake test
           lake env python3 scripts/test_transactional_resources.py \
             --capture "$RUNNER_TEMP/transactional_resources.json"
+          lake env python3 scripts/test_scope_aware_validation.py \
+            --capture "$RUNNER_TEMP/scope_aware_validation"
       - name: Live gate
         env:
           PANTOGRAPH_TEST_SOURCE_ROOT: ${{ runner.temp }}/Pantograph

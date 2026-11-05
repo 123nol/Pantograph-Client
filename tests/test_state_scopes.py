@@ -234,7 +234,9 @@ def test_proof_rejection_deletes_result_before_raising(setup, tactic):
     assert_reaped(report)
 
 
-@pytest.mark.parametrize("tactic", ["missing_validation", "validation_error"])
+@pytest.mark.parametrize(
+    "tactic", ["missing_validation", "old_validation", "validation_error"]
+)
 def test_invalid_evidence_retires_process_and_invalidates_states(setup, tactic):
     env, report = setup
 
@@ -656,7 +658,9 @@ def test_transitions_inspection_and_certification(setup):
                 start = await scope.start_goal("True")
                 split = await scope.apply_tactic(start, "split")
                 assert split.transition.selected == start.root
-                assert split.transition.direct == tuple(g.goal_name for g in split.goals)
+                assert split.transition.direct == tuple(
+                    g.goal_name for g in split.goals
+                )
                 left, right = (goal.goal_name for goal in split.goals)
                 second = await scope.apply_tactic(split, "nonzero_index", goal_index=1)
                 assert second.transition.selected == right

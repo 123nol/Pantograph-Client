@@ -10,6 +10,8 @@ from .launch import PantographLaunchSpec, build_launch_spec
 from .probes import probe_model_client
 from .protocol import (
     MODEL_SEXP_VERSION,
+    TRANSITION_VALIDATION_VERSION,
+    TRANSITION_VALIDATION_SCOPE,
     PROTOCOL_DESCRIPTION,
     REQUIRED_OPTIONS,
     CertificateReceipt,
@@ -56,6 +58,8 @@ from .protocol import (
 
 __all__ = [
     "MODEL_SEXP_VERSION",
+    "TRANSITION_VALIDATION_VERSION",
+    "TRANSITION_VALIDATION_SCOPE",
     "PROTOCOL_DESCRIPTION",
     "REQUIRED_OPTIONS",
     "CertificateReceipt",

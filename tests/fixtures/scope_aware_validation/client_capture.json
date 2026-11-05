@@ -1,0 +1,1913 @@
+{
+  "companion_commit": "ba2c3dd8383f90b4b5327e31a645a53411f385e4",
+  "repl_sha256": "e3c11038b1d0fa463f6ef439788dd4d70ed425a9928b67d3942546614939dd78",
+  "required_options": {
+    "printExprPretty": true,
+    "printExprAST": true,
+    "printExprModelAST": true,
+    "noRepeat": false,
+    "automaticMode": true
+  },
+  "mathlib_source_verification": {
+    "reference_commit": "29dcec074de168ac2bf835a77ef68bbe069194c5",
+    "checked_files": 4737,
+    "missing_or_different": [],
+    "local_extra_lean_files": []
+  },
+  "core": [
+    {
+      "command": "options.set",
+      "request": {
+        "printExprPretty": true,
+        "printExprAST": true,
+        "printExprModelAST": true,
+        "noRepeat": false,
+        "automaticMode": true
+      },
+      "request_line": "options.set {\"printExprPretty\":true,\"printExprAST\":true,\"printExprModelAST\":true,\"noRepeat\":false,\"automaticMode\":true}",
+      "response": {},
+      "response_line": "{}"
+    },
+    {
+      "command": "options.print",
+      "request": {},
+      "request_line": "options.print {}",
+      "response": {
+        "printImplementationDetailHyps": false,
+        "printExprPretty": true,
+        "printExprModelAST": true,
+        "printExprAST": true,
+        "printDependentMVars": false,
+        "printAuxDecls": false,
+        "noRepeat": false,
+        "automaticMode": true
+      },
+      "response_line": "{\"printImplementationDetailHyps\":false,\"printExprPretty\":true,\"printExprModelAST\":true,\"printExprAST\":true,\"printDependentMVars\":false,\"printAuxDecls\":false,\"noRepeat\":false,\"automaticMode\":true}"
+    },
+    {
+      "command": "protocol.describe",
+      "request": {},
+      "request_line": "protocol.describe {}",
+      "response": {
+        "transitionValidationVersion": 2,
+        "transitionProvenanceVersion": 1,
+        "tacticErrorsFormat": "string-array-v1",
+        "resourceErrorVersion": 1,
+        "protocolVersion": 3,
+        "protocol": "maths-ai-pantograph",
+        "modelSexpVersion": 1,
+        "messageVersion": 1,
+        "inspectionVersion": 1,
+        "goalSelection": "explicit-focused-v1",
+        "commandTransactionVersion": 1,
+        "certificationVersion": 1
+      },
+      "response_line": "{\"transitionValidationVersion\":2,\"transitionProvenanceVersion\":1,\"tacticErrorsFormat\":\"string-array-v1\",\"resourceErrorVersion\":1,\"protocolVersion\":3,\"protocol\":\"maths-ai-pantograph\",\"modelSexpVersion\":1,\"messageVersion\":1,\"inspectionVersion\":1,\"goalSelection\":\"explicit-focused-v1\",\"commandTransactionVersion\":1,\"certificationVersion\":1}"
+    },
+    {
+      "command": "goal.start",
+      "request": {
+        "expr": "True",
+        "levels": []
+      },
+      "request_line": "goal.start {\"expr\":\"True\",\"levels\":[]}",
+      "response": {
+        "stateId": 0,
+        "root": "_uniq.2"
+      },
+      "response_line": "{\"stateId\":0,\"root\":\"_uniq.2\"}"
+    },
+    {
+      "command": "goal.tactic",
+      "request": {
+        "stateId": 0,
+        "goalId": 0,
+        "tactic": "contract_inert_residue"
+      },
+      "request_line": "goal.tactic {\"stateId\":0,\"goalId\":0,\"tactic\":\"contract_inert_residue\"}",
+      "response": {
+        "validation": {
+          "version": 2,
+          "scope": "execution-closure-and-transition-audit",
+          "checked": true
+        },
+        "transition": {
+          "version": 1,
+          "siblings": [],
+          "selected": "_uniq.2",
+          "introduced": [],
+          "extra": [],
+          "dormant": [],
+          "direct": [],
+          "closed": [],
+          "changed": []
+        },
+        "nextStateId": 1,
+        "messages": [],
+        "hasUnsafe": false,
+        "hasSorry": false,
+        "goals": []
+      },
+      "response_line": "{\"validation\":{\"version\":2,\"scope\":\"execution-closure-and-transition-audit\",\"checked\":true},\"transition\":{\"version\":1,\"siblings\":[],\"selected\":\"_uniq.2\",\"introduced\":[],\"extra\":[],\"dormant\":[],\"direct\":[],\"closed\":[],\"changed\":[]},\"nextStateId\":1,\"messages\":[],\"hasUnsafe\":false,\"hasSorry\":false,\"goals\":[]}"
+    },
+    {
+      "command": "goal.certify",
+      "request": {
+        "stateId": 1
+      },
+      "request_line": "goal.certify {\"stateId\":1}",
+      "response": {
+        "version": 1,
+        "status": "certified",
+        "receipt": {
+          "version": 1,
+          "rootType": "50ed216148291d73",
+          "root": "_uniq.2",
+          "proof": "8bf67748f3048ada",
+          "levels": [],
+          "lean": "4.10.0-rc1 3b58e0649156610ce3aeed4f7b5c652340c668d4",
+          "identity": "lean-expr-digest-v1",
+          "environment": "ad29a3804996ae80",
+          "axioms": [],
+          "auxiliary": []
+        }
+      },
+      "response_line": "{\"version\":1,\"status\":\"certified\",\"receipt\":{\"version\":1,\"rootType\":\"50ed216148291d73\",\"root\":\"_uniq.2\",\"proof\":\"8bf67748f3048ada\",\"levels\":[],\"lean\":\"4.10.0-rc1 3b58e0649156610ce3aeed4f7b5c652340c668d4\",\"identity\":\"lean-expr-digest-v1\",\"environment\":\"ad29a3804996ae80\",\"axioms\":[],\"auxiliary\":[]}}"
+    },
+    {
+      "command": "goal.inspect",
+      "request": {
+        "stateId": 1,
+        "goals": [
+          "_uniq.2"
+        ]
+      },
+      "request_line": "goal.inspect {\"stateId\":1,\"goals\":[\"_uniq.2\"]}",
+      "response": {
+        "obligations": [
+          {
+            "universeHoles": false,
+            "status": "complete",
+            "name": "_uniq.2",
+            "holes": []
+          }
+        ]
+      },
+      "response_line": "{\"obligations\":[{\"universeHoles\":false,\"status\":\"complete\",\"name\":\"_uniq.2\",\"holes\":[]}]}"
+    },
+    {
+      "command": "goal.tactic",
+      "request": {
+        "stateId": 0,
+        "goalId": 0,
+        "tactic": "exact Nat.zero"
+      },
+      "request_line": "goal.tactic {\"stateId\":0,\"goalId\":0,\"tactic\":\"exact Nat.zero\"}",
+      "response": {
+        "tacticErrors": [
+          "type mismatch\n  Nat.zero\nhas type\n  Nat : Type\nbut is expected to have type\n  True : Prop"
+        ],
+        "messages": [
+          {
+            "severity": "error",
+            "pos": {
+              "line": 1,
+              "column": 0
+            },
+            "kind": "[anonymous]",
+            "endPos": {
+              "line": 1,
+              "column": 14
+            },
+            "data": "type mismatch\n  Nat.zero\nhas type\n  Nat : Type\nbut is expected to have type\n  True : Prop"
+          }
+        ],
+        "hasUnsafe": false,
+        "hasSorry": false
+      },
+      "response_line": "{\"tacticErrors\":[\"type mismatch\\n  Nat.zero\\nhas type\\n  Nat : Type\\nbut is expected to have type\\n  True : Prop\"],\"messages\":[{\"severity\":\"error\",\"pos\":{\"line\":1,\"column\":0},\"kind\":\"[anonymous]\",\"endPos\":{\"line\":1,\"column\":14},\"data\":\"type mismatch\\n  Nat.zero\\nhas type\\n  Nat : Type\\nbut is expected to have type\\n  True : Prop\"}],\"hasUnsafe\":false,\"hasSorry\":false}"
+    },
+    {
+      "command": "goal.tactic",
+      "request": {
+        "stateId": 0,
+        "goalId": 0,
+        "tactic": "exact True.intro"
+      },
+      "request_line": "goal.tactic {\"stateId\":0,\"goalId\":0,\"tactic\":\"exact True.intro\"}",
+      "response": {
+        "validation": {
+          "version": 2,
+          "scope": "execution-closure-and-transition-audit",
+          "checked": true
+        },
+        "transition": {
+          "version": 1,
+          "siblings": [],
+          "selected": "_uniq.2",
+          "introduced": [],
+          "extra": [],
+          "dormant": [],
+          "direct": [],
+          "closed": [],
+          "changed": []
+        },
+        "nextStateId": 2,
+        "messages": [],
+        "hasUnsafe": false,
+        "hasSorry": false,
+        "goals": []
+      },
+      "response_line": "{\"validation\":{\"version\":2,\"scope\":\"execution-closure-and-transition-audit\",\"checked\":true},\"transition\":{\"version\":1,\"siblings\":[],\"selected\":\"_uniq.2\",\"introduced\":[],\"extra\":[],\"dormant\":[],\"direct\":[],\"closed\":[],\"changed\":[]},\"nextStateId\":2,\"messages\":[],\"hasUnsafe\":false,\"hasSorry\":false,\"goals\":[]}"
+    },
+    {
+      "command": "goal.certify",
+      "request": {
+        "stateId": 2
+      },
+      "request_line": "goal.certify {\"stateId\":2}",
+      "response": {
+        "version": 1,
+        "status": "certified",
+        "receipt": {
+          "version": 1,
+          "rootType": "50ed216148291d73",
+          "root": "_uniq.2",
+          "proof": "8bf67748f3048ada",
+          "levels": [],
+          "lean": "4.10.0-rc1 3b58e0649156610ce3aeed4f7b5c652340c668d4",
+          "identity": "lean-expr-digest-v1",
+          "environment": "ad29a3804996ae80",
+          "axioms": [],
+          "auxiliary": []
+        }
+      },
+      "response_line": "{\"version\":1,\"status\":\"certified\",\"receipt\":{\"version\":1,\"rootType\":\"50ed216148291d73\",\"root\":\"_uniq.2\",\"proof\":\"8bf67748f3048ada\",\"levels\":[],\"lean\":\"4.10.0-rc1 3b58e0649156610ce3aeed4f7b5c652340c668d4\",\"identity\":\"lean-expr-digest-v1\",\"environment\":\"ad29a3804996ae80\",\"axioms\":[],\"auxiliary\":[]}}"
+    },
+    {
+      "command": "goal.continue",
+      "request": {
+        "target": 2,
+        "goals": [
+          "_uniq.2"
+        ]
+      },
+      "request_line": "goal.continue {\"target\":2,\"goals\":[\"_uniq.2\"]}",
+      "response": {
+        "nextStateId": 3,
+        "goals": []
+      },
+      "response_line": "{\"nextStateId\":3,\"goals\":[]}"
+    },
+    {
+      "command": "goal.certify",
+      "request": {
+        "stateId": 3
+      },
+      "request_line": "goal.certify {\"stateId\":3}",
+      "response": {
+        "version": 1,
+        "status": "certified",
+        "receipt": {
+          "version": 1,
+          "rootType": "50ed216148291d73",
+          "root": "_uniq.2",
+          "proof": "8bf67748f3048ada",
+          "levels": [],
+          "lean": "4.10.0-rc1 3b58e0649156610ce3aeed4f7b5c652340c668d4",
+          "identity": "lean-expr-digest-v1",
+          "environment": "ad29a3804996ae80",
+          "axioms": [],
+          "auxiliary": []
+        }
+      },
+      "response_line": "{\"version\":1,\"status\":\"certified\",\"receipt\":{\"version\":1,\"rootType\":\"50ed216148291d73\",\"root\":\"_uniq.2\",\"proof\":\"8bf67748f3048ada\",\"levels\":[],\"lean\":\"4.10.0-rc1 3b58e0649156610ce3aeed4f7b5c652340c668d4\",\"identity\":\"lean-expr-digest-v1\",\"environment\":\"ad29a3804996ae80\",\"axioms\":[],\"auxiliary\":[]}}"
+    },
+    {
+      "command": "frontend.process",
+      "request": {
+        "file": "universe u\nexample (\u03b1 : Sort u) (a : \u03b1) : \u03b1 := by sorry",
+        "sorrys": true,
+        "invocations": false
+      },
+      "request_line": "frontend.process {\"file\":\"universe u\\nexample (\\u03b1 : Sort u) (a : \\u03b1) : \\u03b1 := by sorry\",\"sorrys\":true,\"invocations\":false}",
+      "response": {
+        "units": [
+          {
+            "messages": [],
+            "goals": [],
+            "boundary": [
+              0,
+              11
+            ]
+          },
+          {
+            "messages": [
+              "<anonymous>:2:0: warning: declaration uses 'sorry'\n"
+            ],
+            "goals": [
+              {
+                "vars": [
+                  {
+                    "userName": "\u03b1",
+                    "type": {
+                      "sexp": "(:sort u)",
+                      "pp": "Sort u",
+                      "modelSexpVersion": 1,
+                      "modelSexp": "(:sort Type)"
+                    },
+                    "name": "_uniq.8",
+                    "isLet": false,
+                    "isInstance": false,
+                    "isInaccessible": false,
+                    "contextIndex": 1,
+                    "binderRole": ":explicit"
+                  },
+                  {
+                    "userName": "a",
+                    "type": {
+                      "sexp": "(:fv _uniq.8)",
+                      "pp": "\u03b1",
+                      "modelSexpVersion": 1,
+                      "modelSexp": "(:fv FV1)"
+                    },
+                    "name": "_uniq.9",
+                    "isLet": false,
+                    "isInstance": false,
+                    "isInaccessible": false,
+                    "contextIndex": 2,
+                    "binderRole": ":explicit"
+                  }
+                ],
+                "target": {
+                  "sexp": "(:fv _uniq.8)",
+                  "pp": "\u03b1",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:fv FV1)"
+                },
+                "name": "_uniq.10",
+                "isConversion": false,
+                "fragment": "tactic"
+              }
+            ],
+            "goalStateId": 4,
+            "boundary": [
+              11,
+              58
+            ]
+          }
+        ]
+      },
+      "response_line": "{\"units\":[{\"messages\":[],\"goals\":[],\"boundary\":[0,11]},{\"messages\":[\"<anonymous>:2:0: warning: declaration uses 'sorry'\\n\"],\"goals\":[{\"vars\":[{\"userName\":\"\u03b1\",\"type\":{\"sexp\":\"(:sort u)\",\"pp\":\"Sort u\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Type)\"},\"name\":\"_uniq.8\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":1,\"binderRole\":\":explicit\"},{\"userName\":\"a\",\"type\":{\"sexp\":\"(:fv _uniq.8)\",\"pp\":\"\u03b1\",\"modelSexpVersion\":1,\"modelSexp\":\"(:fv FV1)\"},\"name\":\"_uniq.9\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":2,\"binderRole\":\":explicit\"}],\"target\":{\"sexp\":\"(:fv _uniq.8)\",\"pp\":\"\u03b1\",\"modelSexpVersion\":1,\"modelSexp\":\"(:fv FV1)\"},\"name\":\"_uniq.10\",\"isConversion\":false,\"fragment\":\"tactic\"}],\"goalStateId\":4,\"boundary\":[11,58]}]}"
+    },
+    {
+      "command": "goal.tactic",
+      "request": {
+        "stateId": 4,
+        "goalId": 0,
+        "tactic": "exact a"
+      },
+      "request_line": "goal.tactic {\"stateId\":4,\"goalId\":0,\"tactic\":\"exact a\"}",
+      "response": {
+        "validation": {
+          "version": 2,
+          "scope": "execution-closure-and-transition-audit",
+          "checked": true
+        },
+        "transition": {
+          "version": 1,
+          "siblings": [],
+          "selected": "_uniq.10",
+          "introduced": [],
+          "extra": [],
+          "dormant": [],
+          "direct": [],
+          "closed": [],
+          "changed": []
+        },
+        "nextStateId": 5,
+        "messages": [],
+        "hasUnsafe": false,
+        "hasSorry": false,
+        "goals": []
+      },
+      "response_line": "{\"validation\":{\"version\":2,\"scope\":\"execution-closure-and-transition-audit\",\"checked\":true},\"transition\":{\"version\":1,\"siblings\":[],\"selected\":\"_uniq.10\",\"introduced\":[],\"extra\":[],\"dormant\":[],\"direct\":[],\"closed\":[],\"changed\":[]},\"nextStateId\":5,\"messages\":[],\"hasUnsafe\":false,\"hasSorry\":false,\"goals\":[]}"
+    },
+    {
+      "command": "goal.certify",
+      "request": {
+        "stateId": 5
+      },
+      "request_line": "goal.certify {\"stateId\":5}",
+      "response": {
+        "version": 1,
+        "status": "certified",
+        "receipt": {
+          "version": 1,
+          "rootType": "1ce0b5fdf72bcbe2",
+          "root": "_uniq.10",
+          "proof": "855469f34238e977",
+          "levels": [
+            "u"
+          ],
+          "lean": "4.10.0-rc1 3b58e0649156610ce3aeed4f7b5c652340c668d4",
+          "identity": "lean-expr-digest-v1",
+          "environment": "ad29a3804996ae80",
+          "axioms": [],
+          "auxiliary": []
+        }
+      },
+      "response_line": "{\"version\":1,\"status\":\"certified\",\"receipt\":{\"version\":1,\"rootType\":\"1ce0b5fdf72bcbe2\",\"root\":\"_uniq.10\",\"proof\":\"855469f34238e977\",\"levels\":[\"u\"],\"lean\":\"4.10.0-rc1 3b58e0649156610ce3aeed4f7b5c652340c668d4\",\"identity\":\"lean-expr-digest-v1\",\"environment\":\"ad29a3804996ae80\",\"axioms\":[],\"auxiliary\":[]}}"
+    },
+    {
+      "command": "goal.delete",
+      "request": {
+        "stateIds": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "request_line": "goal.delete {\"stateIds\":[0,1,2,3,4,5]}",
+      "response": {},
+      "response_line": "{}"
+    },
+    {
+      "command": "stat",
+      "request": {},
+      "request_line": "stat {}",
+      "response": {
+        "nGoals": 0
+      },
+      "response_line": "{\"nGoals\":0}"
+    },
+    {
+      "command": "options.set",
+      "request": {
+        "printExprPretty": true,
+        "printExprAST": true,
+        "printExprModelAST": true,
+        "noRepeat": false,
+        "automaticMode": true
+      },
+      "request_line": "options.set {\"printExprPretty\":true,\"printExprAST\":true,\"printExprModelAST\":true,\"noRepeat\":false,\"automaticMode\":true}",
+      "response": {},
+      "response_line": "{}"
+    },
+    {
+      "command": "options.print",
+      "request": {},
+      "request_line": "options.print {}",
+      "response": {
+        "printImplementationDetailHyps": false,
+        "printExprPretty": true,
+        "printExprModelAST": true,
+        "printExprAST": true,
+        "printDependentMVars": false,
+        "printAuxDecls": false,
+        "noRepeat": false,
+        "automaticMode": true
+      },
+      "response_line": "{\"printImplementationDetailHyps\":false,\"printExprPretty\":true,\"printExprModelAST\":true,\"printExprAST\":true,\"printDependentMVars\":false,\"printAuxDecls\":false,\"noRepeat\":false,\"automaticMode\":true}"
+    },
+    {
+      "command": "goal.start",
+      "request": {
+        "expr": "True",
+        "levels": []
+      },
+      "request_line": "goal.start {\"expr\":\"True\",\"levels\":[]}",
+      "response": {
+        "stateId": 0,
+        "root": "_uniq.2"
+      },
+      "response_line": "{\"stateId\":0,\"root\":\"_uniq.2\"}"
+    },
+    {
+      "command": "goal.tactic",
+      "request": {
+        "stateId": 0,
+        "tactic": "contract_invalid_mutation"
+      },
+      "response": {
+        "error": "validation",
+        "desc": "execution owner=metavariable _uniq.2 path=root/assignment: Missing local declaration _uniq.3"
+      },
+      "response_line": "{\"error\":\"validation\",\"desc\":\"execution owner=metavariable _uniq.2 path=root/assignment: Missing local declaration _uniq.3\"}"
+    }
+  ],
+  "mathlib": [
+    {
+      "command": "options.set",
+      "request": {
+        "printExprPretty": true,
+        "printExprAST": true,
+        "printExprModelAST": true,
+        "noRepeat": false,
+        "automaticMode": true
+      },
+      "request_line": "options.set {\"printExprPretty\":true,\"printExprAST\":true,\"printExprModelAST\":true,\"noRepeat\":false,\"automaticMode\":true}",
+      "response": {},
+      "response_line": "{}"
+    },
+    {
+      "command": "options.print",
+      "request": {},
+      "request_line": "options.print {}",
+      "response": {
+        "printImplementationDetailHyps": false,
+        "printExprPretty": true,
+        "printExprModelAST": true,
+        "printExprAST": true,
+        "printDependentMVars": false,
+        "printAuxDecls": false,
+        "noRepeat": false,
+        "automaticMode": true
+      },
+      "response_line": "{\"printImplementationDetailHyps\":false,\"printExprPretty\":true,\"printExprModelAST\":true,\"printExprAST\":true,\"printDependentMVars\":false,\"printAuxDecls\":false,\"noRepeat\":false,\"automaticMode\":true}"
+    },
+    {
+      "command": "protocol.describe",
+      "request": {},
+      "request_line": "protocol.describe {}",
+      "response": {
+        "transitionValidationVersion": 2,
+        "transitionProvenanceVersion": 1,
+        "tacticErrorsFormat": "string-array-v1",
+        "resourceErrorVersion": 1,
+        "protocolVersion": 3,
+        "protocol": "maths-ai-pantograph",
+        "modelSexpVersion": 1,
+        "messageVersion": 1,
+        "inspectionVersion": 1,
+        "goalSelection": "explicit-focused-v1",
+        "commandTransactionVersion": 1,
+        "certificationVersion": 1
+      },
+      "response_line": "{\"transitionValidationVersion\":2,\"transitionProvenanceVersion\":1,\"tacticErrorsFormat\":\"string-array-v1\",\"resourceErrorVersion\":1,\"protocolVersion\":3,\"protocol\":\"maths-ai-pantograph\",\"modelSexpVersion\":1,\"messageVersion\":1,\"inspectionVersion\":1,\"goalSelection\":\"explicit-focused-v1\",\"commandTransactionVersion\":1,\"certificationVersion\":1}"
+    },
+    {
+      "command": "goal.start",
+      "request": {
+        "expr": "\u2200 (p q : Prop), p \u2227 q \u2192 q \u2227 p",
+        "levels": []
+      },
+      "request_line": "goal.start {\"expr\":\"\\u2200 (p q : Prop), p \\u2227 q \\u2192 q \\u2227 p\",\"levels\":[]}",
+      "response": {
+        "stateId": 0,
+        "root": "_uniq.9"
+      },
+      "response_line": "{\"stateId\":0,\"root\":\"_uniq.9\"}"
+    },
+    {
+      "command": "goal.tactic",
+      "request": {
+        "stateId": 0,
+        "goalId": 0,
+        "tactic": "intro p q"
+      },
+      "request_line": "goal.tactic {\"stateId\":0,\"goalId\":0,\"tactic\":\"intro p q\"}",
+      "response": {
+        "validation": {
+          "version": 2,
+          "scope": "execution-closure-and-transition-audit",
+          "checked": true
+        },
+        "transition": {
+          "version": 1,
+          "siblings": [],
+          "selected": "_uniq.9",
+          "introduced": [
+            [
+              "_uniq.10",
+              "_uniq.13"
+            ]
+          ],
+          "extra": [],
+          "dormant": [],
+          "direct": [
+            "_uniq.14"
+          ],
+          "closed": [],
+          "changed": []
+        },
+        "nextStateId": 1,
+        "messages": [],
+        "hasUnsafe": false,
+        "hasSorry": false,
+        "goals": [
+          {
+            "vars": [
+              {
+                "userName": "p",
+                "type": {
+                  "sexp": "(:sort 0)",
+                  "pp": "Prop",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:sort Prop)"
+                },
+                "name": "_uniq.10",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 0,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "q",
+                "type": {
+                  "sexp": "(:sort 0)",
+                  "pp": "Prop",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:sort Prop)"
+                },
+                "name": "_uniq.13",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 1,
+                "binderRole": ":explicit"
+              }
+            ],
+            "target": {
+              "sexp": "(:forall _ ((:c And) (:fv _uniq.10) (:fv _uniq.13)) ((:c And) (:fv _uniq.13) (:fv _uniq.10)))",
+              "pp": "p \u2227 q \u2192 q \u2227 p",
+              "modelSexpVersion": 1,
+              "modelSexp": "(:forall _ :explicit (:app (:c And) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:fv FV1))) (:app (:c And) (:arg :explicit 0 (:fv FV1)) (:arg :explicit 1 (:fv FV0))))"
+            },
+            "name": "_uniq.14",
+            "isConversion": false,
+            "fragment": "tactic"
+          }
+        ]
+      },
+      "response_line": "{\"validation\":{\"version\":2,\"scope\":\"execution-closure-and-transition-audit\",\"checked\":true},\"transition\":{\"version\":1,\"siblings\":[],\"selected\":\"_uniq.9\",\"introduced\":[[\"_uniq.10\",\"_uniq.13\"]],\"extra\":[],\"dormant\":[],\"direct\":[\"_uniq.14\"],\"closed\":[],\"changed\":[]},\"nextStateId\":1,\"messages\":[],\"hasUnsafe\":false,\"hasSorry\":false,\"goals\":[{\"vars\":[{\"userName\":\"p\",\"type\":{\"sexp\":\"(:sort 0)\",\"pp\":\"Prop\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Prop)\"},\"name\":\"_uniq.10\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":0,\"binderRole\":\":explicit\"},{\"userName\":\"q\",\"type\":{\"sexp\":\"(:sort 0)\",\"pp\":\"Prop\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Prop)\"},\"name\":\"_uniq.13\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":1,\"binderRole\":\":explicit\"}],\"target\":{\"sexp\":\"(:forall _ ((:c And) (:fv _uniq.10) (:fv _uniq.13)) ((:c And) (:fv _uniq.13) (:fv _uniq.10)))\",\"pp\":\"p \u2227 q \u2192 q \u2227 p\",\"modelSexpVersion\":1,\"modelSexp\":\"(:forall _ :explicit (:app (:c And) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:fv FV1))) (:app (:c And) (:arg :explicit 0 (:fv FV1)) (:arg :explicit 1 (:fv FV0))))\"},\"name\":\"_uniq.14\",\"isConversion\":false,\"fragment\":\"tactic\"}]}"
+    },
+    {
+      "command": "goal.inspect",
+      "request": {
+        "stateId": 1,
+        "goals": [
+          "_uniq.9",
+          "_uniq.14"
+        ]
+      },
+      "request_line": "goal.inspect {\"stateId\":1,\"goals\":[\"_uniq.9\",\"_uniq.14\"]}",
+      "response": {
+        "obligations": [
+          {
+            "universeHoles": false,
+            "status": "assigned",
+            "name": "_uniq.9",
+            "holes": [
+              "_uniq.12"
+            ]
+          },
+          {
+            "universeHoles": false,
+            "status": "active",
+            "name": "_uniq.14",
+            "holes": [],
+            "goal": {
+              "vars": [
+                {
+                  "userName": "p",
+                  "type": {
+                    "sexp": "(:sort 0)",
+                    "pp": "Prop",
+                    "modelSexpVersion": 1,
+                    "modelSexp": "(:sort Prop)"
+                  },
+                  "name": "_uniq.10",
+                  "isLet": false,
+                  "isInstance": false,
+                  "isInaccessible": false,
+                  "contextIndex": 0,
+                  "binderRole": ":explicit"
+                },
+                {
+                  "userName": "q",
+                  "type": {
+                    "sexp": "(:sort 0)",
+                    "pp": "Prop",
+                    "modelSexpVersion": 1,
+                    "modelSexp": "(:sort Prop)"
+                  },
+                  "name": "_uniq.13",
+                  "isLet": false,
+                  "isInstance": false,
+                  "isInaccessible": false,
+                  "contextIndex": 1,
+                  "binderRole": ":explicit"
+                }
+              ],
+              "target": {
+                "sexp": "(:forall _ ((:c And) (:fv _uniq.10) (:fv _uniq.13)) ((:c And) (:fv _uniq.13) (:fv _uniq.10)))",
+                "pp": "p \u2227 q \u2192 q \u2227 p",
+                "modelSexpVersion": 1,
+                "modelSexp": "(:forall _ :explicit (:app (:c And) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:fv FV1))) (:app (:c And) (:arg :explicit 0 (:fv FV1)) (:arg :explicit 1 (:fv FV0))))"
+              },
+              "name": "_uniq.14",
+              "isConversion": false,
+              "fragment": "tactic"
+            }
+          }
+        ]
+      },
+      "response_line": "{\"obligations\":[{\"universeHoles\":false,\"status\":\"assigned\",\"name\":\"_uniq.9\",\"holes\":[\"_uniq.12\"]},{\"universeHoles\":false,\"status\":\"active\",\"name\":\"_uniq.14\",\"holes\":[],\"goal\":{\"vars\":[{\"userName\":\"p\",\"type\":{\"sexp\":\"(:sort 0)\",\"pp\":\"Prop\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Prop)\"},\"name\":\"_uniq.10\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":0,\"binderRole\":\":explicit\"},{\"userName\":\"q\",\"type\":{\"sexp\":\"(:sort 0)\",\"pp\":\"Prop\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Prop)\"},\"name\":\"_uniq.13\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":1,\"binderRole\":\":explicit\"}],\"target\":{\"sexp\":\"(:forall _ ((:c And) (:fv _uniq.10) (:fv _uniq.13)) ((:c And) (:fv _uniq.13) (:fv _uniq.10)))\",\"pp\":\"p \u2227 q \u2192 q \u2227 p\",\"modelSexpVersion\":1,\"modelSexp\":\"(:forall _ :explicit (:app (:c And) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:fv FV1))) (:app (:c And) (:arg :explicit 0 (:fv FV1)) (:arg :explicit 1 (:fv FV0))))\"},\"name\":\"_uniq.14\",\"isConversion\":false,\"fragment\":\"tactic\"}}]}"
+    },
+    {
+      "command": "goal.tactic",
+      "request": {
+        "stateId": 1,
+        "goalId": 0,
+        "tactic": "tauto"
+      },
+      "request_line": "goal.tactic {\"stateId\":1,\"goalId\":0,\"tactic\":\"tauto\"}",
+      "response": {
+        "validation": {
+          "version": 2,
+          "scope": "execution-closure-and-transition-audit",
+          "checked": true
+        },
+        "transition": {
+          "version": 1,
+          "siblings": [],
+          "selected": "_uniq.14",
+          "introduced": [],
+          "extra": [],
+          "dormant": [],
+          "direct": [],
+          "closed": [],
+          "changed": []
+        },
+        "nextStateId": 2,
+        "messages": [],
+        "hasUnsafe": false,
+        "hasSorry": false,
+        "goals": []
+      },
+      "response_line": "{\"validation\":{\"version\":2,\"scope\":\"execution-closure-and-transition-audit\",\"checked\":true},\"transition\":{\"version\":1,\"siblings\":[],\"selected\":\"_uniq.14\",\"introduced\":[],\"extra\":[],\"dormant\":[],\"direct\":[],\"closed\":[],\"changed\":[]},\"nextStateId\":2,\"messages\":[],\"hasUnsafe\":false,\"hasSorry\":false,\"goals\":[]}"
+    },
+    {
+      "command": "goal.certify",
+      "request": {
+        "stateId": 2
+      },
+      "request_line": "goal.certify {\"stateId\":2}",
+      "response": {
+        "version": 1,
+        "status": "certified",
+        "receipt": {
+          "version": 1,
+          "rootType": "f8ce7b4991494a80",
+          "root": "_uniq.9",
+          "proof": "3f3974e0eb11c0de",
+          "levels": [],
+          "lean": "4.10.0-rc1 3b58e0649156610ce3aeed4f7b5c652340c668d4",
+          "identity": "lean-expr-digest-v1",
+          "environment": "1f25fae908fae89b",
+          "axioms": [],
+          "auxiliary": []
+        }
+      },
+      "response_line": "{\"version\":1,\"status\":\"certified\",\"receipt\":{\"version\":1,\"rootType\":\"f8ce7b4991494a80\",\"root\":\"_uniq.9\",\"proof\":\"3f3974e0eb11c0de\",\"levels\":[],\"lean\":\"4.10.0-rc1 3b58e0649156610ce3aeed4f7b5c652340c668d4\",\"identity\":\"lean-expr-digest-v1\",\"environment\":\"1f25fae908fae89b\",\"axioms\":[],\"auxiliary\":[]}}"
+    },
+    {
+      "command": "goal.inspect",
+      "request": {
+        "stateId": 2,
+        "goals": [
+          "_uniq.9",
+          "_uniq.14"
+        ]
+      },
+      "request_line": "goal.inspect {\"stateId\":2,\"goals\":[\"_uniq.9\",\"_uniq.14\"]}",
+      "response": {
+        "obligations": [
+          {
+            "universeHoles": false,
+            "status": "complete",
+            "name": "_uniq.9",
+            "holes": []
+          },
+          {
+            "universeHoles": false,
+            "status": "complete",
+            "name": "_uniq.14",
+            "holes": []
+          }
+        ]
+      },
+      "response_line": "{\"obligations\":[{\"universeHoles\":false,\"status\":\"complete\",\"name\":\"_uniq.9\",\"holes\":[]},{\"universeHoles\":false,\"status\":\"complete\",\"name\":\"_uniq.14\",\"holes\":[]}]}"
+    },
+    {
+      "command": "goal.tactic",
+      "request": {
+        "stateId": 1,
+        "goalId": 0,
+        "tactic": "tauto"
+      },
+      "request_line": "goal.tactic {\"stateId\":1,\"goalId\":0,\"tactic\":\"tauto\"}",
+      "response": {
+        "validation": {
+          "version": 2,
+          "scope": "execution-closure-and-transition-audit",
+          "checked": true
+        },
+        "transition": {
+          "version": 1,
+          "siblings": [],
+          "selected": "_uniq.14",
+          "introduced": [],
+          "extra": [],
+          "dormant": [],
+          "direct": [],
+          "closed": [],
+          "changed": []
+        },
+        "nextStateId": 3,
+        "messages": [],
+        "hasUnsafe": false,
+        "hasSorry": false,
+        "goals": []
+      },
+      "response_line": "{\"validation\":{\"version\":2,\"scope\":\"execution-closure-and-transition-audit\",\"checked\":true},\"transition\":{\"version\":1,\"siblings\":[],\"selected\":\"_uniq.14\",\"introduced\":[],\"extra\":[],\"dormant\":[],\"direct\":[],\"closed\":[],\"changed\":[]},\"nextStateId\":3,\"messages\":[],\"hasUnsafe\":false,\"hasSorry\":false,\"goals\":[]}"
+    },
+    {
+      "command": "goal.certify",
+      "request": {
+        "stateId": 3
+      },
+      "request_line": "goal.certify {\"stateId\":3}",
+      "response": {
+        "version": 1,
+        "status": "certified",
+        "receipt": {
+          "version": 1,
+          "rootType": "f8ce7b4991494a80",
+          "root": "_uniq.9",
+          "proof": "3f3974e0eb11c0de",
+          "levels": [],
+          "lean": "4.10.0-rc1 3b58e0649156610ce3aeed4f7b5c652340c668d4",
+          "identity": "lean-expr-digest-v1",
+          "environment": "1f25fae908fae89b",
+          "axioms": [],
+          "auxiliary": []
+        }
+      },
+      "response_line": "{\"version\":1,\"status\":\"certified\",\"receipt\":{\"version\":1,\"rootType\":\"f8ce7b4991494a80\",\"root\":\"_uniq.9\",\"proof\":\"3f3974e0eb11c0de\",\"levels\":[],\"lean\":\"4.10.0-rc1 3b58e0649156610ce3aeed4f7b5c652340c668d4\",\"identity\":\"lean-expr-digest-v1\",\"environment\":\"1f25fae908fae89b\",\"axioms\":[],\"auxiliary\":[]}}"
+    },
+    {
+      "command": "goal.start",
+      "request": {
+        "expr": "\u2200 (p q : Prop), p \u2228 q \u2192 q \u2228 p",
+        "levels": []
+      },
+      "request_line": "goal.start {\"expr\":\"\\u2200 (p q : Prop), p \\u2228 q \\u2192 q \\u2228 p\",\"levels\":[]}",
+      "response": {
+        "stateId": 4,
+        "root": "_uniq.344"
+      },
+      "response_line": "{\"stateId\":4,\"root\":\"_uniq.344\"}"
+    },
+    {
+      "command": "goal.tactic",
+      "request": {
+        "stateId": 4,
+        "goalId": 0,
+        "tactic": "intro p q"
+      },
+      "request_line": "goal.tactic {\"stateId\":4,\"goalId\":0,\"tactic\":\"intro p q\"}",
+      "response": {
+        "validation": {
+          "version": 2,
+          "scope": "execution-closure-and-transition-audit",
+          "checked": true
+        },
+        "transition": {
+          "version": 1,
+          "siblings": [],
+          "selected": "_uniq.344",
+          "introduced": [
+            [
+              "_uniq.345",
+              "_uniq.348"
+            ]
+          ],
+          "extra": [],
+          "dormant": [],
+          "direct": [
+            "_uniq.349"
+          ],
+          "closed": [],
+          "changed": []
+        },
+        "nextStateId": 5,
+        "messages": [],
+        "hasUnsafe": false,
+        "hasSorry": false,
+        "goals": [
+          {
+            "vars": [
+              {
+                "userName": "p",
+                "type": {
+                  "sexp": "(:sort 0)",
+                  "pp": "Prop",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:sort Prop)"
+                },
+                "name": "_uniq.345",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 0,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "q",
+                "type": {
+                  "sexp": "(:sort 0)",
+                  "pp": "Prop",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:sort Prop)"
+                },
+                "name": "_uniq.348",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 1,
+                "binderRole": ":explicit"
+              }
+            ],
+            "target": {
+              "sexp": "(:forall _ ((:c Or) (:fv _uniq.345) (:fv _uniq.348)) ((:c Or) (:fv _uniq.348) (:fv _uniq.345)))",
+              "pp": "p \u2228 q \u2192 q \u2228 p",
+              "modelSexpVersion": 1,
+              "modelSexp": "(:forall _ :explicit (:app (:c Or) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:fv FV1))) (:app (:c Or) (:arg :explicit 0 (:fv FV1)) (:arg :explicit 1 (:fv FV0))))"
+            },
+            "name": "_uniq.349",
+            "isConversion": false,
+            "fragment": "tactic"
+          }
+        ]
+      },
+      "response_line": "{\"validation\":{\"version\":2,\"scope\":\"execution-closure-and-transition-audit\",\"checked\":true},\"transition\":{\"version\":1,\"siblings\":[],\"selected\":\"_uniq.344\",\"introduced\":[[\"_uniq.345\",\"_uniq.348\"]],\"extra\":[],\"dormant\":[],\"direct\":[\"_uniq.349\"],\"closed\":[],\"changed\":[]},\"nextStateId\":5,\"messages\":[],\"hasUnsafe\":false,\"hasSorry\":false,\"goals\":[{\"vars\":[{\"userName\":\"p\",\"type\":{\"sexp\":\"(:sort 0)\",\"pp\":\"Prop\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Prop)\"},\"name\":\"_uniq.345\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":0,\"binderRole\":\":explicit\"},{\"userName\":\"q\",\"type\":{\"sexp\":\"(:sort 0)\",\"pp\":\"Prop\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Prop)\"},\"name\":\"_uniq.348\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":1,\"binderRole\":\":explicit\"}],\"target\":{\"sexp\":\"(:forall _ ((:c Or) (:fv _uniq.345) (:fv _uniq.348)) ((:c Or) (:fv _uniq.348) (:fv _uniq.345)))\",\"pp\":\"p \u2228 q \u2192 q \u2228 p\",\"modelSexpVersion\":1,\"modelSexp\":\"(:forall _ :explicit (:app (:c Or) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:fv FV1))) (:app (:c Or) (:arg :explicit 0 (:fv FV1)) (:arg :explicit 1 (:fv FV0))))\"},\"name\":\"_uniq.349\",\"isConversion\":false,\"fragment\":\"tactic\"}]}"
+    },
+    {
+      "command": "goal.inspect",
+      "request": {
+        "stateId": 5,
+        "goals": [
+          "_uniq.344",
+          "_uniq.349"
+        ]
+      },
+      "request_line": "goal.inspect {\"stateId\":5,\"goals\":[\"_uniq.344\",\"_uniq.349\"]}",
+      "response": {
+        "obligations": [
+          {
+            "universeHoles": false,
+            "status": "assigned",
+            "name": "_uniq.344",
+            "holes": [
+              "_uniq.347"
+            ]
+          },
+          {
+            "universeHoles": false,
+            "status": "active",
+            "name": "_uniq.349",
+            "holes": [],
+            "goal": {
+              "vars": [
+                {
+                  "userName": "p",
+                  "type": {
+                    "sexp": "(:sort 0)",
+                    "pp": "Prop",
+                    "modelSexpVersion": 1,
+                    "modelSexp": "(:sort Prop)"
+                  },
+                  "name": "_uniq.345",
+                  "isLet": false,
+                  "isInstance": false,
+                  "isInaccessible": false,
+                  "contextIndex": 0,
+                  "binderRole": ":explicit"
+                },
+                {
+                  "userName": "q",
+                  "type": {
+                    "sexp": "(:sort 0)",
+                    "pp": "Prop",
+                    "modelSexpVersion": 1,
+                    "modelSexp": "(:sort Prop)"
+                  },
+                  "name": "_uniq.348",
+                  "isLet": false,
+                  "isInstance": false,
+                  "isInaccessible": false,
+                  "contextIndex": 1,
+                  "binderRole": ":explicit"
+                }
+              ],
+              "target": {
+                "sexp": "(:forall _ ((:c Or) (:fv _uniq.345) (:fv _uniq.348)) ((:c Or) (:fv _uniq.348) (:fv _uniq.345)))",
+                "pp": "p \u2228 q \u2192 q \u2228 p",
+                "modelSexpVersion": 1,
+                "modelSexp": "(:forall _ :explicit (:app (:c Or) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:fv FV1))) (:app (:c Or) (:arg :explicit 0 (:fv FV1)) (:arg :explicit 1 (:fv FV0))))"
+              },
+              "name": "_uniq.349",
+              "isConversion": false,
+              "fragment": "tactic"
+            }
+          }
+        ]
+      },
+      "response_line": "{\"obligations\":[{\"universeHoles\":false,\"status\":\"assigned\",\"name\":\"_uniq.344\",\"holes\":[\"_uniq.347\"]},{\"universeHoles\":false,\"status\":\"active\",\"name\":\"_uniq.349\",\"holes\":[],\"goal\":{\"vars\":[{\"userName\":\"p\",\"type\":{\"sexp\":\"(:sort 0)\",\"pp\":\"Prop\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Prop)\"},\"name\":\"_uniq.345\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":0,\"binderRole\":\":explicit\"},{\"userName\":\"q\",\"type\":{\"sexp\":\"(:sort 0)\",\"pp\":\"Prop\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Prop)\"},\"name\":\"_uniq.348\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":1,\"binderRole\":\":explicit\"}],\"target\":{\"sexp\":\"(:forall _ ((:c Or) (:fv _uniq.345) (:fv _uniq.348)) ((:c Or) (:fv _uniq.348) (:fv _uniq.345)))\",\"pp\":\"p \u2228 q \u2192 q \u2228 p\",\"modelSexpVersion\":1,\"modelSexp\":\"(:forall _ :explicit (:app (:c Or) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:fv FV1))) (:app (:c Or) (:arg :explicit 0 (:fv FV1)) (:arg :explicit 1 (:fv FV0))))\"},\"name\":\"_uniq.349\",\"isConversion\":false,\"fragment\":\"tactic\"}}]}"
+    },
+    {
+      "command": "goal.tactic",
+      "request": {
+        "stateId": 5,
+        "goalId": 0,
+        "tactic": "tauto"
+      },
+      "request_line": "goal.tactic {\"stateId\":5,\"goalId\":0,\"tactic\":\"tauto\"}",
+      "response": {
+        "validation": {
+          "version": 2,
+          "scope": "execution-closure-and-transition-audit",
+          "checked": true
+        },
+        "transition": {
+          "version": 1,
+          "siblings": [],
+          "selected": "_uniq.349",
+          "introduced": [],
+          "extra": [],
+          "dormant": [],
+          "direct": [],
+          "closed": [],
+          "changed": []
+        },
+        "nextStateId": 6,
+        "messages": [],
+        "hasUnsafe": false,
+        "hasSorry": false,
+        "goals": []
+      },
+      "response_line": "{\"validation\":{\"version\":2,\"scope\":\"execution-closure-and-transition-audit\",\"checked\":true},\"transition\":{\"version\":1,\"siblings\":[],\"selected\":\"_uniq.349\",\"introduced\":[],\"extra\":[],\"dormant\":[],\"direct\":[],\"closed\":[],\"changed\":[]},\"nextStateId\":6,\"messages\":[],\"hasUnsafe\":false,\"hasSorry\":false,\"goals\":[]}"
+    },
+    {
+      "command": "goal.certify",
+      "request": {
+        "stateId": 6
+      },
+      "request_line": "goal.certify {\"stateId\":6}",
+      "response": {
+        "version": 1,
+        "status": "certified",
+        "receipt": {
+          "version": 1,
+          "rootType": "956ecbd65840853e",
+          "root": "_uniq.344",
+          "proof": "2c2a3f68249786ce",
+          "levels": [],
+          "lean": "4.10.0-rc1 3b58e0649156610ce3aeed4f7b5c652340c668d4",
+          "identity": "lean-expr-digest-v1",
+          "environment": "1f25fae908fae89b",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "propext"
+          ],
+          "auxiliary": []
+        }
+      },
+      "response_line": "{\"version\":1,\"status\":\"certified\",\"receipt\":{\"version\":1,\"rootType\":\"956ecbd65840853e\",\"root\":\"_uniq.344\",\"proof\":\"2c2a3f68249786ce\",\"levels\":[],\"lean\":\"4.10.0-rc1 3b58e0649156610ce3aeed4f7b5c652340c668d4\",\"identity\":\"lean-expr-digest-v1\",\"environment\":\"1f25fae908fae89b\",\"axioms\":[\"Classical.choice\",\"Quot.sound\",\"propext\"],\"auxiliary\":[]}}"
+    },
+    {
+      "command": "goal.inspect",
+      "request": {
+        "stateId": 6,
+        "goals": [
+          "_uniq.344",
+          "_uniq.349"
+        ]
+      },
+      "request_line": "goal.inspect {\"stateId\":6,\"goals\":[\"_uniq.344\",\"_uniq.349\"]}",
+      "response": {
+        "obligations": [
+          {
+            "universeHoles": false,
+            "status": "complete",
+            "name": "_uniq.344",
+            "holes": []
+          },
+          {
+            "universeHoles": false,
+            "status": "complete",
+            "name": "_uniq.349",
+            "holes": []
+          }
+        ]
+      },
+      "response_line": "{\"obligations\":[{\"universeHoles\":false,\"status\":\"complete\",\"name\":\"_uniq.344\",\"holes\":[]},{\"universeHoles\":false,\"status\":\"complete\",\"name\":\"_uniq.349\",\"holes\":[]}]}"
+    },
+    {
+      "command": "goal.tactic",
+      "request": {
+        "stateId": 5,
+        "goalId": 0,
+        "tactic": "tauto"
+      },
+      "request_line": "goal.tactic {\"stateId\":5,\"goalId\":0,\"tactic\":\"tauto\"}",
+      "response": {
+        "validation": {
+          "version": 2,
+          "scope": "execution-closure-and-transition-audit",
+          "checked": true
+        },
+        "transition": {
+          "version": 1,
+          "siblings": [],
+          "selected": "_uniq.349",
+          "introduced": [],
+          "extra": [],
+          "dormant": [],
+          "direct": [],
+          "closed": [],
+          "changed": []
+        },
+        "nextStateId": 7,
+        "messages": [],
+        "hasUnsafe": false,
+        "hasSorry": false,
+        "goals": []
+      },
+      "response_line": "{\"validation\":{\"version\":2,\"scope\":\"execution-closure-and-transition-audit\",\"checked\":true},\"transition\":{\"version\":1,\"siblings\":[],\"selected\":\"_uniq.349\",\"introduced\":[],\"extra\":[],\"dormant\":[],\"direct\":[],\"closed\":[],\"changed\":[]},\"nextStateId\":7,\"messages\":[],\"hasUnsafe\":false,\"hasSorry\":false,\"goals\":[]}"
+    },
+    {
+      "command": "goal.certify",
+      "request": {
+        "stateId": 7
+      },
+      "request_line": "goal.certify {\"stateId\":7}",
+      "response": {
+        "version": 1,
+        "status": "certified",
+        "receipt": {
+          "version": 1,
+          "rootType": "956ecbd65840853e",
+          "root": "_uniq.344",
+          "proof": "2c2a3f68249786ce",
+          "levels": [],
+          "lean": "4.10.0-rc1 3b58e0649156610ce3aeed4f7b5c652340c668d4",
+          "identity": "lean-expr-digest-v1",
+          "environment": "1f25fae908fae89b",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "propext"
+          ],
+          "auxiliary": []
+        }
+      },
+      "response_line": "{\"version\":1,\"status\":\"certified\",\"receipt\":{\"version\":1,\"rootType\":\"956ecbd65840853e\",\"root\":\"_uniq.344\",\"proof\":\"2c2a3f68249786ce\",\"levels\":[],\"lean\":\"4.10.0-rc1 3b58e0649156610ce3aeed4f7b5c652340c668d4\",\"identity\":\"lean-expr-digest-v1\",\"environment\":\"1f25fae908fae89b\",\"axioms\":[\"Classical.choice\",\"Quot.sound\",\"propext\"],\"auxiliary\":[]}}"
+    },
+    {
+      "command": "goal.start",
+      "request": {
+        "expr": "\u2200 (\u03b1 : Type u_1) (\u03b2 : Type u_2) (\u03b3 : Type u_3) [DecidableEq \u03b1] (s t u v : Finset \u03b1) (a b : \u03b1), a \u2209 s \u2192 ((\u2200 a \u2208 t, a \u2209 s) \u2194 \u2200 \u2983a : \u03b1\u2984, a \u2208 s \u2192 a \u2209 t)",
+        "levels": [
+          "u_1",
+          "u_2",
+          "u_3"
+        ]
+      },
+      "request_line": "goal.start {\"expr\":\"\\u2200 (\\u03b1 : Type u_1) (\\u03b2 : Type u_2) (\\u03b3 : Type u_3) [DecidableEq \\u03b1] (s t u v : Finset \\u03b1) (a b : \\u03b1), a \\u2209 s \\u2192 ((\\u2200 a \\u2208 t, a \\u2209 s) \\u2194 \\u2200 \\u2983a : \\u03b1\\u2984, a \\u2208 s \\u2192 a \\u2209 t)\",\"levels\":[\"u_1\",\"u_2\",\"u_3\"]}",
+      "response": {
+        "stateId": 8,
+        "root": "_uniq.1238"
+      },
+      "response_line": "{\"stateId\":8,\"root\":\"_uniq.1238\"}"
+    },
+    {
+      "command": "goal.tactic",
+      "request": {
+        "stateId": 8,
+        "goalId": 0,
+        "tactic": "intro \u03b1 \u03b2 \u03b3 inst s t u v a b"
+      },
+      "request_line": "goal.tactic {\"stateId\":8,\"goalId\":0,\"tactic\":\"intro \\u03b1 \\u03b2 \\u03b3 inst s t u v a b\"}",
+      "response": {
+        "validation": {
+          "version": 2,
+          "scope": "execution-closure-and-transition-audit",
+          "checked": true
+        },
+        "transition": {
+          "version": 1,
+          "siblings": [],
+          "selected": "_uniq.1238",
+          "introduced": [
+            [
+              "_uniq.1239",
+              "_uniq.1242",
+              "_uniq.1245",
+              "_uniq.1248",
+              "_uniq.1253",
+              "_uniq.1256",
+              "_uniq.1259",
+              "_uniq.1262",
+              "_uniq.1265",
+              "_uniq.1268"
+            ]
+          ],
+          "extra": [],
+          "dormant": [],
+          "direct": [
+            "_uniq.1269"
+          ],
+          "closed": [],
+          "changed": []
+        },
+        "nextStateId": 9,
+        "messages": [],
+        "hasUnsafe": false,
+        "hasSorry": false,
+        "goals": [
+          {
+            "vars": [
+              {
+                "userName": "\u03b1",
+                "type": {
+                  "sexp": "(:sort (+ u_1 1))",
+                  "pp": "Type u_1",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:sort Type)"
+                },
+                "name": "_uniq.1239",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 0,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "\u03b2",
+                "type": {
+                  "sexp": "(:sort (+ u_2 1))",
+                  "pp": "Type u_2",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:sort Type)"
+                },
+                "name": "_uniq.1242",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 1,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "\u03b3",
+                "type": {
+                  "sexp": "(:sort (+ u_3 1))",
+                  "pp": "Type u_3",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:sort Type)"
+                },
+                "name": "_uniq.1245",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 2,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "inst",
+                "type": {
+                  "sexp": "((:c DecidableEq) (:fv _uniq.1239))",
+                  "pp": "DecidableEq \u03b1",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:app (:c DecidableEq) (:arg :explicit 0 (:fv FV0)))"
+                },
+                "name": "_uniq.1248",
+                "isLet": false,
+                "isInstance": true,
+                "isInaccessible": false,
+                "contextIndex": 3,
+                "binderRole": ":instance-implicit"
+              },
+              {
+                "userName": "s",
+                "type": {
+                  "sexp": "((:c Finset) (:fv _uniq.1239))",
+                  "pp": "Finset \u03b1",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:app (:c Finset) (:arg :explicit 0 (:fv FV0)))"
+                },
+                "name": "_uniq.1253",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 4,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "t",
+                "type": {
+                  "sexp": "((:c Finset) (:fv _uniq.1239))",
+                  "pp": "Finset \u03b1",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:app (:c Finset) (:arg :explicit 0 (:fv FV0)))"
+                },
+                "name": "_uniq.1256",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 5,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "u",
+                "type": {
+                  "sexp": "((:c Finset) (:fv _uniq.1239))",
+                  "pp": "Finset \u03b1",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:app (:c Finset) (:arg :explicit 0 (:fv FV0)))"
+                },
+                "name": "_uniq.1259",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 6,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "v",
+                "type": {
+                  "sexp": "((:c Finset) (:fv _uniq.1239))",
+                  "pp": "Finset \u03b1",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:app (:c Finset) (:arg :explicit 0 (:fv FV0)))"
+                },
+                "name": "_uniq.1262",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 7,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "a",
+                "type": {
+                  "sexp": "(:fv _uniq.1239)",
+                  "pp": "\u03b1",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:fv FV0)"
+                },
+                "name": "_uniq.1265",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 8,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "b",
+                "type": {
+                  "sexp": "(:fv _uniq.1239)",
+                  "pp": "\u03b1",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:fv FV0)"
+                },
+                "name": "_uniq.1268",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 9,
+                "binderRole": ":explicit"
+              }
+            ],
+            "target": {
+              "sexp": "(:forall _ ((:c Not) ((:c Membership.mem) (:fv _uniq.1239) ((:c Finset) (:fv _uniq.1239)) ((:c Finset.instMembership) (:fv _uniq.1239)) (:fv _uniq.1265) (:fv _uniq.1253))) ((:c Iff) (:forall a (:fv _uniq.1239) (:forall _ ((:c Membership.mem) (:fv _uniq.1239) ((:c Finset) (:fv _uniq.1239)) ((:c Finset.instMembership) (:fv _uniq.1239)) 0 (:fv _uniq.1256)) ((:c Not) ((:c Membership.mem) (:fv _uniq.1239) ((:c Finset) (:fv _uniq.1239)) ((:c Finset.instMembership) (:fv _uniq.1239)) 1 (:fv _uniq.1253))))) (:forall a (:fv _uniq.1239) (:forall _ ((:c Membership.mem) (:fv _uniq.1239) ((:c Finset) (:fv _uniq.1239)) ((:c Finset.instMembership) (:fv _uniq.1239)) 0 (:fv _uniq.1253)) ((:c Not) ((:c Membership.mem) (:fv _uniq.1239) ((:c Finset) (:fv _uniq.1239)) ((:c Finset.instMembership) (:fv _uniq.1239)) 1 (:fv _uniq.1256)))) :strictImplicit)))",
+              "pp": "a \u2209 s \u2192 ((\u2200 a \u2208 t, a \u2209 s) \u2194 \u2200 \u2983a : \u03b1\u2984, a \u2208 s \u2192 a \u2209 t)",
+              "modelSexpVersion": 1,
+              "modelSexp": "(:forall _ :explicit (:app (:c Not) (:arg :explicit 0 (:app (:c Membership.mem) (:arg :implicit-type 0 (:fv FV0)) (:arg :implicit-type 1 (:app (:c Finset) (:arg :explicit 0 (:fv FV0)))) (:arg :instance 2 (:instance-of (:app (:c Membership) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:app (:c Finset) (:arg :explicit 0 (:fv FV0))))))) (:arg :explicit 3 (:fv FV8)) (:arg :explicit 4 (:fv FV4))))) (:app (:c Iff) (:arg :explicit 0 (:forall a :explicit (:fv FV0) (:forall _ :explicit (:app (:c Membership.mem) (:arg :implicit-type 0 (:fv FV0)) (:arg :implicit-type 1 (:app (:c Finset) (:arg :explicit 0 (:fv FV0)))) (:arg :instance 2 (:instance-of (:app (:c Membership) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:app (:c Finset) (:arg :explicit 0 (:fv FV0))))))) (:arg :explicit 3 0) (:arg :explicit 4 (:fv FV5))) (:app (:c Not) (:arg :explicit 0 (:app (:c Membership.mem) (:arg :implicit-type 0 (:fv FV0)) (:arg :implicit-type 1 (:app (:c Finset) (:arg :explicit 0 (:fv FV0)))) (:arg :instance 2 (:instance-of (:app (:c Membership) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:app (:c Finset) (:arg :explicit 0 (:fv FV0))))))) (:arg :explicit 3 1) (:arg :explicit 4 (:fv FV4)))))))) (:arg :explicit 1 (:forall a :strict-implicit (:fv FV0) (:forall _ :explicit (:app (:c Membership.mem) (:arg :implicit-type 0 (:fv FV0)) (:arg :implicit-type 1 (:app (:c Finset) (:arg :explicit 0 (:fv FV0)))) (:arg :instance 2 (:instance-of (:app (:c Membership) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:app (:c Finset) (:arg :explicit 0 (:fv FV0))))))) (:arg :explicit 3 0) (:arg :explicit 4 (:fv FV4))) (:app (:c Not) (:arg :explicit 0 (:app (:c Membership.mem) (:arg :implicit-type 0 (:fv FV0)) (:arg :implicit-type 1 (:app (:c Finset) (:arg :explicit 0 (:fv FV0)))) (:arg :instance 2 (:instance-of (:app (:c Membership) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:app (:c Finset) (:arg :explicit 0 (:fv FV0))))))) (:arg :explicit 3 1) (:arg :explicit 4 (:fv FV5))))))))))"
+            },
+            "name": "_uniq.1269",
+            "isConversion": false,
+            "fragment": "tactic"
+          }
+        ]
+      },
+      "response_line": "{\"validation\":{\"version\":2,\"scope\":\"execution-closure-and-transition-audit\",\"checked\":true},\"transition\":{\"version\":1,\"siblings\":[],\"selected\":\"_uniq.1238\",\"introduced\":[[\"_uniq.1239\",\"_uniq.1242\",\"_uniq.1245\",\"_uniq.1248\",\"_uniq.1253\",\"_uniq.1256\",\"_uniq.1259\",\"_uniq.1262\",\"_uniq.1265\",\"_uniq.1268\"]],\"extra\":[],\"dormant\":[],\"direct\":[\"_uniq.1269\"],\"closed\":[],\"changed\":[]},\"nextStateId\":9,\"messages\":[],\"hasUnsafe\":false,\"hasSorry\":false,\"goals\":[{\"vars\":[{\"userName\":\"\u03b1\",\"type\":{\"sexp\":\"(:sort (+ u_1 1))\",\"pp\":\"Type u_1\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Type)\"},\"name\":\"_uniq.1239\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":0,\"binderRole\":\":explicit\"},{\"userName\":\"\u03b2\",\"type\":{\"sexp\":\"(:sort (+ u_2 1))\",\"pp\":\"Type u_2\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Type)\"},\"name\":\"_uniq.1242\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":1,\"binderRole\":\":explicit\"},{\"userName\":\"\u03b3\",\"type\":{\"sexp\":\"(:sort (+ u_3 1))\",\"pp\":\"Type u_3\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Type)\"},\"name\":\"_uniq.1245\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":2,\"binderRole\":\":explicit\"},{\"userName\":\"inst\",\"type\":{\"sexp\":\"((:c DecidableEq) (:fv _uniq.1239))\",\"pp\":\"DecidableEq \u03b1\",\"modelSexpVersion\":1,\"modelSexp\":\"(:app (:c DecidableEq) (:arg :explicit 0 (:fv FV0)))\"},\"name\":\"_uniq.1248\",\"isLet\":false,\"isInstance\":true,\"isInaccessible\":false,\"contextIndex\":3,\"binderRole\":\":instance-implicit\"},{\"userName\":\"s\",\"type\":{\"sexp\":\"((:c Finset) (:fv _uniq.1239))\",\"pp\":\"Finset \u03b1\",\"modelSexpVersion\":1,\"modelSexp\":\"(:app (:c Finset) (:arg :explicit 0 (:fv FV0)))\"},\"name\":\"_uniq.1253\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":4,\"binderRole\":\":explicit\"},{\"userName\":\"t\",\"type\":{\"sexp\":\"((:c Finset) (:fv _uniq.1239))\",\"pp\":\"Finset \u03b1\",\"modelSexpVersion\":1,\"modelSexp\":\"(:app (:c Finset) (:arg :explicit 0 (:fv FV0)))\"},\"name\":\"_uniq.1256\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":5,\"binderRole\":\":explicit\"},{\"userName\":\"u\",\"type\":{\"sexp\":\"((:c Finset) (:fv _uniq.1239))\",\"pp\":\"Finset \u03b1\",\"modelSexpVersion\":1,\"modelSexp\":\"(:app (:c Finset) (:arg :explicit 0 (:fv FV0)))\"},\"name\":\"_uniq.1259\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":6,\"binderRole\":\":explicit\"},{\"userName\":\"v\",\"type\":{\"sexp\":\"((:c Finset) (:fv _uniq.1239))\",\"pp\":\"Finset \u03b1\",\"modelSexpVersion\":1,\"modelSexp\":\"(:app (:c Finset) (:arg :explicit 0 (:fv FV0)))\"},\"name\":\"_uniq.1262\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":7,\"binderRole\":\":explicit\"},{\"userName\":\"a\",\"type\":{\"sexp\":\"(:fv _uniq.1239)\",\"pp\":\"\u03b1\",\"modelSexpVersion\":1,\"modelSexp\":\"(:fv FV0)\"},\"name\":\"_uniq.1265\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":8,\"binderRole\":\":explicit\"},{\"userName\":\"b\",\"type\":{\"sexp\":\"(:fv _uniq.1239)\",\"pp\":\"\u03b1\",\"modelSexpVersion\":1,\"modelSexp\":\"(:fv FV0)\"},\"name\":\"_uniq.1268\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":9,\"binderRole\":\":explicit\"}],\"target\":{\"sexp\":\"(:forall _ ((:c Not) ((:c Membership.mem) (:fv _uniq.1239) ((:c Finset) (:fv _uniq.1239)) ((:c Finset.instMembership) (:fv _uniq.1239)) (:fv _uniq.1265) (:fv _uniq.1253))) ((:c Iff) (:forall a (:fv _uniq.1239) (:forall _ ((:c Membership.mem) (:fv _uniq.1239) ((:c Finset) (:fv _uniq.1239)) ((:c Finset.instMembership) (:fv _uniq.1239)) 0 (:fv _uniq.1256)) ((:c Not) ((:c Membership.mem) (:fv _uniq.1239) ((:c Finset) (:fv _uniq.1239)) ((:c Finset.instMembership) (:fv _uniq.1239)) 1 (:fv _uniq.1253))))) (:forall a (:fv _uniq.1239) (:forall _ ((:c Membership.mem) (:fv _uniq.1239) ((:c Finset) (:fv _uniq.1239)) ((:c Finset.instMembership) (:fv _uniq.1239)) 0 (:fv _uniq.1253)) ((:c Not) ((:c Membership.mem) (:fv _uniq.1239) ((:c Finset) (:fv _uniq.1239)) ((:c Finset.instMembership) (:fv _uniq.1239)) 1 (:fv _uniq.1256)))) :strictImplicit)))\",\"pp\":\"a \u2209 s \u2192 ((\u2200 a \u2208 t, a \u2209 s) \u2194 \u2200 \u2983a : \u03b1\u2984, a \u2208 s \u2192 a \u2209 t)\",\"modelSexpVersion\":1,\"modelSexp\":\"(:forall _ :explicit (:app (:c Not) (:arg :explicit 0 (:app (:c Membership.mem) (:arg :implicit-type 0 (:fv FV0)) (:arg :implicit-type 1 (:app (:c Finset) (:arg :explicit 0 (:fv FV0)))) (:arg :instance 2 (:instance-of (:app (:c Membership) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:app (:c Finset) (:arg :explicit 0 (:fv FV0))))))) (:arg :explicit 3 (:fv FV8)) (:arg :explicit 4 (:fv FV4))))) (:app (:c Iff) (:arg :explicit 0 (:forall a :explicit (:fv FV0) (:forall _ :explicit (:app (:c Membership.mem) (:arg :implicit-type 0 (:fv FV0)) (:arg :implicit-type 1 (:app (:c Finset) (:arg :explicit 0 (:fv FV0)))) (:arg :instance 2 (:instance-of (:app (:c Membership) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:app (:c Finset) (:arg :explicit 0 (:fv FV0))))))) (:arg :explicit 3 0) (:arg :explicit 4 (:fv FV5))) (:app (:c Not) (:arg :explicit 0 (:app (:c Membership.mem) (:arg :implicit-type 0 (:fv FV0)) (:arg :implicit-type 1 (:app (:c Finset) (:arg :explicit 0 (:fv FV0)))) (:arg :instance 2 (:instance-of (:app (:c Membership) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:app (:c Finset) (:arg :explicit 0 (:fv FV0))))))) (:arg :explicit 3 1) (:arg :explicit 4 (:fv FV4)))))))) (:arg :explicit 1 (:forall a :strict-implicit (:fv FV0) (:forall _ :explicit (:app (:c Membership.mem) (:arg :implicit-type 0 (:fv FV0)) (:arg :implicit-type 1 (:app (:c Finset) (:arg :explicit 0 (:fv FV0)))) (:arg :instance 2 (:instance-of (:app (:c Membership) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:app (:c Finset) (:arg :explicit 0 (:fv FV0))))))) (:arg :explicit 3 0) (:arg :explicit 4 (:fv FV4))) (:app (:c Not) (:arg :explicit 0 (:app (:c Membership.mem) (:arg :implicit-type 0 (:fv FV0)) (:arg :implicit-type 1 (:app (:c Finset) (:arg :explicit 0 (:fv FV0)))) (:arg :instance 2 (:instance-of (:app (:c Membership) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:app (:c Finset) (:arg :explicit 0 (:fv FV0))))))) (:arg :explicit 3 1) (:arg :explicit 4 (:fv FV5))))))))))\"},\"name\":\"_uniq.1269\",\"isConversion\":false,\"fragment\":\"tactic\"}]}"
+    },
+    {
+      "command": "goal.tactic",
+      "request": {
+        "stateId": 9,
+        "goalId": 0,
+        "tactic": "tauto"
+      },
+      "request_line": "goal.tactic {\"stateId\":9,\"goalId\":0,\"tactic\":\"tauto\"}",
+      "response": {
+        "validation": {
+          "version": 2,
+          "scope": "execution-closure-and-transition-audit",
+          "checked": true
+        },
+        "transition": {
+          "version": 1,
+          "siblings": [],
+          "selected": "_uniq.1269",
+          "introduced": [],
+          "extra": [],
+          "dormant": [],
+          "direct": [],
+          "closed": [],
+          "changed": []
+        },
+        "nextStateId": 10,
+        "messages": [],
+        "hasUnsafe": false,
+        "hasSorry": false,
+        "goals": []
+      },
+      "response_line": "{\"validation\":{\"version\":2,\"scope\":\"execution-closure-and-transition-audit\",\"checked\":true},\"transition\":{\"version\":1,\"siblings\":[],\"selected\":\"_uniq.1269\",\"introduced\":[],\"extra\":[],\"dormant\":[],\"direct\":[],\"closed\":[],\"changed\":[]},\"nextStateId\":10,\"messages\":[],\"hasUnsafe\":false,\"hasSorry\":false,\"goals\":[]}"
+    },
+    {
+      "command": "goal.certify",
+      "request": {
+        "stateId": 10
+      },
+      "request_line": "goal.certify {\"stateId\":10}",
+      "response": {
+        "version": 1,
+        "status": "certified",
+        "receipt": {
+          "version": 1,
+          "rootType": "eabe3e9a225d7f83",
+          "root": "_uniq.1238",
+          "proof": "68c49ff1ebe045c5",
+          "levels": [
+            "u_1",
+            "u_2",
+            "u_3"
+          ],
+          "lean": "4.10.0-rc1 3b58e0649156610ce3aeed4f7b5c652340c668d4",
+          "identity": "lean-expr-digest-v1",
+          "environment": "1f25fae908fae89b",
+          "axioms": [
+            "Quot.sound",
+            "propext"
+          ],
+          "auxiliary": []
+        }
+      },
+      "response_line": "{\"version\":1,\"status\":\"certified\",\"receipt\":{\"version\":1,\"rootType\":\"eabe3e9a225d7f83\",\"root\":\"_uniq.1238\",\"proof\":\"68c49ff1ebe045c5\",\"levels\":[\"u_1\",\"u_2\",\"u_3\"],\"lean\":\"4.10.0-rc1 3b58e0649156610ce3aeed4f7b5c652340c668d4\",\"identity\":\"lean-expr-digest-v1\",\"environment\":\"1f25fae908fae89b\",\"axioms\":[\"Quot.sound\",\"propext\"],\"auxiliary\":[]}}"
+    },
+    {
+      "command": "goal.start",
+      "request": {
+        "expr": "\u2200 (p q : Prop), (p \u2227 q \u2192 q \u2227 p) \u2227 (p \u2228 q \u2192 q \u2228 p)",
+        "levels": []
+      },
+      "request_line": "goal.start {\"expr\":\"\\u2200 (p q : Prop), (p \\u2227 q \\u2192 q \\u2227 p) \\u2227 (p \\u2228 q \\u2192 q \\u2228 p)\",\"levels\":[]}",
+      "response": {
+        "stateId": 11,
+        "root": "_uniq.3667"
+      },
+      "response_line": "{\"stateId\":11,\"root\":\"_uniq.3667\"}"
+    },
+    {
+      "command": "goal.tactic",
+      "request": {
+        "stateId": 11,
+        "goalId": 0,
+        "tactic": "intro p q; constructor"
+      },
+      "request_line": "goal.tactic {\"stateId\":11,\"goalId\":0,\"tactic\":\"intro p q; constructor\"}",
+      "response": {
+        "validation": {
+          "version": 2,
+          "scope": "execution-closure-and-transition-audit",
+          "checked": true
+        },
+        "transition": {
+          "version": 1,
+          "siblings": [],
+          "selected": "_uniq.3667",
+          "introduced": [
+            [
+              "_uniq.3668",
+              "_uniq.3671"
+            ],
+            [
+              "_uniq.3668",
+              "_uniq.3671"
+            ]
+          ],
+          "extra": [],
+          "dormant": [],
+          "direct": [
+            "_uniq.3680",
+            "_uniq.3681"
+          ],
+          "closed": [],
+          "changed": []
+        },
+        "nextStateId": 12,
+        "messages": [],
+        "hasUnsafe": false,
+        "hasSorry": false,
+        "goals": [
+          {
+            "vars": [
+              {
+                "userName": "p",
+                "type": {
+                  "sexp": "(:sort 0)",
+                  "pp": "Prop",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:sort Prop)"
+                },
+                "name": "_uniq.3668",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 0,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "q",
+                "type": {
+                  "sexp": "(:sort 0)",
+                  "pp": "Prop",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:sort Prop)"
+                },
+                "name": "_uniq.3671",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 1,
+                "binderRole": ":explicit"
+              }
+            ],
+            "userName": "left",
+            "target": {
+              "sexp": "(:forall _ ((:c And) (:fv _uniq.3668) (:fv _uniq.3671)) ((:c And) (:fv _uniq.3671) (:fv _uniq.3668)))",
+              "pp": "p \u2227 q \u2192 q \u2227 p",
+              "modelSexpVersion": 1,
+              "modelSexp": "(:forall _ :explicit (:app (:c And) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:fv FV1))) (:app (:c And) (:arg :explicit 0 (:fv FV1)) (:arg :explicit 1 (:fv FV0))))"
+            },
+            "name": "_uniq.3680",
+            "isConversion": false,
+            "fragment": "tactic"
+          },
+          {
+            "vars": [
+              {
+                "userName": "p",
+                "type": {
+                  "sexp": "(:sort 0)",
+                  "pp": "Prop",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:sort Prop)"
+                },
+                "name": "_uniq.3668",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 0,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "q",
+                "type": {
+                  "sexp": "(:sort 0)",
+                  "pp": "Prop",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:sort Prop)"
+                },
+                "name": "_uniq.3671",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 1,
+                "binderRole": ":explicit"
+              }
+            ],
+            "userName": "right",
+            "target": {
+              "sexp": "(:forall _ ((:c Or) (:fv _uniq.3668) (:fv _uniq.3671)) ((:c Or) (:fv _uniq.3671) (:fv _uniq.3668)))",
+              "pp": "p \u2228 q \u2192 q \u2228 p",
+              "modelSexpVersion": 1,
+              "modelSexp": "(:forall _ :explicit (:app (:c Or) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:fv FV1))) (:app (:c Or) (:arg :explicit 0 (:fv FV1)) (:arg :explicit 1 (:fv FV0))))"
+            },
+            "name": "_uniq.3681",
+            "isConversion": false,
+            "fragment": "tactic"
+          }
+        ]
+      },
+      "response_line": "{\"validation\":{\"version\":2,\"scope\":\"execution-closure-and-transition-audit\",\"checked\":true},\"transition\":{\"version\":1,\"siblings\":[],\"selected\":\"_uniq.3667\",\"introduced\":[[\"_uniq.3668\",\"_uniq.3671\"],[\"_uniq.3668\",\"_uniq.3671\"]],\"extra\":[],\"dormant\":[],\"direct\":[\"_uniq.3680\",\"_uniq.3681\"],\"closed\":[],\"changed\":[]},\"nextStateId\":12,\"messages\":[],\"hasUnsafe\":false,\"hasSorry\":false,\"goals\":[{\"vars\":[{\"userName\":\"p\",\"type\":{\"sexp\":\"(:sort 0)\",\"pp\":\"Prop\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Prop)\"},\"name\":\"_uniq.3668\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":0,\"binderRole\":\":explicit\"},{\"userName\":\"q\",\"type\":{\"sexp\":\"(:sort 0)\",\"pp\":\"Prop\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Prop)\"},\"name\":\"_uniq.3671\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":1,\"binderRole\":\":explicit\"}],\"userName\":\"left\",\"target\":{\"sexp\":\"(:forall _ ((:c And) (:fv _uniq.3668) (:fv _uniq.3671)) ((:c And) (:fv _uniq.3671) (:fv _uniq.3668)))\",\"pp\":\"p \u2227 q \u2192 q \u2227 p\",\"modelSexpVersion\":1,\"modelSexp\":\"(:forall _ :explicit (:app (:c And) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:fv FV1))) (:app (:c And) (:arg :explicit 0 (:fv FV1)) (:arg :explicit 1 (:fv FV0))))\"},\"name\":\"_uniq.3680\",\"isConversion\":false,\"fragment\":\"tactic\"},{\"vars\":[{\"userName\":\"p\",\"type\":{\"sexp\":\"(:sort 0)\",\"pp\":\"Prop\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Prop)\"},\"name\":\"_uniq.3668\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":0,\"binderRole\":\":explicit\"},{\"userName\":\"q\",\"type\":{\"sexp\":\"(:sort 0)\",\"pp\":\"Prop\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Prop)\"},\"name\":\"_uniq.3671\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":1,\"binderRole\":\":explicit\"}],\"userName\":\"right\",\"target\":{\"sexp\":\"(:forall _ ((:c Or) (:fv _uniq.3668) (:fv _uniq.3671)) ((:c Or) (:fv _uniq.3671) (:fv _uniq.3668)))\",\"pp\":\"p \u2228 q \u2192 q \u2228 p\",\"modelSexpVersion\":1,\"modelSexp\":\"(:forall _ :explicit (:app (:c Or) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:fv FV1))) (:app (:c Or) (:arg :explicit 0 (:fv FV1)) (:arg :explicit 1 (:fv FV0))))\"},\"name\":\"_uniq.3681\",\"isConversion\":false,\"fragment\":\"tactic\"}]}"
+    },
+    {
+      "command": "goal.tactic",
+      "request": {
+        "stateId": 12,
+        "goalId": 1,
+        "tactic": "tauto"
+      },
+      "request_line": "goal.tactic {\"stateId\":12,\"goalId\":1,\"tactic\":\"tauto\"}",
+      "response": {
+        "validation": {
+          "version": 2,
+          "scope": "execution-closure-and-transition-audit",
+          "checked": true
+        },
+        "transition": {
+          "version": 1,
+          "siblings": [
+            "_uniq.3680"
+          ],
+          "selected": "_uniq.3681",
+          "introduced": [],
+          "extra": [],
+          "dormant": [],
+          "direct": [],
+          "closed": [],
+          "changed": []
+        },
+        "nextStateId": 13,
+        "messages": [],
+        "hasUnsafe": false,
+        "hasSorry": false,
+        "goals": [
+          {
+            "vars": [
+              {
+                "userName": "p",
+                "type": {
+                  "sexp": "(:sort 0)",
+                  "pp": "Prop",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:sort Prop)"
+                },
+                "name": "_uniq.3668",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 0,
+                "binderRole": ":explicit"
+              },
+              {
+                "userName": "q",
+                "type": {
+                  "sexp": "(:sort 0)",
+                  "pp": "Prop",
+                  "modelSexpVersion": 1,
+                  "modelSexp": "(:sort Prop)"
+                },
+                "name": "_uniq.3671",
+                "isLet": false,
+                "isInstance": false,
+                "isInaccessible": false,
+                "contextIndex": 1,
+                "binderRole": ":explicit"
+              }
+            ],
+            "userName": "left",
+            "target": {
+              "sexp": "(:forall _ ((:c And) (:fv _uniq.3668) (:fv _uniq.3671)) ((:c And) (:fv _uniq.3671) (:fv _uniq.3668)))",
+              "pp": "p \u2227 q \u2192 q \u2227 p",
+              "modelSexpVersion": 1,
+              "modelSexp": "(:forall _ :explicit (:app (:c And) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:fv FV1))) (:app (:c And) (:arg :explicit 0 (:fv FV1)) (:arg :explicit 1 (:fv FV0))))"
+            },
+            "name": "_uniq.3680",
+            "isConversion": false,
+            "fragment": "tactic"
+          }
+        ]
+      },
+      "response_line": "{\"validation\":{\"version\":2,\"scope\":\"execution-closure-and-transition-audit\",\"checked\":true},\"transition\":{\"version\":1,\"siblings\":[\"_uniq.3680\"],\"selected\":\"_uniq.3681\",\"introduced\":[],\"extra\":[],\"dormant\":[],\"direct\":[],\"closed\":[],\"changed\":[]},\"nextStateId\":13,\"messages\":[],\"hasUnsafe\":false,\"hasSorry\":false,\"goals\":[{\"vars\":[{\"userName\":\"p\",\"type\":{\"sexp\":\"(:sort 0)\",\"pp\":\"Prop\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Prop)\"},\"name\":\"_uniq.3668\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":0,\"binderRole\":\":explicit\"},{\"userName\":\"q\",\"type\":{\"sexp\":\"(:sort 0)\",\"pp\":\"Prop\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Prop)\"},\"name\":\"_uniq.3671\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":1,\"binderRole\":\":explicit\"}],\"userName\":\"left\",\"target\":{\"sexp\":\"(:forall _ ((:c And) (:fv _uniq.3668) (:fv _uniq.3671)) ((:c And) (:fv _uniq.3671) (:fv _uniq.3668)))\",\"pp\":\"p \u2227 q \u2192 q \u2227 p\",\"modelSexpVersion\":1,\"modelSexp\":\"(:forall _ :explicit (:app (:c And) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:fv FV1))) (:app (:c And) (:arg :explicit 0 (:fv FV1)) (:arg :explicit 1 (:fv FV0))))\"},\"name\":\"_uniq.3680\",\"isConversion\":false,\"fragment\":\"tactic\"}]}"
+    },
+    {
+      "command": "goal.inspect",
+      "request": {
+        "stateId": 13,
+        "goals": [
+          "_uniq.3680",
+          "_uniq.3681"
+        ]
+      },
+      "request_line": "goal.inspect {\"stateId\":13,\"goals\":[\"_uniq.3680\",\"_uniq.3681\"]}",
+      "response": {
+        "obligations": [
+          {
+            "universeHoles": false,
+            "status": "active",
+            "name": "_uniq.3680",
+            "holes": [],
+            "goal": {
+              "vars": [
+                {
+                  "userName": "p",
+                  "type": {
+                    "sexp": "(:sort 0)",
+                    "pp": "Prop",
+                    "modelSexpVersion": 1,
+                    "modelSexp": "(:sort Prop)"
+                  },
+                  "name": "_uniq.3668",
+                  "isLet": false,
+                  "isInstance": false,
+                  "isInaccessible": false,
+                  "contextIndex": 0,
+                  "binderRole": ":explicit"
+                },
+                {
+                  "userName": "q",
+                  "type": {
+                    "sexp": "(:sort 0)",
+                    "pp": "Prop",
+                    "modelSexpVersion": 1,
+                    "modelSexp": "(:sort Prop)"
+                  },
+                  "name": "_uniq.3671",
+                  "isLet": false,
+                  "isInstance": false,
+                  "isInaccessible": false,
+                  "contextIndex": 1,
+                  "binderRole": ":explicit"
+                }
+              ],
+              "userName": "left",
+              "target": {
+                "sexp": "(:forall _ ((:c And) (:fv _uniq.3668) (:fv _uniq.3671)) ((:c And) (:fv _uniq.3671) (:fv _uniq.3668)))",
+                "pp": "p \u2227 q \u2192 q \u2227 p",
+                "modelSexpVersion": 1,
+                "modelSexp": "(:forall _ :explicit (:app (:c And) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:fv FV1))) (:app (:c And) (:arg :explicit 0 (:fv FV1)) (:arg :explicit 1 (:fv FV0))))"
+              },
+              "name": "_uniq.3680",
+              "isConversion": false,
+              "fragment": "tactic"
+            }
+          },
+          {
+            "universeHoles": false,
+            "status": "complete",
+            "name": "_uniq.3681",
+            "holes": []
+          }
+        ]
+      },
+      "response_line": "{\"obligations\":[{\"universeHoles\":false,\"status\":\"active\",\"name\":\"_uniq.3680\",\"holes\":[],\"goal\":{\"vars\":[{\"userName\":\"p\",\"type\":{\"sexp\":\"(:sort 0)\",\"pp\":\"Prop\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Prop)\"},\"name\":\"_uniq.3668\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":0,\"binderRole\":\":explicit\"},{\"userName\":\"q\",\"type\":{\"sexp\":\"(:sort 0)\",\"pp\":\"Prop\",\"modelSexpVersion\":1,\"modelSexp\":\"(:sort Prop)\"},\"name\":\"_uniq.3671\",\"isLet\":false,\"isInstance\":false,\"isInaccessible\":false,\"contextIndex\":1,\"binderRole\":\":explicit\"}],\"userName\":\"left\",\"target\":{\"sexp\":\"(:forall _ ((:c And) (:fv _uniq.3668) (:fv _uniq.3671)) ((:c And) (:fv _uniq.3671) (:fv _uniq.3668)))\",\"pp\":\"p \u2227 q \u2192 q \u2227 p\",\"modelSexpVersion\":1,\"modelSexp\":\"(:forall _ :explicit (:app (:c And) (:arg :explicit 0 (:fv FV0)) (:arg :explicit 1 (:fv FV1))) (:app (:c And) (:arg :explicit 0 (:fv FV1)) (:arg :explicit 1 (:fv FV0))))\"},\"name\":\"_uniq.3680\",\"isConversion\":false,\"fragment\":\"tactic\"}},{\"universeHoles\":false,\"status\":\"complete\",\"name\":\"_uniq.3681\",\"holes\":[]}]}"
+    },
+    {
+      "command": "goal.tactic",
+      "request": {
+        "stateId": 13,
+        "goalId": 0,
+        "tactic": "tauto"
+      },
+      "request_line": "goal.tactic {\"stateId\":13,\"goalId\":0,\"tactic\":\"tauto\"}",
+      "response": {
+        "validation": {
+          "version": 2,
+          "scope": "execution-closure-and-transition-audit",
+          "checked": true
+        },
+        "transition": {
+          "version": 1,
+          "siblings": [],
+          "selected": "_uniq.3680",
+          "introduced": [],
+          "extra": [],
+          "dormant": [],
+          "direct": [],
+          "closed": [],
+          "changed": []
+        },
+        "nextStateId": 14,
+        "messages": [],
+        "hasUnsafe": false,
+        "hasSorry": false,
+        "goals": []
+      },
+      "response_line": "{\"validation\":{\"version\":2,\"scope\":\"execution-closure-and-transition-audit\",\"checked\":true},\"transition\":{\"version\":1,\"siblings\":[],\"selected\":\"_uniq.3680\",\"introduced\":[],\"extra\":[],\"dormant\":[],\"direct\":[],\"closed\":[],\"changed\":[]},\"nextStateId\":14,\"messages\":[],\"hasUnsafe\":false,\"hasSorry\":false,\"goals\":[]}"
+    },
+    {
+      "command": "goal.certify",
+      "request": {
+        "stateId": 14
+      },
+      "request_line": "goal.certify {\"stateId\":14}",
+      "response": {
+        "version": 1,
+        "status": "certified",
+        "receipt": {
+          "version": 1,
+          "rootType": "ceb9818b9d49148a",
+          "root": "_uniq.3667",
+          "proof": "f8db6f769a75c8c5",
+          "levels": [],
+          "lean": "4.10.0-rc1 3b58e0649156610ce3aeed4f7b5c652340c668d4",
+          "identity": "lean-expr-digest-v1",
+          "environment": "1f25fae908fae89b",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "propext"
+          ],
+          "auxiliary": []
+        }
+      },
+      "response_line": "{\"version\":1,\"status\":\"certified\",\"receipt\":{\"version\":1,\"rootType\":\"ceb9818b9d49148a\",\"root\":\"_uniq.3667\",\"proof\":\"f8db6f769a75c8c5\",\"levels\":[],\"lean\":\"4.10.0-rc1 3b58e0649156610ce3aeed4f7b5c652340c668d4\",\"identity\":\"lean-expr-digest-v1\",\"environment\":\"1f25fae908fae89b\",\"axioms\":[\"Classical.choice\",\"Quot.sound\",\"propext\"],\"auxiliary\":[]}}"
+    },
+    {
+      "command": "goal.delete",
+      "request": {
+        "stateIds": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14
+        ]
+      },
+      "request_line": "goal.delete {\"stateIds\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14]}",
+      "response": {},
+      "response_line": "{}"
+    },
+    {
+      "command": "stat",
+      "request": {},
+      "request_line": "stat {}",
+      "response": {
+        "nGoals": 0
+      },
+      "response_line": "{\"nGoals\":0}"
+    }
+  ],
+  "diagnostic": {
+    "zetaDeltaCount": 0,
+    "validator": "accepted",
+    "synthetic": [],
+    "rootCertificate": {
+      "version": 1,
+      "status": "certified",
+      "receipt": {
+        "version": 1,
+        "rootType": "f8ce7b4991494a80",
+        "root": "_uniq.9",
+        "proof": "3f3974e0eb11c0de",
+        "levels": [],
+        "lean": "4.10.0-rc1 3b58e0649156610ce3aeed4f7b5c652340c668d4",
+        "identity": "lean-expr-digest-v1",
+        "environment": "1f25fae908fae89b",
+        "axioms": [],
+        "auxiliary": []
+      }
+    },
+    "postponedCount": 0,
+    "pending": [],
+    "letRecCount": 0,
+    "errorOwners": [],
+    "auxiliaryAudit": [
+      "owner=metavariable _uniq.18 path=retained record audit/assignment: Missing local declaration _uniq.19"
+    ],
+    "assignments": [
+      {
+        "value": "_uniq.19",
+        "type": "Prop",
+        "rootReachable": false,
+        "owner": "_uniq.18",
+        "missingInOwner": [
+          "_uniq.19"
+        ],
+        "assignmentKind": "ordinary"
+      }
+    ]
+  },
+  "ordinary_lean": "Test/Mathlib/ScopeControls.lean:7:24: warning: unused variable `\u03b2`\nnote: this linter can be disabled with `set_option linter.unusedVariables false`\nTest/Mathlib/ScopeControls.lean:7:39: warning: unused variable `\u03b3`\nnote: this linter can be disabled with `set_option linter.unusedVariables false`\nTest/Mathlib/ScopeControls.lean:8:25: warning: unused variable `u`\nnote: this linter can be disabled with `set_option linter.unusedVariables false`\nTest/Mathlib/ScopeControls.lean:8:27: warning: unused variable `v`\nnote: this linter can be disabled with `set_option linter.unusedVariables false`\nTest/Mathlib/ScopeControls.lean:8:44: warning: unused variable `b`\nnote: this linter can be disabled with `set_option linter.unusedVariables false`\n"
+}

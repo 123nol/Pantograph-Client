@@ -17,6 +17,8 @@ from typing import Any, Literal, Mapping, cast
 # The client owns every wire version. Consumers compare their own expression
 # representation against these values instead of the codec importing theirs.
 MODEL_SEXP_VERSION = 1
+TRANSITION_VALIDATION_VERSION = 2
+TRANSITION_VALIDATION_SCOPE = "execution-closure-and-transition-audit"
 
 PROTOCOL_DESCRIPTION = MappingProxyType(
     {
@@ -25,7 +27,7 @@ PROTOCOL_DESCRIPTION = MappingProxyType(
         "resourceErrorVersion": 1,
         "commandTransactionVersion": 1,
         "modelSexpVersion": MODEL_SEXP_VERSION,
-        "transitionValidationVersion": 1,
+        "transitionValidationVersion": TRANSITION_VALIDATION_VERSION,
         "transitionProvenanceVersion": 1,
         "inspectionVersion": 1,
         "certificationVersion": 1,
@@ -84,19 +86,21 @@ CERTIFICATE_STATUSES = frozenset(
 PROOF_IDENTITY = "lean-expr-digest-v1"
 DIGEST = re.compile(r"[0-9a-f]{16}")
 # These categories come from Repl.lean and Library.lean at the pinned base.
-# "validation" is reserved for the required companion extension.
+# "validation" is a terminal integrity failure from the shared snapshot validator.
 COMMAND_ERROR_CATEGORIES = MappingProxyType(
     {
         "protocol.describe": frozenset({"command"}),
         "options.set": frozenset({"command"}),
         "options.print": frozenset({"command"}),
-        "goal.start": frozenset({"command", "arguments", "parsing", "elab"}),
+        "goal.start": frozenset(
+            {"command", "arguments", "parsing", "elab", "validation"}
+        ),
         "goal.tactic": frozenset(
             {"command", "arguments", "index", "invalid", "validation"}
         ),
         "goal.delete": frozenset({"command"}),
-        "goal.inspect": frozenset({"command", "arguments", "index"}),
-        "goal.certify": frozenset({"command", "arguments", "index"}),
+        "goal.inspect": frozenset({"command", "arguments", "index", "validation"}),
+        "goal.certify": frozenset({"command", "arguments", "index", "validation"}),
         "stat": frozenset({"command"}),
     }
 )
@@ -858,7 +862,11 @@ def decode_transition_validation(
     version = _nat(obj["version"], "validation version")
     scope = _string(obj["scope"], "validation scope")
     checked = _bool(obj["checked"], "validation checked")
-    if version != 1 or scope != "transition-expressions" or not checked:
+    if (
+        version != TRANSITION_VALIDATION_VERSION
+        or scope != TRANSITION_VALIDATION_SCOPE
+        or not checked
+    ):
         raise PantographProtocolError(
             "Required transition validation was not performed with the supported version/scope."
         )

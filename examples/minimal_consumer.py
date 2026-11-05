@@ -15,6 +15,8 @@ from pantograph_async import (
     PantographTacticRejected,
     PantographResourceError,
     TacticState,
+    TRANSITION_VALIDATION_VERSION,
+    TRANSITION_VALIDATION_SCOPE,
 )
 
 
@@ -25,6 +27,8 @@ async def main(source_root: Path, repl: Path, imports: tuple[str, ...]) -> None:
             root = await scope.start_goal("∀ (p : Prop), p → p")
             state = await scope.apply_tactic(root, "intro p h", goal_index=0)
             assert isinstance(state, TacticState)
+            assert state.validation.version == TRANSITION_VALIDATION_VERSION
+            assert state.validation.scope == TRANSITION_VALIDATION_SCOPE
             goal = state.goals[0]
             print("target:", goal.target.pp, "| model:", goal.target.model_sexp)
             print(

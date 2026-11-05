@@ -1,0 +1,169 @@
+{
+  "kind": "scope-aware-companion-client-stage3-provenance",
+  "recorded_on": "2026-11-05",
+  "source_url": "https://github.com/123nol/Pantograph.git",
+  "source_commit": "ba2c3dd8383f90b4b5327e31a645a53411f385e4",
+  "published_commit_verified": true,
+  "patch_base_commit": "0dd5d2225e2d093f66a4b6231c1aa35004f2c8f3",
+  "client_contract_revision": 5,
+  "client_distribution_version": "0.4.0",
+  "descriptor": {
+    "protocol": "maths-ai-pantograph",
+    "protocolVersion": 3,
+    "modelSexpVersion": 1,
+    "transitionValidationVersion": 2,
+    "transitionProvenanceVersion": 1,
+    "inspectionVersion": 1,
+    "certificationVersion": 1,
+    "messageVersion": 1,
+    "goalSelection": "explicit-focused-v1",
+    "tacticErrorsFormat": "string-array-v1",
+    "resourceErrorVersion": 1,
+    "commandTransactionVersion": 1
+  },
+  "transition_validation": {
+    "version": 2,
+    "scope": "execution-closure-and-transition-audit",
+    "checked": true
+  },
+  "patch_sha256": "12572873c1c2ea24757da3c50365a30b4e585004cb5821ec8af76bcf6146a777",
+  "patched_sources_sha256": {
+    "Main.lean": "858dd49d714da1e2e349fee8c151e5f2df76ae9e701e9a86a55e95d99bc12672",
+    "Pantograph.lean": "68e0f53f75a10feb52a9aa22d7d1e05f86ad9a1b0dcaf406c6e8949f01dbf802",
+    "Pantograph/Certify.lean": "b770774958dc67be53136b3fbeb955422900c95fe93ce4da88b481e931dd45a3",
+    "Pantograph/Diagnostics.lean": "3e56d216d05212a780c1054bee813ed1d14ab03ad7095e92bf9f3479ebd9bd40",
+    "Pantograph/Environment.lean": "910046d1dc6bcf5bd19a1f829e6457ba97b8e10de83230238847074aefbee9ea",
+    "Pantograph/Frontend/Basic.lean": "cc4c2b7b5f5b15181c76d09a1839d0caa00ad531441e78382a5bdd8fba18b23d",
+    "Pantograph/Frontend/Elab.lean": "73b444eb441401768985da9ece4610c6c76f584182d91af6b664493a3d5dfa4b",
+    "Pantograph/Goal.lean": "72d70bf2d5333a5142b7dec14974f6203b63b0964dd81a675aa15e21aef84848",
+    "Pantograph/Library.lean": "b0a49c2ddb8c797a45dac3d1920e327d5a89317e1be3223aad80b72115415ae5",
+    "Pantograph/Protocol.lean": "4d1c7168803796e518728f269666228e5c7fe7068ac035ce9a4058a18d98bbbc",
+    "Pantograph/Resources.lean": "e818c4aacc4bcfcca96a53610b4d7cf50e232590376caebb9d4feb49114c0460",
+    "Pantograph/Serial.lean": "9856407c0082928e439e03b8799f073f9e301dc0964f2afe295ee0a5737c8a61",
+    "Pantograph/Transition.lean": "a776f174d622c9e66bc7130455512232f0018de0e5001193aee39afbdd77bd2f",
+    "Pantograph/Validation.lean": "9ae1cf4cdca302e39784da358da9d8878ff234f26a6b492bdd9521e61b115b76",
+    "Repl.lean": "e63baa2f5b4111078396450871f49fe626d2014b26d65ebac9f51f7de0c07527",
+    "Test/Common.lean": "eb42eb050f70fca876f8a419165741b9acfc339442e89f971aba5112dfbb0c10",
+    "Test/ContractFixtures.lean": "b5dbae3fda4df200cf8166c41b70038b3d8811351b5a4317d3c2c5cda1ad54c0",
+    "Test/Frontend.lean": "23a571fc55f6fa1d614e6bda468bc3b7daf6178c2ffe1649a483f6fe3715acc3",
+    "Test/Integration.lean": "ccf09b60d297e56f619b5a35653eb94b57d27a5467cb1d3d2652f9f3f70e8e03",
+    "Test/Main.lean": "8520f12991d8e9af95270bc84f5361acafec3e828d3326e2daa92f82328019eb",
+    "Test/Mathlib/ScopeControls.lean": "9b7d03abfe546361d952b977655b013efadf9d322cc39d47210224fd842bc4eb",
+    "Test/Proofs.lean": "3ba0d58a2399ab0e671cee54f0540543e1ce56aa2dee4b0fa269ed0ee464db71",
+    "Test/ScopeDiagnostic.lean": "19de460970b337fa5589ff62f83c4326e521340ba1e4e52a89b3e8248c257ff5",
+    "Test/ScopeValidation.lean": "82432de0076ea36fa23b504c38532a09aba8c92f3c46a6159d58652ca088e687",
+    "Test/Snapshot.lean": "b6adfde2bac25c91d9ee3b475e67d044b31a6fce8329852c138bcc6fb8a0c7ba",
+    "Test/Tactic/Prograde.lean": "11a08437a691602d75f34b84296107b8126cc1c2cb39597ae0d52df2b45a4562",
+    "Test/Transaction.lean": "14f9344b0f9ca96b3b7141b6fe0608745ef1adc39d64f115b6ae13bf689204ae",
+    "Test/Validation.lean": "3b6ca0903503bb7d2760ddf9295c95f99f95e32ecb5bd9d28624d34007a1ec46",
+    "doc/repository_client_contract.md": "c94d343229ce923ad56603d38204a8f00bba505b68b3a5aec1cc2434df7dfd2d",
+    "doc/scope_aware_ownership.md": "24c11f21b44abc54c44c73b164be91f5dc6856a2cd82bfbab4b39213e5bfffec",
+    "doc/scope_aware_validation.fixtures.json": "2db9b61a21a95b7eee265dc64b7f5050acac2e2fa18c058d26b3b25b9a34264b",
+    "doc/scope_aware_validation.md": "06a4682053b03a18ce7a90326f68a872bfd8f3ec70348acef1f9b9f96d2fb3bf",
+    "doc/scope_aware_validation.schema.json": "1e2d7320dfbd60df8578a52e0d271307b4b86ca4a9fd0a2c911d85dfa68c0605",
+    "doc/snapshot_protocol.md": "3c7b85cdbd4ac97569a40a0ddb9d8c4c186fc2353cf98076490ad8ca5952932b",
+    "doc/transactional_resources.fixtures.json": "394881fd33dd66f07a936fb70b8272806bc37b332f2e9eaa55085b00577386fd",
+    "doc/transactional_resources.md": "ea6d4c31a6db20cc1ea66d8f4321d6fbd3a9dd9160be40a43736f19c3bf914a1",
+    "doc/transactional_resources.schema.json": "97e00eb158ca69230a36a13d71f516fa4e1ad79e17dc74fbccf5d6f6df9bce71",
+    "lakefile.lean": "571bca648d01ea209492d0c71e8689a2766754a7719b99ea44348fcd1de6acb9",
+    "scripts/capture_repository_client_contract.py": "3135d2dd59655f4c5348a7cd13dd5a6fbdb09b6ce24748fbc6c5b9d636ac95b8",
+    "scripts/test_scope_aware_validation.py": "9226262636963e088a0a43f79a0b150f3ff10f9cc70b1293b52ff273d702f803",
+    "scripts/test_transactional_resources.py": "0f6fb68925fc27e5ddd7c21c6edd1403a1486531b046ccdc5d98e4da57e042eb"
+  },
+  "repl_sha256": "e3c11038b1d0fa463f6ef439788dd4d70ed425a9928b67d3942546614939dd78",
+  "toolchain": "leanprover/lean4:v4.10.0-rc1",
+  "build": {
+    "passed": true,
+    "method": "Apply the bundled patch to the clean recorded base and compare every changed file with ba2c3dd. Build repl, test and scope_diagnostic from source with cached LSpec dependency artifacts."
+  },
+  "tests": {
+    "native_lean_suite": {
+      "passed": true,
+      "assertions": 393,
+      "log": "scope_aware_companion.native-tests.log"
+    },
+    "native_scope_harness": {
+      "passed": true,
+      "core_exchanges": 17,
+      "mathlib_exchanges": 29,
+      "capture": "../../tests/fixtures/scope_aware_validation/capture.json"
+    },
+    "native_resource_harness": {
+      "passed": true,
+      "exchanges": 22,
+      "cumulative_requests": 3000,
+      "capture": "../../tests/fixtures/scope_aware_resources/capture.json"
+    },
+    "client_native": {
+      "passed": 27,
+      "skipped": 3,
+      "skipped_reason": "Optional historical REPL and two installed-distribution-only checks."
+    },
+    "client_checkout_before_capture_tests": {
+      "passed": 757,
+      "skipped": 21
+    },
+    "native_scope_client_options_harness": {
+      "passed": true,
+      "core_exchanges": 21,
+      "mathlib_exchanges": 31,
+      "capture": "../../tests/fixtures/scope_aware_validation/client_capture.json",
+      "options": "Client REQUIRED_OPTIONS applied before any goal; each supported response is decoded with the installed client schema."
+    },
+    "client_checkout_final": {
+      "passed": 843,
+      "skipped": 3,
+      "deselected": 0,
+      "python": "3.12.13",
+      "command": "pytest -q --run-pantograph-live --run-pantograph-mathlib with explicit native/Mathlib paths",
+      "duration_s": 63.15,
+      "skipped_reason": "Optional historical binary and two installed-distribution-only checks."
+    },
+    "client_installed_final": {
+      "passed": 845,
+      "skipped": 1,
+      "deselected": 0,
+      "python": "3.12.13",
+      "command": "PANTOGRAPH_CLIENT_REQUIRE_INSTALLED=1 pytest -q --run-pantograph-live --run-pantograph-mathlib, using the sdist tests against its rebuilt wheel",
+      "duration_s": 66.72,
+      "skipped_reason": "Optional historical binary not configured."
+    },
+    "packaging": {
+      "sdist_built": true,
+      "wheel_built_from_sdist": true,
+      "archive_checks_passed": true,
+      "runtime_dependencies": []
+    }
+  },
+  "mathlib": {
+    "mathlib_source_commit": "29dcec074de168ac2bf835a77ef68bbe069194c5",
+    "file_pattern": "*.olean in Mathlib and dependency build/lib directories",
+    "file_count": 4760,
+    "total_bytes": 3407699608,
+    "manifest_encoding": "sorted relative path + NUL + hex SHA-256 + LF for each file",
+    "manifest_sha256": "3137fb29b72487b07c3ccac80453b0672e99ec948f2ad6f7874926ae4ff9467f",
+    "scope": "Identity of the compiled inputs used for this client native gate, not a fresh Mathlib rebuild or application environment fingerprint."
+  },
+  "mathlib_source_verification": {
+    "reference_commit": "29dcec074de168ac2bf835a77ef68bbe069194c5",
+    "checked_files": 4737,
+    "missing_or_different": [],
+    "local_extra_lean_files": []
+  },
+  "artifacts_sha256": {
+    "docs/evidence/scope_aware_companion.native-tests.log": "1f876db7ed8d79d43546731e1d0106dc90edc87f501d2efe2f14720fd1afbbe9",
+    "docs/evidence/scope_aware_mathlib.compiled-identity.json": "7512ce6dd1d3931e5b0e9b83ed17f05a0b335c0c81ddd866a50039f7161eac07",
+    "tests/fixtures/scope_aware_validation/schema.json": "1e2d7320dfbd60df8578a52e0d271307b4b86ca4a9fd0a2c911d85dfa68c0605",
+    "tests/fixtures/scope_aware_validation/fixtures.json": "2db9b61a21a95b7eee265dc64b7f5050acac2e2fa18c058d26b3b25b9a34264b",
+    "tests/fixtures/scope_aware_validation/capture.json": "d1626dee3f643b7a416928fbaa494dd16a7bedf1385d343601110b0b9b27b0e5",
+    "tests/fixtures/scope_aware_validation/provenance.json": "e1dd2d52de3a5f07199d6fe8e5ed2f7596cc803c43bbb4b51c4aa4e145865c22",
+    "tests/fixtures/scope_aware_resources/schema.json": "97e00eb158ca69230a36a13d71f516fa4e1ad79e17dc74fbccf5d6f6df9bce71",
+    "tests/fixtures/scope_aware_resources/fixtures.json": "394881fd33dd66f07a936fb70b8272806bc37b332f2e9eaa55085b00577386fd",
+    "tests/fixtures/scope_aware_resources/capture.json": "f1a8eca85da67642826e5a3b054d06951580207ff93a308cbe38dc4600797957",
+    "tests/fixtures/scope_aware_resources/provenance.json": "3f75a9aa831d8dacffe247123088aa3a26759927f1b784d965af02617733fc21",
+    "tests/fixtures/scope_aware_snapshot_companion/capture.json": "1215c541efaaa147672a6e81bde89313f481ccaddba24e47d8fda5b8b1e27ccc",
+    "tests/fixtures/scope_aware_snapshot_companion/provenance.json": "da953f22d99c01175270a52a1c1e8e802a3ae2bbf7b041c7b9f02e7a299f19ce",
+    "tests/fixtures/scope_aware_validation/client_capture.json": "78f5c51595a601891d2162afe8efe2ddfb5954db53ec63ca86b9857d05643e69"
+  },
+  "scope": "Standalone client Stage 3, with core and pinned Mathlib native controls. No application search/RL, trained-model, Docker or JupyterHub migration is claimed."
+}

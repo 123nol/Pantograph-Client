@@ -1,11 +1,11 @@
 {
   "kind": "authored-future-contract",
-  "note": "Authored protocol-version-3 resource recovery contract; not native validation evidence.",
+  "note": "Authored validation-version-2 contract. Native scope-aware captures are recorded separately.",
   "descriptor": {
     "protocol": "maths-ai-pantograph",
     "protocolVersion": 3,
     "modelSexpVersion": 1,
-    "transitionValidationVersion": 1,
+    "transitionValidationVersion": 2,
     "transitionProvenanceVersion": 1,
     "inspectionVersion": 1,
     "certificationVersion": 1,
@@ -64,8 +64,8 @@
         }
       ],
       "validation": {
-        "version": 1,
-        "scope": "transition-expressions",
+        "version": 2,
+        "scope": "execution-closure-and-transition-audit",
         "checked": true
       },
       "messages": [],
@@ -121,8 +121,8 @@
         }
       ],
       "validation": {
-        "version": 1,
-        "scope": "transition-expressions",
+        "version": 2,
+        "scope": "execution-closure-and-transition-audit",
         "checked": true
       },
       "messages": [],
@@ -164,8 +164,8 @@
         }
       ],
       "validation": {
-        "version": 1,
-        "scope": "transition-expressions",
+        "version": 2,
+        "scope": "execution-closure-and-transition-audit",
         "checked": true
       },
       "messages": [],
@@ -191,7 +191,7 @@
         {
           "vars": [
             {
-              "userName": "\u03b1",
+              "userName": "α",
               "type": {
                 "sexp": "(:sort 1)",
                 "pp": "Type",
@@ -209,7 +209,7 @@
               "userName": "inst",
               "type": {
                 "sexp": "((:c Inhabited) (:fv _uniq.74))",
-                "pp": "Inhabited \u03b1",
+                "pp": "Inhabited α",
                 "modelSexpVersion": 1,
                 "modelSexp": "(:app (:c Inhabited) (:arg :explicit 0 (:fv FV0)))"
               },
@@ -224,7 +224,7 @@
               "userName": "x",
               "type": {
                 "sexp": "(:fv _uniq.74)",
-                "pp": "\u03b1",
+                "pp": "α",
                 "modelSexpVersion": 1,
                 "modelSexp": "(:fv FV0)"
               },
@@ -248,8 +248,8 @@
         }
       ],
       "validation": {
-        "version": 1,
-        "scope": "transition-expressions",
+        "version": 2,
+        "scope": "execution-closure-and-transition-audit",
         "checked": true
       },
       "messages": [],
@@ -284,7 +284,7 @@
               "userName": "n",
               "type": {
                 "sexp": "(:c Nat)",
-                "pp": "\u2115",
+                "pp": "ℕ",
                 "modelSexpVersion": 1,
                 "modelSexp": "(:c Nat)"
               },
@@ -305,7 +305,7 @@
               "userName": "x",
               "type": {
                 "sexp": "(:c Nat)",
-                "pp": "\u2115",
+                "pp": "ℕ",
                 "modelSexpVersion": 1,
                 "modelSexp": "(:c Nat)"
               },
@@ -329,8 +329,8 @@
         }
       ],
       "validation": {
-        "version": 1,
-        "scope": "transition-expressions",
+        "version": 2,
+        "scope": "execution-closure-and-transition-audit",
         "checked": true
       },
       "messages": [],
@@ -359,8 +359,8 @@
       "nextStateId": 16,
       "goals": [],
       "validation": {
-        "version": 1,
-        "scope": "transition-expressions",
+        "version": 2,
+        "scope": "execution-closure-and-transition-audit",
         "checked": true
       },
       "messages": [],
@@ -382,8 +382,8 @@
       "nextStateId": 14,
       "goals": [],
       "validation": {
-        "version": 1,
-        "scope": "transition-expressions",
+        "version": 2,
+        "scope": "execution-closure-and-transition-audit",
         "checked": true
       },
       "messages": [
@@ -415,8 +415,8 @@
       "nextStateId": 16,
       "goals": [],
       "validation": {
-        "version": 1,
-        "scope": "transition-expressions",
+        "version": 2,
+        "scope": "execution-closure-and-transition-audit",
         "checked": true
       },
       "messages": [],
@@ -491,8 +491,8 @@
     "nextStateId": 16,
     "goals": [],
     "validation": {
-      "version": 1,
-      "scope": "transition-expressions",
+      "version": 2,
+      "scope": "execution-closure-and-transition-audit",
       "checked": true
     },
     "messages": [
@@ -524,7 +524,7 @@
       "extra": []
     }
   },
-  "contract_revision": 4,
+  "contract_revision": 5,
   "certified": {
     "version": 1,
     "status": "certified",
