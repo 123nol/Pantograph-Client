@@ -1,4 +1,4 @@
-"""Strict scope-aware validation metadata and terminal integrity failures."""
+"""Strict representation-aware validation metadata and terminal integrity failures."""
 
 import asyncio
 from copy import deepcopy
@@ -18,7 +18,8 @@ from pantograph_async.protocol import decode_response
 from tests.support import run, records, assert_reaped
 
 FIXTURES = Path(__file__).parent / "fixtures"
-SHARED = json.loads((FIXTURES / "scope_aware_validation" / "fixtures.json").read_text())
+CURRENT = FIXTURES / "compiler_aware_validation"
+SHARED = json.loads((CURRENT / "fixtures.json").read_text())
 SUCCESS = json.loads((FIXTURES / "future_contract.json").read_text())["successes"][
     "valid_truth"
 ]
@@ -28,7 +29,7 @@ def test_shared_validation_contract_accepts_checked_scope():
     wire = deepcopy(SUCCESS)
     wire["validation"] = SHARED["validation"]
     result = decode_response("goal.tactic", wire)
-    assert result.validation.version == TRANSITION_VALIDATION_VERSION == 2
+    assert result.validation.version == TRANSITION_VALIDATION_VERSION == 3
     assert result.validation.scope == TRANSITION_VALIDATION_SCOPE
     assert result.validation.checked and not result.validation.is_rejection
 
@@ -64,7 +65,12 @@ def test_startup_rejects_old_validation_before_options_or_allocations(
 
 
 @pytest.mark.parametrize(
-    "folder", ["snapshot_companion", "transactional_snapshot_companion"]
+    "folder",
+    [
+        "snapshot_companion",
+        "transactional_snapshot_companion",
+        "scope_aware_snapshot_companion",
+    ],
 )
 def test_historical_success_cannot_claim_current_validation(folder):
     historical = json.loads((FIXTURES / folder / "capture.json").read_text())
@@ -101,16 +107,14 @@ def test_validation_failure_prevents_a_queued_request_from_writing(setup):
     assert_reaped(report)
 
 
-CAPTURE = json.loads((FIXTURES / "scope_aware_validation" / "capture.json").read_text())
+CAPTURE = json.loads((CURRENT / "capture.json").read_text())
 
 
-CLIENT_CAPTURE = json.loads(
-    (FIXTURES / "scope_aware_validation" / "client_capture.json").read_text()
-)
+CLIENT_CAPTURE = json.loads((CURRENT / "client_capture.json").read_text())
 
 
 @pytest.mark.parametrize("entry", [*CLIENT_CAPTURE["core"], *CLIENT_CAPTURE["mathlib"]])
-def test_captured_scope_aware_exchanges_decode_strictly(entry):
+def test_captured_compiler_aware_exchanges_decode_strictly(entry):
     from pantograph_async.protocol import SUPPORTED_COMMANDS, decode_json_response
 
     assert decode_json_response(entry["response_line"]) == entry["response"]
@@ -119,7 +123,7 @@ def test_captured_scope_aware_exchanges_decode_strictly(entry):
         if entry["response"].get("error") == "validation":
             assert type(result.as_exception()) is PantographProtocolError
         if "validation" in entry["response"]:
-            assert result.validation.version == 2
+            assert result.validation.version == TRANSITION_VALIDATION_VERSION
             assert result.validation.checked
 
 
@@ -134,11 +138,11 @@ def test_captured_diagnostic_retains_inert_residue_and_certifies_root():
     )
 
 
-def test_scope_aware_shared_artifacts_match_pinned_companion():
+def test_compiler_aware_shared_artifacts_match_pinned_companion():
     import hashlib
     from pantograph_async import compatibility
 
-    root = FIXTURES / "scope_aware_validation"
+    root = CURRENT
     provenance = json.loads((root / "provenance.json").read_text())
     assert (
         provenance["companion_commit"]
@@ -148,8 +152,8 @@ def test_scope_aware_shared_artifacts_match_pinned_companion():
         provenance["repl_sha256"]
         == compatibility.manifest()["companion"]["reference_repl_sha256"]
     )
-    assert provenance["core_exchanges"] == len(CAPTURE["core"]) == 17
-    assert provenance["mathlib_exchanges"] == len(CAPTURE["mathlib"]) == 29
+    assert provenance["core_exchanges"] == len(CAPTURE["core"]) == 44
+    assert provenance["mathlib_exchanges"] == len(CAPTURE["mathlib"]) == 40
     assert CLIENT_CAPTURE["companion_commit"] == provenance["companion_commit"]
     assert CLIENT_CAPTURE["repl_sha256"] == provenance["repl_sha256"]
     assert CLIENT_CAPTURE["required_options"] == dict(compatibility.REQUIRED_OPTIONS)
@@ -183,3 +187,60 @@ def test_default_option_capture_still_carries_strict_validation(wire):
     assert checked.version == TRANSITION_VALIDATION_VERSION
     assert checked.scope == TRANSITION_VALIDATION_SCOPE
     assert checked.checked
+
+
+def _compiler_producing(entries):
+    return [
+        entry
+        for entry in entries
+        if entry["command"] == "goal.tactic"
+        and entry["request"].get("tactic")
+        in {"unfold Nat.pow", "rw [Nat.pow]", "simp only [Nat.pow]", "cases n <;> simp [Nat.pow]"}
+    ]
+
+
+def test_compiler_producing_tactics_are_checked_transitions():
+    # These tactics compile an on-demand match splitter. Version 2 ended the session.
+    from pantograph_async.protocol import decode_transition_validation
+
+    raw = _compiler_producing([*CAPTURE["core"], *CAPTURE["mathlib"]])
+    configured = _compiler_producing([*CLIENT_CAPTURE["core"], *CLIENT_CAPTURE["mathlib"]])
+    assert len(raw) >= 5 and len(configured) == len(raw)
+    for entry in raw:
+        wire = entry["response"]
+        checked = decode_transition_validation(
+            wire["validation"], has_sorry=wire["hasSorry"], has_unsafe=wire["hasUnsafe"]
+        )
+        assert checked.version == TRANSITION_VALIDATION_VERSION and checked.checked
+        assert not wire["hasSorry"] and not wire["hasUnsafe"]
+    for entry in configured:
+        # The client's required options give the complete typed result.
+        result = decode_response("goal.tactic", entry["response"])
+        assert result.validation.version == TRANSITION_VALIDATION_VERSION
+        assert result.validation.scope == TRANSITION_VALIDATION_SCOPE
+        assert not result.validation.is_rejection
+
+
+def test_compiler_producing_proofs_certify_without_compiler_dependencies():
+    receipts = [
+        entry["response"]["receipt"]
+        for entry in [*CAPTURE["core"], *CAPTURE["mathlib"]]
+        if entry["command"] == "goal.certify"
+        and any("splitter" in name for name in entry["response"]["receipt"]["auxiliary"])
+    ]
+    assert len(receipts) >= 3
+    for receipt in receipts:
+        decode_response("goal.certify", {"version": 1, "status": "certified", "receipt": receipt})
+        assert not any("_cstage" in name for name in receipt["auxiliary"])
+
+
+def test_old_compiler_failure_is_a_terminal_protocol_error():
+    # The exact integrity failure version 2 reported for `unfold Nat.pow`.
+    wire = {
+        "error": "validation",
+        "desc": "execution owner=declaration _private.0.Nat.pow.match_1.splitter._rarg._cstage2 "
+        "path=environment audit/declaration-type/binder-type: Missing proof dependency _obj",
+    }
+    error = decode_response("goal.tactic", wire).as_exception()
+    assert type(error) is PantographProtocolError
+    assert error.payload == wire

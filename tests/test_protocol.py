@@ -331,8 +331,10 @@ def test_validation_fields_are_required(field):
     [
         ("version", True),
         ("version", 1),
-        ("version", 3),
+        ("version", 2),
+        ("version", 4),
         ("scope", "transition-expressions"),
+        ("scope", "execution-closure-and-transition-audit"),
         ("scope", "root-proof"),
         ("checked", False),
         ("checked", 1),
@@ -566,7 +568,7 @@ def test_immutable_containers():
 def test_baseline_evidence_is_not_final_contract_evidence():
     assert BASELINE["kind"] == "unmodified-custom-repl-baseline"
     assert FUTURE["kind"] == "authored-future-contract"
-    assert FUTURE["contract_revision"] == 5
+    assert FUTURE["contract_revision"] == 6
     assert BASELINE["readiness_line"] == "ready."
     for entry in BASELINE["interactions"]:
         assert json.loads(entry["response_line"]) == entry["response"]
@@ -591,7 +593,7 @@ def test_frozen_contract_descriptor_matches_the_codec():
         COMMAND_ERROR_CATEGORIES
     )
     assert contract["complete_theorem_certification"] is True
-    assert contract["contract_revision"] == FUTURE["contract_revision"] == 5
+    assert contract["contract_revision"] == FUTURE["contract_revision"] == 6
     assert contract["transition_validation"] == success()["validation"]
     assert set(contract["tactic_responses"]["success"]["required"]) == set(success())
     for variant, fixture in [

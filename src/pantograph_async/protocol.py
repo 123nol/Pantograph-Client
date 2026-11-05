@@ -17,8 +17,8 @@ from typing import Any, Literal, Mapping, cast
 # The client owns every wire version. Consumers compare their own expression
 # representation against these values instead of the codec importing theirs.
 MODEL_SEXP_VERSION = 1
-TRANSITION_VALIDATION_VERSION = 2
-TRANSITION_VALIDATION_SCOPE = "execution-closure-and-transition-audit"
+TRANSITION_VALIDATION_VERSION = 3
+TRANSITION_VALIDATION_SCOPE = "execution-closure-and-representation-aware-audit"
 
 PROTOCOL_DESCRIPTION = MappingProxyType(
     {

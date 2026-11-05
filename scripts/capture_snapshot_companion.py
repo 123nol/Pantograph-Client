@@ -5,7 +5,7 @@ The output directory must not exist. Run from any directory with GNU stdbuf on
 PATH; the companion checkout supplies LEAN_PATH through ``lake env``.
 
     python scripts/capture_snapshot_companion.py \\
-        --companion /path/to/Pantograph --output tests/fixtures/scope_aware_snapshot_companion
+        --companion /path/to/Pantograph --output tests/fixtures/compiler_aware_snapshot_companion
 """
 
 from __future__ import annotations

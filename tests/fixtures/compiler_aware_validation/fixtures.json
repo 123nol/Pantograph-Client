@@ -1,0 +1,11 @@
+{
+  "validation": {
+    "version": 3,
+    "scope": "execution-closure-and-representation-aware-audit",
+    "checked": true
+  },
+  "integrityError": {
+    "error": "validation",
+    "desc": "execution owner=metavariable Scope.root path=root/assignment: Missing local declaration Scope.missing"
+  }
+}

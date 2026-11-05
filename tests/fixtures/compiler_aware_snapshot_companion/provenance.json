@@ -1,0 +1,8 @@
+{
+  "kind": "snapshot-companion-capture-provenance",
+  "companion_commit": "fc740c26a1e832ecb571859af24a5c632a351bd9",
+  "checkout_commit": "fc740c26a1e832ecb571859af24a5c632a351bd9",
+  "repl_sha256": "6cba4f74fdf2bc8ba7060603e7bc11feffb7229dd8c288ec7c3c0ba2e9c2ef29",
+  "toolchain": "leanprover/lean4:v4.10.0-rc1",
+  "capture_sha256": "6e2746ee2f2f761b38084a158d453e80719b98d31641f5fbe1071d5a3193e36d"
+}

@@ -37,7 +37,7 @@ def test_contract_base_matches_verified_merge_and_unchanged_environment():
 
 
 def test_contract_revision_does_not_add_a_runtime_schema_selector():
-    assert CONTRACT["contract_revision"] == 5
+    assert CONTRACT["contract_revision"] == 6
     assert CONTRACT["descriptor"]["protocolVersion"] == 3
     assert CONTRACT["complete_theorem_certification"] is True
     assert set(CONTRACT["transition_validation"]) == {"version", "scope", "checked"}

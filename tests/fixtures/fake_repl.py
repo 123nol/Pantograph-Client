@@ -145,7 +145,7 @@ def main():
                 "resourceErrorVersion": 1,
                 "commandTransactionVersion": 1,
                 "modelSexpVersion": 1,
-                "transitionValidationVersion": 2,
+                "transitionValidationVersion": 3,
                 "transitionProvenanceVersion": 1,
                 "inspectionVersion": 1,
                 "certificationVersion": 1,
@@ -154,7 +154,7 @@ def main():
                 "tacticErrorsFormat": "string-array-v1",
             }
             if scenario == "old_validation_descriptor":
-                result["transitionValidationVersion"] = 1
+                result["transitionValidationVersion"] = 2
             if scenario == "bad_descriptor":
                 result["protocolVersion"] = 99
             if scenario == "unextended":
@@ -266,8 +266,8 @@ def main():
                     next_id += 1
                     if tactic == "old_validation":
                         result["validation"] = {
-                            "version": 1,
-                            "scope": "transition-expressions",
+                            "version": 2,
+                            "scope": "execution-closure-and-transition-audit",
                             "checked": True,
                         }
                     if tactic == "missing_validation":

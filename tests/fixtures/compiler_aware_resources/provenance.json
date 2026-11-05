@@ -1,0 +1,15 @@
+{
+  "kind": "compiler-aware-resource-capture-provenance",
+  "companion_commit": "fc740c26a1e832ecb571859af24a5c632a351bd9",
+  "checkout_commit": "fc740c26a1e832ecb571859af24a5c632a351bd9",
+  "repl_sha256": "6cba4f74fdf2bc8ba7060603e7bc11feffb7229dd8c288ec7c3c0ba2e9c2ef29",
+  "toolchain": "leanprover/lean4:v4.10.0-rc1",
+  "captured_exchanges": 22,
+  "cumulative_requests": 3000,
+  "files_sha256": {
+    "schema.json": "97e00eb158ca69230a36a13d71f516fa4e1ad79e17dc74fbccf5d6f6df9bce71",
+    "fixtures.json": "394881fd33dd66f07a936fb70b8272806bc37b332f2e9eaa55085b00577386fd",
+    "capture.json": "4e6021ead885ce788ecb2dbe3ca228abe902c89b580037e2ea82ed80739385a0"
+  },
+  "scope": "Fresh native transactional-resource exchanges against the representation-aware validator; no historical captures rewritten."
+}
