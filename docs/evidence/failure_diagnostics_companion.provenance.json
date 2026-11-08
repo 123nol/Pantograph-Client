@@ -1,0 +1,145 @@
+{
+  "kind": "failure-diagnostics-companion-client-provenance",
+  "recorded_on": "2026-11-08",
+  "source_url": "https://github.com/123nol/Pantograph.git",
+  "source_commit": "d809a610a4cf24560ea836e8bcb879338e4f4797",
+  "source_branch": "Leul-Negash/Pantograph feat/failure-diagnostics (proposed into client_centric_repo)",
+  "published_commit_verified": false,
+  "patch_base_commit": "0dd5d2225e2d093f66a4b6231c1aa35004f2c8f3",
+  "client_contract_revision": 6,
+  "client_distribution_version": "0.6.0",
+  "descriptor": {
+    "protocol": "maths-ai-pantograph",
+    "protocolVersion": 3,
+    "modelSexpVersion": 1,
+    "transitionValidationVersion": 3,
+    "transitionProvenanceVersion": 1,
+    "inspectionVersion": 1,
+    "certificationVersion": 1,
+    "messageVersion": 1,
+    "goalSelection": "explicit-focused-v1",
+    "tacticErrorsFormat": "string-array-v1",
+    "resourceErrorVersion": 1,
+    "commandTransactionVersion": 1
+  },
+  "patch_sha256": "a5ed39613b49288a6895652069a16190d618210ef19d55daeac2dd4d34681ee2",
+  "patched_sources_sha256": {
+    "Main.lean": "858dd49d714da1e2e349fee8c151e5f2df76ae9e701e9a86a55e95d99bc12672",
+    "Pantograph.lean": "68e0f53f75a10feb52a9aa22d7d1e05f86ad9a1b0dcaf406c6e8949f01dbf802",
+    "Pantograph/Certify.lean": "8894c252e3e938778e91124dfe8f0eb8c445bc1a57a0e51329aabe7393d556f8",
+    "Pantograph/DeclarationAudit.lean": "87ab2f86defbef07f0b5f1610d6eeeb1efcbcf5a11e1696f5e1db9afcd71eccd",
+    "Pantograph/Diagnostics.lean": "3e56d216d05212a780c1054bee813ed1d14ab03ad7095e92bf9f3479ebd9bd40",
+    "Pantograph/Environment.lean": "4117530efdfd4b306eb9041f2116785067699ecc4021b2e50a12cf3032afd22c",
+    "Pantograph/Frontend/Basic.lean": "cc4c2b7b5f5b15181c76d09a1839d0caa00ad531441e78382a5bdd8fba18b23d",
+    "Pantograph/Frontend/Elab.lean": "1f1f38595f47e90130dd5cbac8aa7a78aeee59ebd104e6fd32e788e005370478",
+    "Pantograph/Goal.lean": "716811036ff1505590e70c668f87f4c8168d51510cce1ac44f02d60e088ba20c",
+    "Pantograph/Library.lean": "5fb1db123b9f5cf176fdf98b457cd5a00ada40b7aca070df5f22c37c8b55b5ad",
+    "Pantograph/Protocol.lean": "438a5890f5c79a4cf5b0d3ed647fb003ff4ac9bfc13e293423c1ca74d264d3ac",
+    "Pantograph/Resources.lean": "c08497e33c2a1920d55abea9eb0063aa063fe6df5cba0c17a266e06de22bbbbc",
+    "Pantograph/Serial.lean": "e650a3874e2094c0ed3b295393277e7e6481f4d12f26f326c3e9bf2d21f4aa87",
+    "Pantograph/Transition.lean": "a776f174d622c9e66bc7130455512232f0018de0e5001193aee39afbdd77bd2f",
+    "Pantograph/Validation.lean": "6b10fc8b445c08422009ff8b3adff222ffe88ae24a0c37d4c5f4496aed50a540",
+    "Repl.lean": "d8c95e927a3310467c64c125b8af02f5e6c52dfe49e35226d0e24876f557c90e",
+    "Test/Common.lean": "eb42eb050f70fca876f8a419165741b9acfc339442e89f971aba5112dfbb0c10",
+    "Test/CompilerDiagnostic.lean": "58ea0a6b4603344c2aa9ff0d32ffdeda5e6402ac95178e934a1cb933b19ada8e",
+    "Test/CompilerValidation.lean": "2d0b77a6962b4ad3c9d398ee154e04e22f96cbdbd10d8e6253d930de78d5113f",
+    "Test/ContractFixtures.lean": "aea2a47a154b0ff33e26c493667057faf6240c4631b3d67a1c91868154f577c1",
+    "Test/FailureBoundary.lean": "6e5a1a7b6127b887b14223c0ab2ddb46b02c1b7f504fadcbf8a4203c2a6845a6",
+    "Test/Frontend.lean": "23a571fc55f6fa1d614e6bda468bc3b7daf6178c2ffe1649a483f6fe3715acc3",
+    "Test/Integration.lean": "ccf09b60d297e56f619b5a35653eb94b57d27a5467cb1d3d2652f9f3f70e8e03",
+    "Test/Main.lean": "3032f01c2d6b2bc70c719b155ae7cc45f5e3141d27c0dc4783b1e5e9be0b86f3",
+    "Test/Mathlib/ScopeControls.lean": "9b7d03abfe546361d952b977655b013efadf9d322cc39d47210224fd842bc4eb",
+    "Test/Proofs.lean": "3ba0d58a2399ab0e671cee54f0540543e1ce56aa2dee4b0fa269ed0ee464db71",
+    "Test/ScopeDiagnostic.lean": "19de460970b337fa5589ff62f83c4326e521340ba1e4e52a89b3e8248c257ff5",
+    "Test/ScopeValidation.lean": "82432de0076ea36fa23b504c38532a09aba8c92f3c46a6159d58652ca088e687",
+    "Test/Snapshot.lean": "b6adfde2bac25c91d9ee3b475e67d044b31a6fce8329852c138bcc6fb8a0c7ba",
+    "Test/Tactic/Prograde.lean": "11a08437a691602d75f34b84296107b8126cc1c2cb39597ae0d52df2b45a4562",
+    "Test/Transaction.lean": "14f9344b0f9ca96b3b7141b6fe0608745ef1adc39d64f115b6ae13bf689204ae",
+    "Test/Validation.lean": "3b6ca0903503bb7d2760ddf9295c95f99f95e32ecb5bd9d28624d34007a1ec46",
+    "doc/compiler_aware_validation.md": "536018aac8e55cc9aa56073e2719f02cf7b327072e9d45096b7661ada741bac5",
+    "doc/failure_diagnostics.md": "6ef437c60286c77a91735ecc7f9c1ab36d941d3d102ef8b5198a46bafa6e1f45",
+    "doc/repository_client_contract.md": "38ab19fe9f397ff83dcfd84abdab32437b85fda1d3ec3e6c7aa5a35850e6d4ee",
+    "doc/scope_aware_ownership.md": "24c11f21b44abc54c44c73b164be91f5dc6856a2cd82bfbab4b39213e5bfffec",
+    "doc/scope_aware_validation.fixtures.json": "94629dd054eb88acd142ef74bd30c6d2f8a9b213a2d7313f730af369cfb0c15b",
+    "doc/scope_aware_validation.md": "5153311b3e6cae839c1911308f7045b9ce277a3749dcf0ad4648a8848a251b16",
+    "doc/scope_aware_validation.schema.json": "1784d046264b9e66adf35f1855935d43535702220496bd2ae687247169b01975",
+    "doc/snapshot_protocol.md": "a7d00918b66dd64984de67a98521ce9b31e5d0560c72661a4221c42c46dbb62b",
+    "doc/transactional_resources.fixtures.json": "394881fd33dd66f07a936fb70b8272806bc37b332f2e9eaa55085b00577386fd",
+    "doc/transactional_resources.md": "6de1f34f6c5281e36b3cd7d33747d5a423241a102d10e540e80f21508c5724ed",
+    "doc/transactional_resources.schema.json": "97e00eb158ca69230a36a13d71f516fa4e1ad79e17dc74fbccf5d6f6df9bce71",
+    "lakefile.lean": "118ef9cf0559e87a61641d0e68abd83468305bc340c8f53e1714b1020d59ff19",
+    "scripts/capture_repository_client_contract.py": "3135d2dd59655f4c5348a7cd13dd5a6fbdb09b6ce24748fbc6c5b9d636ac95b8",
+    "scripts/test_failure_diagnostics.py": "45329ebcfb8eb3b816f01a040c492daae1e2da64678bbeb87b5160231c904770",
+    "scripts/test_scope_aware_validation.py": "b679fe002e8db3e98bc977694ae8ac9c9ff5c12a0fb43c4af18660e27234af3f",
+    "scripts/test_transactional_resources.py": "0f6fb68925fc27e5ddd7c21c6edd1403a1486531b046ccdc5d98e4da57e042eb"
+  },
+  "repl_sha256": "60bc921929d164b8eb2185cb40ea50805262e5da7c59df30a9fe88e84a9eafb8",
+  "toolchain": "leanprover/lean4:v4.10.0-rc1",
+  "previous_companion": {
+    "source_commit": "fc740c26a1e832ecb571859af24a5c632a351bd9",
+    "repl_sha256": "6cba4f74fdf2bc8ba7060603e7bc11feffb7229dd8c288ec7c3c0ba2e9c2ef29"
+  },
+  "build": {
+    "passed": true,
+    "method": "Build repl, test and the native harnesses from a checkout of d809a61; the bundled patch applied to the recorded base reproduces all 48 changed sources (verify_companion_sources)."
+  },
+  "tests": {
+    "native_lean_suite": {
+      "passed": true,
+      "assertions": 418,
+      "new_assertions": 8,
+      "log": "failure_diagnostics_companion.native-tests.log"
+    },
+    "native_failure_harness": {
+      "passed": true,
+      "abort_sessions": 2,
+      "fatal_diagnostics": 2,
+      "mathlib": true
+    },
+    "native_validation_harness": {
+      "passed": true,
+      "core_exchanges": 44,
+      "mathlib_exchanges": 40
+    },
+    "native_resource_harness": {
+      "passed": true,
+      "exchanges": 22,
+      "cumulative_requests": 3000
+    },
+    "client_checkout_final": {
+      "passed": 922,
+      "skipped": 4,
+      "failed": 0,
+      "python": "3.12.15",
+      "command": "pytest -q --run-pantograph-live --run-pantograph-mathlib with explicit native/Mathlib paths and PANTOGRAPH_TEST_COMPANION_SOURCE"
+    },
+    "client_installed_final": {
+      "passed": 924,
+      "skipped": 2,
+      "failed": 0,
+      "python": "3.12.15",
+      "command": "PANTOGRAPH_CLIENT_REQUIRE_INSTALLED=1 pytest -q --run-pantograph-live --run-pantograph-mathlib using the sdist tests against its rebuilt wheel"
+    },
+    "packaging": {
+      "sdist_built": true,
+      "wheel_built_from_sdist": true,
+      "archive_checks_passed": true,
+      "runtime_dependencies": []
+    }
+  },
+  "artifacts_sha256": {
+    "docs/evidence/failure_diagnostics_companion.native-tests.log": "79a5cd95a8135c3e57f90a6d6f4182e5582fab32df772402b415015b31484ea6",
+    "tests/fixtures/failure_diagnostics_validation/capture.json": "5653b1c2ff31679c0337d7513843b0a5b51d0a282ab831a8caf86b10f514654b",
+    "tests/fixtures/failure_diagnostics_validation/client_capture.json": "bd59036de2d7ce142bf6220acbc96cf2c5b41ea87fb111b29c53af6f954cc636",
+    "tests/fixtures/failure_diagnostics_validation/fixtures.json": "94629dd054eb88acd142ef74bd30c6d2f8a9b213a2d7313f730af369cfb0c15b",
+    "tests/fixtures/failure_diagnostics_validation/provenance.json": "b4da7932d9e0ff95500aa266b93aef5cf1895d1d654ec700571afc6422e0a858",
+    "tests/fixtures/failure_diagnostics_validation/schema.json": "1784d046264b9e66adf35f1855935d43535702220496bd2ae687247169b01975",
+    "tests/fixtures/failure_diagnostics_resources/capture.json": "8d9db7dce5bbdf4dcd9047223e95e24d82844745ec02cf61f852a6cc76cde687",
+    "tests/fixtures/failure_diagnostics_resources/fixtures.json": "394881fd33dd66f07a936fb70b8272806bc37b332f2e9eaa55085b00577386fd",
+    "tests/fixtures/failure_diagnostics_resources/provenance.json": "81636b5a2e26140437ab9ea84990207e39b2aaa2e17c76b3df96769442b1c699",
+    "tests/fixtures/failure_diagnostics_resources/schema.json": "97e00eb158ca69230a36a13d71f516fa4e1ad79e17dc74fbccf5d6f6df9bce71",
+    "tests/fixtures/failure_diagnostics_snapshot_companion/capture.json": "6e2746ee2f2f761b38084a158d453e80719b98d31641f5fbe1071d5a3193e36d",
+    "tests/fixtures/failure_diagnostics_snapshot_companion/provenance.json": "f93f7111013e6c052ef99c28ea66eb5ddd9f9b401d32eeec67d46593c64189ba"
+  },
+  "scope": "Standalone client with native core and pinned Mathlib controls against the failure-diagnostics companion. The companion commit is on the author's fork until merged; re-pin if the merged commit differs. No application or deployment change is claimed."
+}
