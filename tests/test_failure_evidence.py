@@ -1,5 +1,6 @@
 """Request events and failure snapshots: bounded, immutable, and lifecycle-safe."""
 
+import asyncio
 import dataclasses
 import json
 
@@ -198,3 +199,83 @@ def test_snapshot_bounds_and_ambiguous_records():
     assert len(json.dumps(snapshot.payload, ensure_ascii=False).encode()) <= 32768
     # The only record names another operation: it is not assigned to this request.
     assert snapshot.association == "ambiguous" and snapshot.repl_failure is None
+
+
+def _fatal_stat(monkeypatch):
+    monkeypatch.setenv("PANTOGRAPH_FAKE_RESOURCE_COMMAND", "stat")
+    monkeypatch.setenv("PANTOGRAPH_FAKE_RESOURCE_MODE", "internal")
+    monkeypatch.setenv("PANTOGRAPH_FAKE_RESOURCE_DELAY", "0.2")
+
+
+def test_a_queued_caller_cannot_take_over_the_failed_requests_snapshot(setup, monkeypatch):
+    env, report = setup
+
+    _fatal_stat(monkeypatch)
+
+    async def body():
+        client = await PantographClient.create(env)
+        async with client.state_scope() as scope:
+            failing = asyncio.create_task(client.stat())
+            await asyncio.sleep(0.05)
+            queued = asyncio.create_task(scope.start_goal("True"))
+            first, second = await asyncio.gather(failing, queued, return_exceptions=True)
+            assert type(first) is PantographRemoteInternalError and second is first
+        await client.aclose()
+        snapshot = client.last_failure
+        assert snapshot.final and snapshot.operation == "stat"
+        assert snapshot.exchange_stage == "decoded" and snapshot.request == "stat {}"
+        assert snapshot.payload["recovery"] == "session-unusable"
+
+    run(body)
+    assert_reaped(report)
+
+
+def test_a_cancelled_waiting_caller_leaves_the_owning_snapshot(setup, monkeypatch):
+    env, report = setup
+
+    _fatal_stat(monkeypatch)
+
+    async def body():
+        client = await PantographClient.create(env)
+        async with client.state_scope() as scope:
+            failing = asyncio.create_task(client.stat())
+            await asyncio.sleep(0.05)
+            waiting = asyncio.create_task(scope.start_goal("True"))
+            await asyncio.sleep(0.02)
+            waiting.cancel()
+            results = await asyncio.gather(failing, waiting, return_exceptions=True)
+            assert type(results[0]) is PantographRemoteInternalError
+        await client.aclose()
+        assert client.last_failure.operation == "stat"
+        assert client.last_failure.exchange_stage == "decoded"
+
+    run(body)
+    assert_reaped(report)
+
+
+def test_a_caller_that_times_out_waiting_owns_its_own_failure(setup, monkeypatch):
+    env, report = setup
+
+    monkeypatch.setenv("PANTOGRAPH_FAKE_RESOURCE_COMMAND", "stat")
+    monkeypatch.setenv("PANTOGRAPH_FAKE_RESOURCE_MODE", "rollback")
+    monkeypatch.setenv("PANTOGRAPH_FAKE_RESOURCE_DELAY", "0.3")
+
+    async def body():
+        async with await PantographClient.create(env) as client:
+            slow = asyncio.create_task(client.stat())
+            await asyncio.sleep(0.05)
+            deadline = asyncio.get_running_loop().time() + 0.05
+            with pytest.raises(Exception) as caught:
+                await client._exchange("stat", {}, deadline=deadline)
+            assert type(caught.value).__name__ == "PantographRequestTimeout"
+            # Nothing was written for the timed-out caller, and no written request failed yet.
+            snapshot = client.last_failure
+            assert snapshot.exchange_stage == "waiting" and snapshot.timeout_source == "request-deadline"
+            with pytest.raises(PantographResourceError):
+                await slow
+            # The written request's own failure then takes ownership.
+            assert client.last_failure.exchange_stage == "decoded"
+            assert client.is_usable
+
+    run(body)
+    assert_reaped(report)

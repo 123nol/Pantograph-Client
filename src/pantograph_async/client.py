@@ -769,8 +769,14 @@ class PantographClient:
             stage=exchange["stage"], error=error, stderr_tail=self.stderr_tail,
             timeout_source=exchange.get("timeout_source"), capture_errors=tuple(self._capture_errors),
         )
+        written = exchange["stage"] in ("written", "decoded")
+        owner = self._last_failure
+        if not written and owner is not None and owner.exchange_stage in ("written", "decoded"):
+            # A caller that never wrote cannot claim a failure a written request owns,
+            # whether it inherited that failure, was cancelled or timed out waiting.
+            return
         self._last_failure = snapshot.finalized(self.stderr_tail) if self._phase is SessionPhase.CLOSED else snapshot
-        if exchange["stage"] in ("written", "decoded"):
+        if written:
             self._notify_after_write(event_for(
                 session_id=self.session_id, pid=self.pid, sequence=exchange["sequence"],
                 operation=command, request=exchange["request"], body=exchange["body"],

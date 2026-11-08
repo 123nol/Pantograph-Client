@@ -172,6 +172,10 @@ def parse_repl_failures(stderr: str) -> tuple[ReplFailureRecord, ...]:
 class FailureSnapshot:
     """Evidence for one failed or interrupted request.
 
+    A request that was written owns the session's snapshot: a caller that was
+    still waiting (and so wrote nothing) never replaces it, even when it
+    receives the same terminal exception.
+
     ``final`` is true once the process has been reaped and stderr drained; a
     REPL record can arrive after the stdout response, so read
     ``PantographClient.last_failure`` after ``aclose()`` for the final version.
