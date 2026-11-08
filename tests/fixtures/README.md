@@ -24,7 +24,11 @@ recovery exchanges. Artifact hashes and the source/binary identity are recorded
 in `docs/evidence/transactional_companion.provenance.json`. Historical captures
 are preserved unchanged.
 
-Current evidence uses these directories:
+Current evidence uses the `failure_diagnostics_*` directories, captured from
+companion `d809a61` in the same way as the `compiler_aware_*` directories below,
+which are now history (`docs/evidence/compiler_aware_companion.provenance.json`).
+
+The `compiler_aware_*` layout:
 
 - `compiler_aware_snapshot_companion/`: snapshot and options exchanges, source pin,
   binary identity, certification and zero-allocation cleanup.

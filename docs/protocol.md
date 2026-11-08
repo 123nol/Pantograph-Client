@@ -206,3 +206,37 @@ validation can fail on start, tactic, inspection or certification. The session
 is retired and all handles are invalidated; no candidate-rejection or resource
 exception is substituted. Kernel certification of the original root remains the
 proof-success boundary.
+
+## Request evidence and failure snapshots
+
+`pantograph_async.evidence` holds plain, immutable records; none of them keeps a
+state, handle, process or future.
+
+- `PantographClient.create(env, observer=...)` takes an optional callable that
+  receives a `RequestEvent` for every serialized request: `prepared` before the
+  write, then `completed` or `failed`. Each event has the session and process,
+  the client's own `sequence`, the operation, the bounded request line, and the
+  selected `state_id`/`goal_index`. If the observer raises on `prepared`, the
+  command is not written and `PantographCaptureError` is raised; the session and
+  its states are unaffected. If it raises later, the request's result stands and
+  the error is kept in `client.capture_errors`.
+- `client.last_failure` is a `FailureSnapshot` for the most recent failed
+  request: the bounded request (16 KiB), how far the exchange got (`waiting`,
+  `prepared`, `written`, `decoded`), the exception type, message, notes and
+  structured payload (bounded), the timeout source, the stderr tail, and the
+  REPL's failure records. Read it after `aclose()` for the final version.
+- The REPL writes one stderr line for an unexpected fatal failure: kind
+  `pantograph-command-failure`, version 1, with its own `repl_command_sequence`,
+  the operation, state, goal, phase, exception category and identifier, and a
+  bounded message. `parse_repl_failures` recognizes only that record. A snapshot
+  is `matched` to a record only if the record names the same operation, state
+  and goal and is the only one; otherwise it is `ambiguous` or `absent`, and
+  `repl_failure` stays empty. The two sequence numbers are never assumed equal.
+
+Stdout decoding, recovery classes and session retirement are unchanged.
+`PantographRemoteInternalError` still ends the session.
+
+Companion `d809a61` also stops treating Lean's elaboration aborts as unexpected
+failures. `exact`, `refine` and `have` with a placeholder Lean cannot
+synthesize now give an ordinary `PantographTacticRejected` with Lean's message
+instead of ending the session.
