@@ -698,7 +698,10 @@ class PantographClient:
                     self._notify_after_write(event_for(
                         session_id=self.session_id, pid=self.pid, sequence=sequence,
                         operation=command, request=request, body=body, stage="completed",
-                        outcome=type(result).__name__, elapsed_s=self._loop.time() - started))
+                        outcome=type(result).__name__, elapsed_s=self._loop.time() - started,
+                        allocated_state_id=(
+                            result.state_id if isinstance(result, GoalStartResult)
+                            else result.next_state_id if isinstance(result, TacticSuccess) else None)))
                     return result
             except TimeoutError as exc:
                 exchange["timeout_source"] = "request-deadline"

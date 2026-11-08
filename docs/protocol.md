@@ -215,8 +215,9 @@ state, handle, process or future.
 - `PantographClient.create(env, observer=...)` takes an optional callable that
   receives a `RequestEvent` for every serialized request: `prepared` before the
   write, then `completed` or `failed`. Each event has the session and process,
-  the client's own `sequence`, the operation, the bounded request line, and the
-  selected `state_id`/`goal_index`. If the observer raises on `prepared`, the
+  the client's own `sequence`, the operation, the bounded request line, the
+  selected `state_id`/`goal_index`, and on `completed` the `allocated_state_id`
+  of a new state, so a replay can map recorded states to fresh ones. If the observer raises on `prepared`, the
   command is not written and `PantographCaptureError` is raised; the session and
   its states are unaffected. If it raises later, the request's result stands and
   the error is kept in `client.capture_errors`.

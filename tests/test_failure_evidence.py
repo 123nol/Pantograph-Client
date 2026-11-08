@@ -57,6 +57,9 @@ def test_every_request_is_reported_before_it_is_written_and_after_it_finishes(se
     tactic = next(e for e in events if e.operation == "goal.tactic" and e.stage == "prepared")
     assert json.loads(tactic.request.split(" ", 1)[1])["tactic"] == "trivial"
     assert (tactic.state_id, tactic.goal_index) == (0, 0)
+    allocated = [e.allocated_state_id for e in events if e.stage == "completed"
+                 and e.operation in ("goal.start", "goal.tactic")]
+    assert allocated == [0, 1]
     json.dumps([e.to_dict() for e in events])
     assert_reaped(report)
 

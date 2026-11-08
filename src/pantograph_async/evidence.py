@@ -90,6 +90,9 @@ class RequestEvent:
     outcome: str | None = None
     error_type: str | None = None
     elapsed_s: float | None = None
+    #: The state the response allocated (``goal.start``, ``goal.tactic``), for
+    #: mapping recorded states to fresh ones in a replay. Never a live handle.
+    allocated_state_id: int | None = None
     version: int = EVIDENCE_VERSION
 
     def to_dict(self) -> dict[str, Any]:
@@ -253,6 +256,7 @@ def event_for(
     *, session_id: str, pid: int | None, sequence: int, operation: str, request: bytes,
     body: dict[str, Any], stage: Stage, outcome: str | None = None,
     error: BaseException | None = None, elapsed_s: float | None = None,
+    allocated_state_id: int | None = None,
 ) -> RequestEvent:
     text, truncated = _bounded_text(request.decode("utf-8", errors="replace").rstrip("\n"), REQUEST_BYTES)
     state_id, goal_index = describe_request(body)
@@ -260,5 +264,5 @@ def event_for(
         session_id=session_id, pid=pid, sequence=sequence, operation=operation, stage=stage,
         request=text, request_truncated=truncated, state_id=state_id, goal_index=goal_index,
         outcome=outcome, error_type=type(error).__name__ if error is not None else None,
-        elapsed_s=elapsed_s,
+        elapsed_s=elapsed_s, allocated_state_id=allocated_state_id,
     )
