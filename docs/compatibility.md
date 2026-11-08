@@ -14,10 +14,10 @@ that agreement before returning build pins.
 | Protocol version | 3 |
 | Transition validation | 3, `execution-closure-and-representation-aware-audit` |
 | Resource and command-transaction versions | 1 |
-| Companion commit | `d809a610a4cf24560ea836e8bcb879338e4f4797` |
+| Companion commit | `661df4e32bb487f52e4bf229a34b155f9e69c76b` |
 | Patch base | `0dd5d2225e2d093f66a4b6231c1aa35004f2c8f3` |
-| Patch SHA-256 | `a5ed39613b49288a6895652069a16190d618210ef19d55daeac2dd4d34681ee2` |
-| Reference executable SHA-256 | `60bc921929d164b8eb2185cb40ea50805262e5da7c59df30a9fe88e84a9eafb8` |
+| Patch SHA-256 | `f53b57ee215b35fad7cae684e77eb5c771a246faaecba6eccfe77d96dce73f39` |
+| Reference executable SHA-256 | `670c9b058bc2cdb7e85fb81befdf1ee81e6a19ad7744a2d2594cea1262935745` |
 | Lean | `leanprover/lean4:v4.10.0-rc1` |
 | Native Mathlib source | `29dcec074de168ac2bf835a77ef68bbe069194c5` |
 | Platform | Linux, Python 3.11+, GNU coreutils `stdbuf` |
@@ -32,7 +32,7 @@ validation decoder or disabled-check option is provided.
 ```bash
 git clone https://github.com/123nol/Pantograph.git
 cd Pantograph
-git checkout --detach d809a610a4cf24560ea836e8bcb879338e4f4797
+git checkout --detach 661df4e32bb487f52e4bf229a34b155f9e69c76b
 python -c "from pantograph_async import compatibility as c; c.verify_companion_sources('.')"
 lake build repl test scope_diagnostic compiler_diagnostic
 lake test

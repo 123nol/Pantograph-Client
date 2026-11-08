@@ -1441,10 +1441,10 @@ index 781f4bf..7b1f0b7 100644
    printContext: Bool := true
 diff --git a/Pantograph/Resources.lean b/Pantograph/Resources.lean
 new file mode 100644
-index 0000000..c8ef3bd
+index 0000000..7c373ed
 --- /dev/null
 +++ b/Pantograph/Resources.lean
-@@ -0,0 +1,58 @@
+@@ -0,0 +1,73 @@
 +import Lean
 +
 +namespace Pantograph
@@ -1479,18 +1479,33 @@ index 0000000..c8ef3bd
 +  if errors.isEmpty then return "Lean aborted elaboration after reporting an error"
 +  return "\n".intercalate (← errors.mapM (·.data.toString))
 +
-+/-- The innermost phase an exception last left, cleared whenever a phase starts.
-+    Read at the transaction boundary after unwinding; `none` means no phase saw it. -/
-+builtin_initialize failedCommandPhase : IO.Ref (Option String) ← IO.mkRef none
++/-- The innermost phase the propagating exception left, with that exception.
++    An outer phase keeps the record only for the same exception object, so a
++    handled exception cannot lend its phase to a later, different one. -/
++builtin_initialize failedCommandPhase : IO.Ref (Option (String × Exception)) ← IO.mkRef none
++
++private unsafe def sameExceptionImpl (a b : Exception) : Bool := ptrAddrUnsafe a == ptrAddrUnsafe b
++
++/-- Object identity: the record holds its exception, so the address cannot be reused. -/
++@[implemented_by sameExceptionImpl]
++private opaque sameException (a b : Exception) : Bool
++
++/-- The phase `ex` was recorded in, or `unknown` if no phase saw this exception. -/
++def failurePhase (ex : Exception) : IO String := do
++  match ← failedCommandPhase.get with
++  | some (phase, recorded) => return if sameException recorded ex then phase else "unknown"
++  | none => return "unknown"
 +
 +private def phaseCore (phase : String) (action : CoreM α) : CoreM α := do
-+  failedCommandPhase.set none
 +  tryCatchRuntimeEx (do
 +    Core.checkMaxHeartbeats "pantograph"
 +    let result ← action
 +    Core.checkMaxHeartbeats "pantograph"
 +    return result) fun ex => do
-+      if (← failedCommandPhase.get).isNone then failedCommandPhase.set (some phase)
++      let innermost := match ← failedCommandPhase.get with
++        | some (_, recorded) => !sameException recorded ex
++        | none => true
++      if innermost then failedCommandPhase.set (some (phase, ex))
 +      let ctx ← read
 +      let used := (← IO.getNumHeartbeats) - ctx.initHeartbeats
 +      if ex.isMaxHeartbeat && ctx.maxHeartbeats > 0 && used > ctx.maxHeartbeats then
@@ -2077,7 +2092,7 @@ index 0000000..dfe181f
 +
 +end Pantograph
 diff --git a/Repl.lean b/Repl.lean
-index f031e47..461f086 100644
+index f031e47..c1f326b 100644
 --- a/Repl.lean
 +++ b/Repl.lean
 @@ -1,5 +1,8 @@
@@ -2428,7 +2443,7 @@ index f031e47..461f086 100644
 +      | .error .. => pure (if ex.isRuntime then "runtime" else "error", none)
 +    let nat (key : String) := command.payload.getObjValAs? Nat key |>.toOption
 +    let evidence : FailureEvidence := {
-+      sequence, operation := command.cmd, phase := (← failedCommandPhase.get).getD "unknown",
++      sequence, operation := command.cmd, phase := ← failurePhase ex,
 +      stateId := (nat "stateId").orElse fun _ => nat "target", goalIndex := nat "goalId",
 +      category, internalId, detail := ← renderException ex }
 +    let stderr ← IO.getStderr
@@ -2812,10 +2827,10 @@ index 0000000..75334a9
 +end Pantograph.Test.CompilerValidation
 diff --git a/Test/ContractFixtures.lean b/Test/ContractFixtures.lean
 new file mode 100644
-index 0000000..5590585
+index 0000000..e0c62e4
 --- /dev/null
 +++ b/Test/ContractFixtures.lean
-@@ -0,0 +1,149 @@
+@@ -0,0 +1,162 @@
 +import Pantograph
 +
 +open Lean Elab Tactic
@@ -2931,6 +2946,19 @@ index 0000000..5590585
 +
 +/-- Exercise a fatal exception at the executable transaction boundary. -/
 +elab "contract_internal_failure" : tactic => do
++  throw <| Exception.internal Pantograph.commandResourceExceptionId
++
++/-- An internal failure inside an inner observation phase, propagating unchanged. -/
++elab "contract_inner_phase_failure" : tactic => do
++  Pantograph.withCommandPhase "observe" do
++    throw <| Exception.internal Pantograph.commandResourceExceptionId
++
++/-- A handled inner failure followed by a different fatal failure during execution. -/
++elab "contract_handled_then_internal" : tactic => do
++  try
++    Pantograph.withCommandPhase "observe" do
++      throwError "handled observation failure"
++  catch _ => pure ()
 +  throw <| Exception.internal Pantograph.commandResourceExceptionId
 +
 +/-- An error whose message cannot be rendered: the tactic's own error handler fails. -/
@@ -4254,10 +4282,10 @@ index 0000000..2ea955a
 +  table and the sentinel inventory above.
 diff --git a/doc/failure_diagnostics.md b/doc/failure_diagnostics.md
 new file mode 100644
-index 0000000..867667f
+index 0000000..8227156
 --- /dev/null
 +++ b/doc/failure_diagnostics.md
-@@ -0,0 +1,78 @@
+@@ -0,0 +1,79 @@
 +# Elaboration aborts and fatal failure diagnostics
 +
 +## Elaboration aborts are ordinary failures
@@ -4318,10 +4346,11 @@ index 0000000..867667f
 +responses and write no record. The record carries no expressions, environment
 +data or tactic text; the client's request record carries the command.
 +
-+The phase is the innermost phase the exception passed through since the last
-+phase started. If an earlier failure inside a phase was caught and the later
-+unexpected failure happens outside any phase, the phase can name the earlier
-+one; treat it as evidence, not proof.
++The phase belongs to the exception that reaches the boundary. Each phase
++records the exception leaving it unless an inner phase already recorded that
++same exception object, so an exception keeps its innermost phase. An exception
++that was caught does not lend its phase to a later, different failure: that
++failure gets the phase it actually left, or `unknown` if it left none.
 +
 +`pantograph.traceCommands` remains a Lean launch option for full command
 +traces. The failure record needs no option.
@@ -5386,10 +5415,10 @@ index 0000000..925b77b
 +    main()
 diff --git a/scripts/test_failure_diagnostics.py b/scripts/test_failure_diagnostics.py
 new file mode 100644
-index 0000000..483c481
+index 0000000..8905da5
 --- /dev/null
 +++ b/scripts/test_failure_diagnostics.py
-@@ -0,0 +1,125 @@
+@@ -0,0 +1,129 @@
 +#!/usr/bin/env python3
 +"""Native controls for elaboration aborts and the fatal stderr failure diagnostic.
 +
@@ -5498,7 +5527,11 @@ index 0000000..483c481
 +    result = dict(
 +        aborts=[abort_control(["Init"], env)],
 +        fatal=[fatal_control("contract_internal_failure", "execute", "internal", env),
-+               fatal_control("contract_unrenderable_error", "observe", "error", env)],
++               fatal_control("contract_unrenderable_error", "observe", "error", env),
++               # The same exception keeps its innermost phase.
++               fatal_control("contract_inner_phase_failure", "observe", "internal", env),
++               # A handled inner failure does not lend its phase to a later one.
++               fatal_control("contract_handled_then_internal", "execute", "internal", env)],
 +        ordinary=ordinary_control(env),
 +    )
 +    if args.mathlib:

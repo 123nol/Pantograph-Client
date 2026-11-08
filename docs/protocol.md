@@ -237,7 +237,7 @@ state, handle, process or future.
 Stdout decoding, recovery classes and session retirement are unchanged.
 `PantographRemoteInternalError` still ends the session.
 
-Companion `d809a61` also stops treating Lean's elaboration aborts as unexpected
+Companion `661df4e` also stops treating Lean's elaboration aborts as unexpected
 failures. `exact`, `refine` and `have` with a placeholder Lean cannot
 synthesize now give an ordinary `PantographTacticRejected` with Lean's message
 instead of ending the session.

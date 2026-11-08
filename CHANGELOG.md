@@ -8,7 +8,7 @@
   after `aclose()`). An observer failure before the write sends nothing.
 - Recognize the REPL's version-1 `pantograph-command-failure` stderr records and
   associate one with the failed request only when it is unambiguous.
-- Pin companion `d809a61`: elaboration aborts (`exact`/`refine`/`have` with a
+- Pin companion `661df4e`: elaboration aborts (`exact`/`refine`/`have` with a
   placeholder Lean cannot synthesize) are ordinary tactic rejections, and
   unexpected failures write the stderr record. Add current
   `failure_diagnostics_*` captures; earlier captures stay historical.

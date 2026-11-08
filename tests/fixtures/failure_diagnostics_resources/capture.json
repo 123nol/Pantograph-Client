@@ -1,8 +1,8 @@
 {
   "protocol_version": 3,
-  "source_base": "d809a610a4cf24560ea836e8bcb879338e4f4797",
+  "source_base": "661df4e32bb487f52e4bf229a34b155f9e69c76b",
   "source_dirty": false,
-  "binary_sha256": "60bc921929d164b8eb2185cb40ea50805262e5da7c59df30a9fe88e84a9eafb8",
+  "binary_sha256": "670c9b058bc2cdb7e85fb81befdf1ee81e6a19ad7744a2d2594cea1262935745",
   "toolchain": "leanprover/lean4:v4.10.0-rc1",
   "imports": [
     "Init",

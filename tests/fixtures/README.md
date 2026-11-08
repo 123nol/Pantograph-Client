@@ -25,7 +25,7 @@ in `docs/evidence/transactional_companion.provenance.json`. Historical captures
 are preserved unchanged.
 
 Current evidence uses the `failure_diagnostics_*` directories, captured from
-companion `d809a61` in the same way as the `compiler_aware_*` directories below,
+companion `661df4e` in the same way as the `compiler_aware_*` directories below,
 which are now history (`docs/evidence/compiler_aware_companion.provenance.json`).
 
 The `compiler_aware_*` layout:

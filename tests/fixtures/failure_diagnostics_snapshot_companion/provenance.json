@@ -1,8 +1,8 @@
 {
   "kind": "snapshot-companion-capture-provenance",
-  "companion_commit": "d809a610a4cf24560ea836e8bcb879338e4f4797",
-  "checkout_commit": "d809a610a4cf24560ea836e8bcb879338e4f4797",
-  "repl_sha256": "60bc921929d164b8eb2185cb40ea50805262e5da7c59df30a9fe88e84a9eafb8",
+  "companion_commit": "661df4e32bb487f52e4bf229a34b155f9e69c76b",
+  "checkout_commit": "661df4e32bb487f52e4bf229a34b155f9e69c76b",
+  "repl_sha256": "670c9b058bc2cdb7e85fb81befdf1ee81e6a19ad7744a2d2594cea1262935745",
   "toolchain": "leanprover/lean4:v4.10.0-rc1",
   "capture_sha256": "6e2746ee2f2f761b38084a158d453e80719b98d31641f5fbe1071d5a3193e36d"
 }
