@@ -456,7 +456,7 @@ index 0000000..eec1aeb
 +
 +end Pantograph
 diff --git a/Pantograph/Environment.lean b/Pantograph/Environment.lean
-index 37faf72..7dbdd83 100644
+index 37faf72..81b2956 100644
 --- a/Pantograph/Environment.lean
 +++ b/Pantograph/Environment.lean
 @@ -139,7 +139,9 @@ def addDecl (args: Protocol.EnvAdd): CoreM (Protocol.CR Protocol.EnvAddResult) :
@@ -466,7 +466,7 @@ index 37faf72..7dbdd83 100644
 -        catch ex => return .error (← ex.toMessageData.toString)
 +        catch ex =>
 +          rethrowInfrastructure ex
-+          return .error (← withCommandPhase "observe" ex.toMessageData.toString)
++          return .error (← withCommandPhase "observe" (failureText ex))
        | .error e => return .error e
      pure $ .ok (type, value)
    let (type, value) ← match ← tvM.run' (ctx := {}) |>.run' with
@@ -517,7 +517,7 @@ index b82658d..5348769 100644
  
  @[export pantograph_frontend_find_source_path_m]
 diff --git a/Pantograph/Frontend/Elab.lean b/Pantograph/Frontend/Elab.lean
-index d4df66d..e3486da 100644
+index d4df66d..0cfe2aa 100644
 --- a/Pantograph/Frontend/Elab.lean
 +++ b/Pantograph/Frontend/Elab.lean
 @@ -88,6 +88,19 @@ structure TacticInvocation where
@@ -645,12 +645,12 @@ index d4df66d..e3486da 100644
      catch e =>
 -      let captureError := toString e
 +      rethrowInfrastructure e
-+      let captureError ← withCommandPhase "observe" e.toMessageData.toString
++      let captureError ← withCommandPhase "observe" (failureText e)
        return {
          goalBefore,
          goalAfter,
 diff --git a/Pantograph/Goal.lean b/Pantograph/Goal.lean
-index ad8f3bd..7e89f40 100644
+index ad8f3bd..12db686 100644
 --- a/Pantograph/Goal.lean
 +++ b/Pantograph/Goal.lean
 @@ -3,6 +3,7 @@ Functions for handling metavariables
@@ -788,7 +788,7 @@ index ad8f3bd..7e89f40 100644
      calcPrevRhs? := .none,
    }
  
-@@ -196,38 +240,75 @@ inductive TacticResult where
+@@ -196,38 +240,82 @@ inductive TacticResult where
    -- Goes to next state
    | success (state: GoalState)
    -- Tactic failed with messages
@@ -825,6 +825,13 @@ index ad8f3bd..7e89f40 100644
 +      | other => pure other
 +    catch exception => do
 +      rethrowInfrastructure exception
++      if isElaborationAbort exception then
++        -- The tactic logged its error before aborting; report that, not the abort.
++        let messages ← renderMessages (← getThe Core.State).messages
++        let errors := messages.filter (·.severity == "error") |>.map (·.data)
++        let text := "Lean aborted the tactic after reporting an error"
++        return TacticResult.failure (if errors.isEmpty then #[text] else errors)
++          (if messages.isEmpty then #[Protocol.Message.error text] else messages)
 +      let text ← withCommandPhase "observe" exception.toMessageData.toString
 +      Elab.logException exception
 +      let messages ← renderMessages (← getThe Core.State).messages
@@ -882,7 +889,7 @@ index ad8f3bd..7e89f40 100644
    let expr ← match Parser.runParserCategory
      (env := ← MonadEnv.getEnv)
      (catName := `term)
-@@ -235,13 +316,12 @@ protected def GoalState.tryAssign (state: GoalState) (goal: MVarId) (expr: Strin
+@@ -235,13 +323,12 @@ protected def GoalState.tryAssign (state: GoalState) (goal: MVarId) (expr: Strin
      (fileName := filename) with
      | .ok syn => pure syn
      | .error error => return .parseError error
@@ -898,7 +905,7 @@ index ad8f3bd..7e89f40 100644
    let type ← match Parser.runParserCategory
      (env := ← MonadEnv.getEnv)
      (catName := `term)
-@@ -249,16 +329,16 @@ protected def GoalState.tryLet (state: GoalState) (goal: MVarId) (binderName: St
+@@ -249,16 +336,16 @@ protected def GoalState.tryLet (state: GoalState) (goal: MVarId) (binderName: St
      (fileName := filename) with
      | .ok syn => pure syn
      | .error error => return .parseError error
@@ -918,7 +925,7 @@ index ad8f3bd..7e89f40 100644
  
      -- See Lean.Elab.Tactic.Conv.convTarget
      let convMVar ← Elab.Tactic.withMainContext do
-@@ -266,30 +346,30 @@ protected def GoalState.conv (state: GoalState) (goal: MVarId):
+@@ -266,30 +353,30 @@ protected def GoalState.conv (state: GoalState) (goal: MVarId):
        Elab.Tactic.replaceMainGoal [newGoal.mvarId!]
        pure rhs.mvarId!
      return (← MonadBacktrack.saveState, convMVar)
@@ -964,7 +971,7 @@ index ad8f3bd..7e89f40 100644
  
      -- Close all existing goals with `refl`
      for mvarId in (← Elab.Tactic.getGoals) do
-@@ -306,17 +386,18 @@ protected def GoalState.convExit (state: GoalState):
+@@ -306,17 +393,18 @@ protected def GoalState.convExit (state: GoalState):
        let proof ← instantiateMVars (.mvar convGoal)
        Elab.Tactic.liftMetaTactic1 fun mvarId => mvarId.replaceTargetEq targetNew proof
      MonadBacktrack.saveState
@@ -994,7 +1001,7 @@ index ad8f3bd..7e89f40 100644
  
  protected def GoalState.calcPrevRhsOf? (state: GoalState) (goal: MVarId): Option Expr := do
    let (mvarId, rhs) ← state.calcPrevRhs?
-@@ -326,8 +407,7 @@ protected def GoalState.calcPrevRhsOf? (state: GoalState) (goal: MVarId): Option
+@@ -326,8 +414,7 @@ protected def GoalState.calcPrevRhsOf? (state: GoalState) (goal: MVarId): Option
      .none
  @[export pantograph_goal_state_try_calc_m]
  protected def GoalState.tryCalc (state: GoalState) (goal: MVarId) (pred: String):
@@ -1004,7 +1011,7 @@ index ad8f3bd..7e89f40 100644
    if state.convMVar?.isSome then
      return .invalidAction "Cannot initiate `calc` while in `conv` state"
    let `(term|$pred) ← match Parser.runParserCategory
-@@ -342,58 +422,59 @@ protected def GoalState.tryCalc (state: GoalState) (goal: MVarId) (pred: String)
+@@ -342,58 +429,59 @@ protected def GoalState.tryCalc (state: GoalState) (goal: MVarId) (pred: String)
    let decl ← goal.getDecl
    let target ← instantiateMVars decl.type
    let tag := decl.userName
@@ -1116,7 +1123,7 @@ index ad8f3bd..7e89f40 100644
  
  end Pantograph
 diff --git a/Pantograph/Library.lean b/Pantograph/Library.lean
-index 23a2046..7d8b849 100644
+index 23a2046..e00381b 100644
 --- a/Pantograph/Library.lean
 +++ b/Pantograph/Library.lean
 @@ -3,6 +3,7 @@ import Pantograph.Environment
@@ -1144,7 +1151,7 @@ index 23a2046..7d8b849 100644
 -      return .error $ errorI "typing" (← exception.toMessageData.toString)
 +    catch exception => do
 +      rethrowInfrastructure exception
-+      return .error $ errorI "typing" (← withCommandPhase "observe" exception.toMessageData.toString)
++      return .error $ errorI "typing" (← withCommandPhase "observe" (failureText exception))
  
  @[export pantograph_goal_start_expr_m]
  def goalStartExpr (expr: String) (levels: Array String): CoreM (Protocol.CR GoalState) :=
@@ -1175,7 +1182,7 @@ index 23a2046..7d8b849 100644
 +        rootLevels := levels.toList.map (·.toName) }
 +    catch exception => do
 +      rethrowInfrastructure exception
-+      return .error (errorI "elab" (← withCommandPhase "observe" exception.toMessageData.toString))
++      return .error (errorI "elab" (← withCommandPhase "observe" (failureText exception)))
 +    finally
 +      outer.restore (restoreInfo := true)
 +      modifyThe Meta.State fun _ => outer.meta.meta
@@ -1434,10 +1441,10 @@ index 781f4bf..7b1f0b7 100644
    printContext: Bool := true
 diff --git a/Pantograph/Resources.lean b/Pantograph/Resources.lean
 new file mode 100644
-index 0000000..4ff3b1c
+index 0000000..c8ef3bd
 --- /dev/null
 +++ b/Pantograph/Resources.lean
-@@ -0,0 +1,38 @@
+@@ -0,0 +1,58 @@
 +import Lean
 +
 +namespace Pantograph
@@ -1452,18 +1459,38 @@ index 0000000..4ff3b1c
 +builtin_initialize commandResourceExceptionId : InternalExceptionId ←
 +  registerInternalExceptionId `pantographCommandResource
 +
-+/-- Keep resource and unexpected internal exceptions out of ordinary user diagnostics. -/
++/-- Lean's elaborator logs an error and then aborts the term, tactic or command.
++    The abort carries no message of its own; it is an ordinary elaboration failure. -/
++def isElaborationAbort : Exception → Bool
++  | .internal id _ => Elab.isAbortExceptionId id
++  | _ => false
++
++/-- Keep resource and unexpected internal exceptions out of ordinary user diagnostics.
++    Elaboration aborts are ordinary failures whose error is already in the message log. -/
 +def rethrowInfrastructure [Monad m] [MonadExceptOf Exception m] (ex : Exception) : m Unit := do
 +  match ex with
-+  | .internal .. => throw ex
++  | .internal .. => unless isElaborationAbort ex do throw ex
 +  | _ => if ex.isRuntime then throw ex
 +
++/-- Text of an ordinary elaboration failure. An abort's text is the error it logged. -/
++def failureText (ex : Exception) : CoreM String := do
++  unless isElaborationAbort ex do return ← ex.toMessageData.toString
++  let errors := (← getThe Core.State).messages.toList.filter (·.severity == .error)
++  if errors.isEmpty then return "Lean aborted elaboration after reporting an error"
++  return "\n".intercalate (← errors.mapM (·.data.toString))
++
++/-- The innermost phase an exception last left, cleared whenever a phase starts.
++    Read at the transaction boundary after unwinding; `none` means no phase saw it. -/
++builtin_initialize failedCommandPhase : IO.Ref (Option String) ← IO.mkRef none
++
 +private def phaseCore (phase : String) (action : CoreM α) : CoreM α := do
++  failedCommandPhase.set none
 +  tryCatchRuntimeEx (do
 +    Core.checkMaxHeartbeats "pantograph"
 +    let result ← action
 +    Core.checkMaxHeartbeats "pantograph"
 +    return result) fun ex => do
++      if (← failedCommandPhase.get).isNone then failedCommandPhase.set (some phase)
 +      let ctx ← read
 +      let used := (← IO.getNumHeartbeats) - ctx.initHeartbeats
 +      if ex.isMaxHeartbeat && ctx.maxHeartbeats > 0 && used > ctx.maxHeartbeats then
@@ -1477,7 +1504,7 @@ index 0000000..4ff3b1c
 +
 +end Pantograph
 diff --git a/Pantograph/Serial.lean b/Pantograph/Serial.lean
-index 00766ca..4254943 100644
+index 00766ca..292bd4a 100644
 --- a/Pantograph/Serial.lean
 +++ b/Pantograph/Serial.lean
 @@ -38,12 +38,16 @@ def elabType (syn: Syntax): Elab.TermElabM (Except String Expr) := do
@@ -1487,7 +1514,7 @@ index 00766ca..4254943 100644
 -  catch ex => return .error (← ex.toMessageData.toString)
 +  catch ex =>
 +    rethrowInfrastructure ex
-+    return .error (← withCommandPhase "observe" ex.toMessageData.toString)
++    return .error (← withCommandPhase "observe" (failureText ex))
  def elabTerm (syn: Syntax) (expectedType? : Option Expr := .none): Elab.TermElabM (Except String Expr) := do
    try
      let expr ← Elab.Term.elabTerm (stx := syn) expectedType?
@@ -1495,7 +1522,7 @@ index 00766ca..4254943 100644
 -  catch ex => return .error (← ex.toMessageData.toString)
 +  catch ex =>
 +    rethrowInfrastructure ex
-+    return .error (← withCommandPhase "observe" ex.toMessageData.toString)
++    return .error (← withCommandPhase "observe" (failureText ex))
  
  
  --- Output Functions ---
@@ -2050,7 +2077,7 @@ index 0000000..dfe181f
 +
 +end Pantograph
 diff --git a/Repl.lean b/Repl.lean
-index f031e47..b3447c8 100644
+index f031e47..461f086 100644
 --- a/Repl.lean
 +++ b/Repl.lean
 @@ -1,5 +1,8 @@
@@ -2062,15 +2089,17 @@ index f031e47..b3447c8 100644
  
  namespace Pantograph.Repl
  
-@@ -8,6 +11,7 @@ structure Context where
+@@ -8,6 +11,9 @@ structure Context where
  
  /-- Stores state of the REPL -/
  structure State where
 +  usable : Bool := true
++  /-- Commands this process has dispatched; numbers its failure diagnostics. -/
++  commandSequence : Nat := 0
    options: Protocol.Options := {}
    nextId: Nat := 0
    goalStates: Lean.HashMap Nat GoalState := Lean.HashMap.empty
-@@ -24,15 +28,16 @@ def runMetaInMainM { α } (metaM: Lean.MetaM α): MainM α :=
+@@ -24,15 +30,16 @@ def runMetaInMainM { α } (metaM: Lean.MetaM α): MainM α :=
  def runTermElabInMainM { α } (termElabM: Lean.Elab.TermElabM α) : MainM α :=
    termElabM.run' (ctx := Condensed.elabContext) |>.run'
  
@@ -2090,7 +2119,7 @@ index f031e47..b3447c8 100644
    | "reset"         => run reset
    | "stat"          => run stat
    | "expr.echo"     => run expr_echo
-@@ -45,6 +50,8 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+@@ -45,6 +52,8 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
    | "goal.tactic"   => run goal_tactic
    | "goal.continue" => run goal_continue
    | "goal.delete"   => run goal_delete
@@ -2099,7 +2128,7 @@ index f031e47..b3447c8 100644
    | "goal.print"    => run goal_print
    | "frontend.process"  => run frontend_process
    | cmd =>
-@@ -55,6 +62,7 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+@@ -55,6 +64,7 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
    errorCommand := errorI "command"
    errorIndex := errorI "index"
    newGoalState (goalState: GoalState) : MainM Nat := do
@@ -2107,7 +2136,7 @@ index f031e47..b3447c8 100644
      let state ← get
      let stateId := state.nextId
      set { state with
-@@ -62,6 +70,8 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+@@ -62,6 +72,8 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
        nextId := state.nextId + 1
      }
      return stateId
@@ -2116,7 +2145,7 @@ index f031e47..b3447c8 100644
    -- Command Functions
    reset (_: Protocol.Reset): MainM (CR Protocol.StatResult) := do
      let state ← get
-@@ -73,11 +83,11 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+@@ -73,11 +85,11 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
      let nGoals := state.goalStates.size
      return .ok { nGoals }
    env_catalog (args: Protocol.EnvCatalog): MainM (CR Protocol.EnvCatalogResult) := do
@@ -2130,7 +2159,7 @@ index f031e47..b3447c8 100644
    env_add (args: Protocol.EnvAdd): MainM (CR Protocol.EnvAddResult) := do
      Environment.addDecl args
    expr_echo (args: Protocol.ExprEcho): MainM (CR Protocol.ExprEchoResult) := do
-@@ -89,7 +99,6 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+@@ -89,7 +101,6 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
      set { state with
        options := {
          -- FIXME: This should be replaced with something more elegant
@@ -2138,7 +2167,7 @@ index f031e47..b3447c8 100644
          printExprPretty := args.printExprPretty?.getD options.printExprPretty,
          printExprAST := args.printExprAST?.getD options.printExprAST,
          printExprModelAST := args.printExprModelAST?.getD options.printExprModelAST,
-@@ -110,7 +119,7 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+@@ -110,7 +121,7 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
        | .none, .some copyFrom =>
          (match env.find? <| copyFrom.toName with
          | .none => return .error <| errorIndex s!"Symbol not found: {copyFrom}"
@@ -2147,7 +2176,7 @@ index f031e47..b3447c8 100644
        | _, _ =>
          return .error <| errorI "arguments" "Exactly one of {expr, copyFrom} must be supplied")
      match expr? with
-@@ -147,6 +156,7 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+@@ -147,6 +158,7 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
            return if autoMode then .success resumedState else result
          match ← resumedState.convExit with
          | .success exitedState =>
@@ -2155,7 +2184,7 @@ index f031e47..b3447c8 100644
            if autoMode then
              let dormantGoals := goalState.convMVar?.map (fun (_, _, goals) => goals) |>.getD []
              match exitedState.resume (exitedState.goals ++ dormantGoals) with
-@@ -182,6 +192,7 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+@@ -182,6 +194,7 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
      match nextGoalState? with
      | .error error => return .error error
      | .ok (.success nextGoalState) => do
@@ -2163,7 +2192,7 @@ index f031e47..b3447c8 100644
        let nextGoalState ← match autoMode, isConvExit with
          | true, false => do
            if goalState.convMVar?.isNone && nextGoalState.convMVar?.isNone then
-@@ -194,24 +205,19 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+@@ -194,24 +207,19 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
            let .ok result := nextGoalState.resume (nextGoalState.goals ++ dormantGoals) | throwError "Resuming known goals"
            pure result
          | false, _ => pure nextGoalState
@@ -2197,7 +2226,7 @@ index f031e47..b3447c8 100644
        }
      | .ok (.parseError message) =>
        return .ok {
-@@ -220,10 +226,10 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+@@ -220,10 +228,10 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
        }
      | .ok (.invalidAction message) =>
        return .error $ errorI "invalid" message
@@ -2210,7 +2239,7 @@ index f031e47..b3447c8 100644
        }
    goal_continue (args: Protocol.GoalContinue): MainM (CR Protocol.GoalContinueResult) := do
      let state ← get
-@@ -239,12 +245,8 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+@@ -239,12 +247,8 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
      match nextState? with
      | .error error => return .error <| errorI "structure" error
      | .ok nextGoalState =>
@@ -2225,7 +2254,7 @@ index f031e47..b3447c8 100644
        return .ok {
          nextStateId,
          goals,
-@@ -254,63 +256,156 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+@@ -254,63 +258,231 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
      let goalStates := args.stateIds.foldl (λ map id => map.erase id) state.goalStates
      set { state with goalStates }
      return .ok {}
@@ -2336,9 +2365,82 @@ index f031e47..b3447c8 100644
 +  bytes : String
 +  fatal : Bool := false
 +
++/-- Byte bounds of the fatal stderr diagnostic. -/
++def diagnosticDetailBytes : Nat := 2048
++def diagnosticLineBytes : Nat := 4096
++
++private def takeBytesAux (limit : Nat) : List Char → Nat → List Char
++  | [], _ => []
++  | c :: cs, used =>
++    let size := (String.singleton c).utf8ByteSize
++    if used + size > limit then [] else c :: takeBytesAux limit cs (used + size)
++
++/-- The longest prefix of `text` that fits in `limit` UTF-8 bytes. -/
++def takeBytes (text : String) (limit : Nat) : String :=
++  String.mk (takeBytesAux limit text.toList 0)
++
++/-- Render an exception's message. Rendering can itself fail; that is reported, not raised.
++    Lean's pretty-printer applies its own default heartbeat limit inside the message. -/
++private def renderException (ex : Lean.Exception) : IO (Option String) := do
++  try
++    return some (← ex.toMessageData.toString)
++  catch _ => return none
++
++/-- What the transaction boundary knows about an unexpected fatal failure. -/
++structure FailureEvidence where
++  sequence : Nat
++  operation : String
++  stateId : Option Nat := none
++  goalIndex : Option Nat := none
++  phase : String := "unknown"
++  category : String
++  internalId : Option String := none
++  /-- The rendered exception message, or `none` when rendering failed. -/
++  detail : Option String := none
++
++/-- The version-1 diagnostic line: kind `pantograph-command-failure`, at most
++    `diagnosticLineBytes` bytes including JSON escaping. The detail is cut first. -/
++def FailureEvidence.line (e : FailureEvidence) : String := Id.run do
++  let full := e.detail.getD ""
++  let record (detail? : Option String) : Lean.Json := Lean.Json.mkObj [
++    ("kind", "pantograph-command-failure"), ("version", (1 : Nat)),
++    ("repl_command_sequence", e.sequence), ("operation", takeBytes e.operation 64),
++    ("state_id", Lean.toJson e.stateId), ("goal_index", Lean.toJson e.goalIndex),
++    ("phase", takeBytes e.phase 32), ("exception_category", e.category),
++    ("internal_exception_id", Lean.toJson (e.internalId.map (takeBytes · 256))),
++    ("detail", Lean.toJson detail?),
++    ("detail_truncated", Lean.toJson (e.detail.isSome && (detail?.getD "").utf8ByteSize < full.utf8ByteSize)),
++    ("render_status", if e.detail.isSome then "rendered" else "failed")]
++  let mut limit := diagnosticDetailBytes
++  let mut line := (record (e.detail.map fun _ => takeBytes full limit)).compress
++  while line.utf8ByteSize > diagnosticLineBytes && limit > 0 do
++    limit := limit / 2
++    line := (record (if limit == 0 then none else e.detail.map fun _ => takeBytes full limit)).compress
++  return line
++
++/-- One bounded JSON line on stderr for an unexpected fatal command failure.
++    Stdout, recovery and session fatality are unchanged; a failed write is ignored. -/
++private def writeFailureDiagnostic (command : Protocol.Command) (sequence : Nat)
++    (ex : Lean.Exception) : IO Unit := do
++  try
++    let (category, internalId) ← match ex with
++      | .internal id _ => pure ("internal", some (← id.getName).toString)
++      | .error .. => pure (if ex.isRuntime then "runtime" else "error", none)
++    let nat (key : String) := command.payload.getObjValAs? Nat key |>.toOption
++    let evidence : FailureEvidence := {
++      sequence, operation := command.cmd, phase := (← failedCommandPhase.get).getD "unknown",
++      stateId := (nat "stateId").orElse fun _ => nat "target", goalIndex := nat "goalId",
++      category, internalId, detail := ← renderException ex }
++    let stderr ← IO.getStderr
++    stderr.putStrLn evidence.line
++    stderr.flush
++  catch _ => pure ()
++
 +/-- A separate Core state reference owns all changes until encoding completes.
 +    Failure discards that reference; restoration requires no Lean computation. -/
 +def runTransaction (command : Protocol.Command) (action : MainM Lean.Json) : MainM CommandResult := do
++  modify fun s => { s with commandSequence := s.commandSequence + 1 }
++  failedCommandPhase.set none
 +  let entry ← get
 +  let coreEntry ← getThe Lean.Core.State
 +  let ctx ← read
@@ -2419,6 +2521,8 @@ index f031e47..b3447c8 100644
 +              (some { phase := details.getString `phase, limit := details.getNat `limit })
 +        else fail "internal" "Unexpected REPL command failure" "session-unusable"
 +      | _ => fail "internal" "Unexpected REPL command failure" "session-unusable"
++    if (Lean.Json.getObjValAs? result.response String "error").toOption == some "internal" then
++      writeFailureDiagnostic command entry.commandSequence ex
 +    set { entry with usable := !result.fatal }
 +    return result
 +
@@ -2708,10 +2812,10 @@ index 0000000..75334a9
 +end Pantograph.Test.CompilerValidation
 diff --git a/Test/ContractFixtures.lean b/Test/ContractFixtures.lean
 new file mode 100644
-index 0000000..6715532
+index 0000000..5590585
 --- /dev/null
 +++ b/Test/ContractFixtures.lean
-@@ -0,0 +1,144 @@
+@@ -0,0 +1,149 @@
 +import Pantograph
 +
 +open Lean Elab Tactic
@@ -2829,6 +2933,11 @@ index 0000000..6715532
 +elab "contract_internal_failure" : tactic => do
 +  throw <| Exception.internal Pantograph.commandResourceExceptionId
 +
++/-- An error whose message cannot be rendered: the tactic's own error handler fails. -/
++elab "contract_unrenderable_error" : tactic => do
++  throwError (MessageData.ofLazy (fun _ => throw (IO.userError "contract render failure"))
++    (fun _ => false))
++
 +/-- Spend allocations while a lazy diagnostic is rendered, after tactic execution. -/
 +elab "contract_diagnostic_heartbeat" : tactic => do
 +  let data := MessageData.ofLazy (fun _ => do
@@ -2856,6 +2965,72 @@ index 0000000..6715532
 +    value := mkConst ``True.intro, hints := .opaque, safety := .safe })
 +  (← getMainGoal).assign (.fvar (← mkFreshFVarId))
 +  setGoals []
+diff --git a/Test/FailureBoundary.lean b/Test/FailureBoundary.lean
+new file mode 100644
+index 0000000..ac6494e
+--- /dev/null
++++ b/Test/FailureBoundary.lean
+@@ -0,0 +1,60 @@
++import Test.Common
++import Pantograph.Validation
++import Pantograph.Certify
++import Repl
++
++/-! Elaboration aborts are ordinary tactic failures; unexpected failures keep evidence.
++
++`exact`, `refine` and `have` log "don't know how to synthesize placeholder" and then
++throw Lean's internal abort exception. The REPL used to treat every internal
++exception as an unexpected failure and end the session. -/
++
++namespace Pantograph.Test.FailureBoundary
++open Lean
++
++private def failsWith (fragment : String) : TacticResult → Bool
++  | .failure errors _ => errors.any fun e => (e.splitOn fragment).length > 1
++  | _ => false
++
++private def placeholderTactics : List String := [
++  "exact (fun (x : Nat) => True.intro) _",
++  "refine (fun (x : Nat) => True.intro) _",
++  "have h := (fun (x : Nat) => x) _",
++  "exact (_ : True)"]
++
++private def abortTests : Elab.TermElabM LSpec.TestSeq := do
++  let mut tests := LSpec.TestSeq.done
++  let .ok root ← goalStartExpr "True" #[] | throwError "start failed"
++  for tactic in placeholderTactics do
++    let result ← (runTermElabM (root.tryTactic root.root tactic) : CoreM _)
++    tests := tests ++ LSpec.test s!"{tactic} is an ordinary failure with Lean's own message"
++      (failsWith "don't know how to synthesize placeholder" result)
++  -- The rejected candidate leaves the input state usable for the next one.
++  let .success done ← (runTermElabM (root.tryTactic root.root "trivial") : CoreM _) | throwError "trivial failed"
++  tests := tests ++ LSpec.test "the input state still proves the goal after the failures"
++    ((← validateTransition root done root.root).toOption.isSome &&
++      (← certifyRoot done 200000).status == "certified")
++  return tests
++
++private def boundTests : LSpec.TestSeq :=
++  let huge := String.join (List.replicate 4000 "∀\"\\\n")
++  let evidence : Repl.FailureEvidence := { sequence := 7, operation := "goal.tactic", stateId := some 3, goalIndex := some 0, phase := "observe", category := "error", detail := some huge }
++  let line := evidence.line
++  let parsed := Json.parse line
++  let field (key : String) := parsed.toOption.bind fun j => (j.getObjVal? key).toOption
++  let unrendered : Repl.FailureEvidence := { sequence := 1, operation := "goal.certify", category := "internal", internalId := some "x", detail := none }
++  let failed := unrendered.line
++  LSpec.test "a huge escaped detail is cut so the whole line stays within the byte limit"
++      (line.utf8ByteSize ≤ Repl.diagnosticLineBytes && parsed.toOption.isSome) ++
++    LSpec.test "the record says the detail was truncated"
++      (field "detail_truncated" == some (Json.bool true) && field "kind" == some (Json.str "pantograph-command-failure")) ++
++    LSpec.test "a failed rendering is reported, not invented"
++      ((Json.parse failed).toOption.any fun j =>
++        (j.getObjVal? "render_status").toOption == some (Json.str "failed") && (j.getObjVal? "detail").toOption == some Json.null)
++
++def suite (env : Environment) : List (String × IO LSpec.TestSeq) := [
++  ("Elaboration aborts", runTermElabMSeq env abortTests),
++  ("Diagnostic bounds", pure boundTests)
++]
++
++end Pantograph.Test.FailureBoundary
 diff --git a/Test/Frontend.lean b/Test/Frontend.lean
 index 4e55c77..a7a918e 100644
 --- a/Test/Frontend.lean
@@ -2976,16 +3151,17 @@ index a45e6ce..5aae5f3 100644
  
  def test_conv_protocol : Test :=
 diff --git a/Test/Main.lean b/Test/Main.lean
-index 0fde5fa..4955616 100644
+index 0fde5fa..fb0d859 100644
 --- a/Test/Main.lean
 +++ b/Test/Main.lean
-@@ -1,4 +1,5 @@
+@@ -1,12 +1,18 @@
  import LSpec
 +import Test.CompilerValidation
  import Test.Environment
++import Test.FailureBoundary
  import Test.Frontend
  import Test.Integration
-@@ -6,7 +7,11 @@ import Test.Library
+ import Test.Library
  import Test.Metavar
  import Test.Proofs
  import Test.Serial
@@ -2997,7 +3173,7 @@ index 0fde5fa..4955616 100644
  
  -- Test running infrastructure
  
-@@ -44,6 +49,9 @@ def main (args: List String) := do
+@@ -44,13 +50,19 @@ def main (args: List String) := do
      (trustLevel := 1)
  
    let suites: List (String × List (String × IO LSpec.TestSeq)) := [
@@ -3005,9 +3181,10 @@ index 0fde5fa..4955616 100644
 +    ("Validation", Validation.suite env_default),
 +    ("CompilerValidation", CompilerValidation.suite env_default),
      ("Environment", Environment.suite),
++    ("FailureBoundary", FailureBoundary.suite env_default),
      ("Frontend", Frontend.suite env_default),
      ("Integration", Integration.suite env_default),
-@@ -51,6 +59,8 @@ def main (args: List String) := do
+     ("Library", Library.suite env_default),
      ("Metavar", Metavar.suite env_default),
      ("Proofs", Proofs.suite env_default),
      ("Serial", Serial.suite env_default),
@@ -4075,6 +4252,90 @@ index 0000000..2ea955a
 +  kernel receipt and `cases n <;> simp [Nat.pow]` under Mathlib.
 +- `.lake/build/bin/compiler_diagnostic [--inventory] Init Lean`: the provenance
 +  table and the sentinel inventory above.
+diff --git a/doc/failure_diagnostics.md b/doc/failure_diagnostics.md
+new file mode 100644
+index 0000000..867667f
+--- /dev/null
++++ b/doc/failure_diagnostics.md
+@@ -0,0 +1,78 @@
++# Elaboration aborts and fatal failure diagnostics
++
++## Elaboration aborts are ordinary failures
++
++Lean's elaborator reports some errors by logging them and then throwing an
++internal *abort* exception (`abortTactic`, `abortTerm`, `abortCommand`). `exact`,
++`refine` and `have` do this when a placeholder cannot be synthesized:
++
++```text
++don't know how to synthesize placeholder for argument 'x'
++```
++
++Lean's own tactic runner (`Elab.Tactic.run`) catches these aborts. The REPL runs
++tactics through `GoalState.step` instead, and `rethrowInfrastructure` re-raised
++every internal exception, so each abort reached the transaction boundary as
++`{"error":"internal","desc":"Unexpected REPL command failure","recovery":"session-unusable"}`
++and ended the session. Sampled RL proposals hit this constantly: a lemma applied
++with arguments Lean cannot infer is one of the most common invalid tactics.
++
++`rethrowInfrastructure` now lets elaboration aborts through to the caller's
++ordinary error path, and `failureText` reports the error the abort logged.
++`goal.tactic` and the other tactic operations return the normal
++`tacticErrors`/`messages` failure, the input state stays usable, and nothing
++is allocated. `goal.start`, `expr.echo` and declaration elaboration report the
++logged error the same way. Other internal exceptions, resource exhaustion and
++runtime limits keep their existing handling. The stdout protocol and its
++versions are unchanged: the failure uses the existing tactic-failure response.
++
++## Fatal failure diagnostic, version 1
++
++An unexpected command failure still returns exactly one stdout response,
++`{"error":"internal","desc":"Unexpected REPL command failure","recovery":"session-unusable"}`,
++and the process still exits. Before that response, the REPL writes one JSON line
++to stderr:
++
++```json
++{"kind":"pantograph-command-failure","version":1,"repl_command_sequence":3,
++ "operation":"goal.tactic","state_id":0,"goal_index":0,"phase":"execute",
++ "exception_category":"internal","internal_exception_id":"pantographCommandResource",
++ "detail":"internal exception #16","detail_truncated":false,"render_status":"rendered"}
++```
++
++| Field | Meaning |
++| --- | --- |
++| `kind`, `version` | `pantograph-command-failure`, `1` |
++| `repl_command_sequence` | Commands this process has dispatched, counting the failed one. Independent of any client counter. |
++| `operation`, `state_id`, `goal_index` | The command and its `stateId` (or `target`) and `goalId`, or `null` |
++| `phase` | Innermost protected phase the exception left (`execute`, `validate`, `observe`, `serialize`), or `unknown` |
++| `exception_category` | `internal`, `runtime` (heartbeat or recursion limit) or `error` |
++| `internal_exception_id` | Registered name of an internal exception, otherwise `null` |
++| `detail` | The exception's rendered message, cut to at most 2048 UTF-8 bytes, or `null` if rendering failed |
++| `detail_truncated`, `render_status` | Whether the detail was cut; `rendered` or `failed` |
++
++The whole line is at most 4096 bytes including JSON escaping; the detail is cut
++further if escaping would exceed that. Rendering and writing are isolated: a
++rendering failure gives `render_status: "failed"`, and a write failure changes
++nothing else. Validation failures and resource rollbacks keep their own
++responses and write no record. The record carries no expressions, environment
++data or tactic text; the client's request record carries the command.
++
++The phase is the innermost phase the exception passed through since the last
++phase started. If an earlier failure inside a phase was caught and the later
++unexpected failure happens outside any phase, the phase can name the earlier
++one; treat it as evidence, not proof.
++
++`pantograph.traceCommands` remains a Lean launch option for full command
++traces. The failure record needs no option.
++
++## Verification
++
++- `lake test`: `FailureBoundary` covers the four placeholder tactics, state
++  reuse and certification after them, and the record's byte bound, escaping,
++  truncation flag and failed rendering.
++- `lake env python3 scripts/test_failure_diagnostics.py [--mathlib PATH]`:
++  native sessions for the aborts (with and without Mathlib), the record for an
++  injected internal failure and an unrenderable error, and an ordinary
++  rejection without a record. `Test.ContractFixtures` provides the injection
++  tactics; they are test-only.
 diff --git a/doc/repository_client_contract.md b/doc/repository_client_contract.md
 new file mode 100644
 index 0000000..63d0d22
@@ -5119,6 +5380,137 @@ index 0000000..925b77b
 +    parser.add_argument("--mathlib", type=Path, required=True)
 +    parser.add_argument("--output", type=Path, required=True)
 +    asyncio.run(capture(parser.parse_args()))
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/scripts/test_failure_diagnostics.py b/scripts/test_failure_diagnostics.py
+new file mode 100644
+index 0000000..483c481
+--- /dev/null
++++ b/scripts/test_failure_diagnostics.py
+@@ -0,0 +1,125 @@
++#!/usr/bin/env python3
++"""Native controls for elaboration aborts and the fatal stderr failure diagnostic.
++
++Run with `lake env python3 scripts/test_failure_diagnostics.py [--mathlib PATH] [--capture DIR]`.
++"""
++import argparse
++import hashlib
++import json
++import os
++from pathlib import Path
++import subprocess
++
++ROOT = Path(__file__).resolve().parents[1]
++REPL = ROOT / ".lake/build/bin/repl"
++PLACEHOLDERS = [
++    "exact (fun (x : Nat) => True.intro) _",
++    "refine (fun (x : Nat) => True.intro) _",
++    "have h := (fun (x : Nat) => x) _",
++    "exact (_ : True)",
++]
++FIELDS = {
++    "kind", "version", "repl_command_sequence", "operation", "state_id", "goal_index", "phase",
++    "exception_category", "internal_exception_id", "detail", "detail_truncated", "render_status",
++}
++
++
++def session(lines, imports, env):
++    """Send all lines at once; return stdout lines, stderr text and exit code."""
++    proc = subprocess.run([str(REPL), *imports], cwd=ROOT, env=env, text=True,
++                          input="".join(line + "\n" for line in lines), capture_output=True, timeout=600)
++    out = proc.stdout.splitlines()
++    assert out[0] == "ready.", out[:2]
++    return [json.loads(line) for line in out[1:]], proc.stderr, proc.returncode
++
++
++def records(stderr):
++    found = []
++    for line in stderr.splitlines():
++        try:
++            value = json.loads(line)
++        except ValueError:
++            continue
++        if isinstance(value, dict) and value.get("kind") == "pantograph-command-failure":
++            found.append(value)
++    return found
++
++
++def abort_control(imports, env, statement="True", closing="trivial"):
++    lines = ['goal.start ' + json.dumps({"expr": statement})]
++    lines += ['goal.tactic ' + json.dumps({"stateId": 0, "goalId": 0, "tactic": t}) for t in PLACEHOLDERS]
++    lines += ['goal.tactic ' + json.dumps({"stateId": 0, "goalId": 0, "tactic": closing}),
++              'goal.certify {"stateId":1}', 'goal.delete {"stateIds":[0,1]}', 'stat {}']
++    responses, stderr, code = session(lines, imports, env)
++    for tactic, response in zip(PLACEHOLDERS, responses[1:]):
++        assert "don't know how to synthesize placeholder" in " ".join(response.get("tacticErrors", [])), (tactic, response)
++    done, certificate = responses[len(PLACEHOLDERS) + 1], responses[len(PLACEHOLDERS) + 2]
++    assert done["nextStateId"] == 1 and done["goals"] == [], done
++    assert certificate["status"] == "certified", certificate
++    assert responses[-1] == {"nGoals": 0} and code == 0 and not records(stderr)
++    return dict(imports=imports, lines=lines, responses=responses)
++
++
++def fatal_control(tactic, phase, category, env):
++    lines = ['protocol.describe {}', 'goal.start {"expr":"True"}',
++             'goal.tactic ' + json.dumps({"stateId": 0, "goalId": 0, "tactic": tactic}), 'stat {}']
++    responses, stderr, code = session(lines, ["Init", "Test.ContractFixtures"], env)
++    assert len(responses) == 3, "a response followed the fatal failure"
++    assert responses[2] == {"error": "internal", "desc": "Unexpected REPL command failure",
++                            "recovery": "session-unusable"}, responses[2]
++    assert code != 0
++    found = records(stderr)
++    assert len(found) == 1, stderr
++    record = found[0]
++    assert set(record) == FIELDS and len(json.dumps(record).encode()) <= 4096, record
++    assert record["version"] == 1 and record["repl_command_sequence"] == 3
++    assert (record["operation"], record["state_id"], record["goal_index"]) == ("goal.tactic", 0, 0)
++    assert (record["phase"], record["exception_category"]) == (phase, category), record
++    return dict(tactic=tactic, responses=responses, stderr=stderr, record=record)
++
++
++def ordinary_control(env):
++    lines = ['goal.start {"expr":"True"}', 'goal.tactic {"stateId":0,"goalId":0,"tactic":"exact Nat.zero"}',
++             'goal.tactic {"stateId":0,"goalId":0,"tactic":"trivial"}']
++    responses, stderr, code = session(lines, ["Init"], env)
++    assert "tacticErrors" in responses[1] and responses[2]["goals"] == []
++    assert code == 0 and not records(stderr)
++    return dict(responses=responses)
++
++
++def environment(mathlib):
++    paths = [ROOT / ".lake/build/lib", ROOT / ".lake/packages/LSpec/.lake/build/lib"]
++    if mathlib:
++        paths += [mathlib / ".lake/build/lib"]
++        paths += [p / ".lake/build/lib" for p in (mathlib / ".lake/packages").iterdir() if p.is_dir()]
++    env = os.environ.copy()
++    env["LEAN_PATH"] = os.pathsep.join(map(str, paths)) + os.pathsep + env.get("LEAN_PATH", "")
++    return env
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--mathlib", type=Path)
++    parser.add_argument("--capture", type=Path)
++    args = parser.parse_args()
++    env = environment(args.mathlib.resolve() if args.mathlib else None)
++    result = dict(
++        aborts=[abort_control(["Init"], env)],
++        fatal=[fatal_control("contract_internal_failure", "execute", "internal", env),
++               fatal_control("contract_unrenderable_error", "observe", "error", env)],
++        ordinary=ordinary_control(env),
++    )
++    if args.mathlib:
++        result["aborts"].append(abort_control(["Mathlib"], env))
++    if args.capture:
++        args.capture.mkdir(parents=True, exist_ok=True)
++        result.update(
++            source_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
++            binary_sha256=hashlib.sha256(REPL.read_bytes()).hexdigest(),
++            toolchain=(ROOT / "lean-toolchain").read_text().strip())
++        (args.capture / "capture.json").write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n")
++    print(f"PASS: {len(result['aborts'])} abort sessions, {len(result['fatal'])} fatal diagnostics, ordinary rejection unchanged")
 +
 +
 +if __name__ == "__main__":
