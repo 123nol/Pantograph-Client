@@ -15,6 +15,14 @@ from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence
 from uuid import uuid4
 import weakref
 
+from .evidence import (
+    FailureSnapshot,
+    PantographCaptureError,
+    RequestEvent,
+    RequestObserver,
+    event_for,
+    snapshot_for,
+)
 from .launch import PantographLaunchSpec, build_launch_spec
 from .protocol import (
     CertificationResult,
@@ -294,11 +302,20 @@ class PantographClient:
         self._allocated_ids: set[int] = set()
         self._scopes: set[PantographStateScope] = set()
         self.effective_options: SessionOptions | None = None
+        self._observer: RequestObserver | None = None
+        self._request_sequence = 0
+        self._last_failure: FailureSnapshot | None = None
+        self._capture_errors: list[str] = []
 
     @classmethod
-    async def create(cls, env: "PantographEnv") -> "PantographClient":
+    async def create(
+        cls, env: "PantographEnv", *, observer: RequestObserver | None = None
+    ) -> "PantographClient":
+        """Start a session. ``observer`` receives a :class:`RequestEvent` before each
+        write and after each outcome; see :mod:`pantograph_async.evidence`."""
         started = asyncio.get_running_loop().time()
         client = cls(build_launch_spec(env))
+        client._observer = observer
         deadline = started + client.launch_spec.startup_timeout_s
         spec = client.launch_spec
         environment = dict(os.environ)
@@ -400,6 +417,30 @@ class PantographClient:
     @property
     def stderr_tail(self) -> str:
         return self._stderr.decode("utf-8", errors="replace")
+
+    @property
+    def last_failure(self) -> FailureSnapshot | None:
+        """Evidence for the most recent failed request, final once the session is closed."""
+        snapshot = self._last_failure
+        if snapshot is not None and not snapshot.final and self._phase is SessionPhase.CLOSED:
+            snapshot = self._last_failure = snapshot.finalized(self.stderr_tail)
+        return snapshot
+
+    @property
+    def capture_errors(self) -> tuple[str, ...]:
+        """Observer failures after a write; the requests themselves were unaffected."""
+        return tuple(self._capture_errors)
+
+    def _notify(self, event: RequestEvent) -> None:
+        if self._observer is not None:
+            self._observer(event)
+
+    def _notify_after_write(self, event: RequestEvent) -> None:
+        try:
+            self._notify(event)
+        except Exception as exc:
+            if len(self._capture_errors) < 32:
+                self._capture_errors.append(f"{event.stage} {event.sequence}: {type(exc).__name__}: {exc}"[:512])
 
     def _check_loop(self) -> None:
         if asyncio.get_running_loop() is not self._loop:
@@ -553,140 +594,193 @@ class PantographClient:
         prepare: Callable[[], Mapping[str, Any] | None] | None = None,
     ) -> Response:
         """Private transaction; synchronous bookkeeping precedes lock release."""
-        self._check_loop()
-        permitted = SessionPhase.STARTING if starting else SessionPhase.READY
-        if self._phase is not permitted:
-            if self._close_task is not None:
-                await self.aclose()
-            raise self._failure or PantographStateError(
-                "Client is closed or unavailable."
-            )
-        deadline = (
-            self._loop.time() + self.launch_spec.request_timeout_s
-            if deadline is None
-            else deadline
-        )
-        body = deepcopy(dict(payload))
-        request = encode_request(command, body) if prepare is None else None
-        acquired = False
-        wrote = False
+        started = self._loop.time()
+        exchange: dict[str, Any] = {"stage": "waiting", "sequence": 0, "request": b"", "body": dict(payload)}
         try:
-            async with asyncio.timeout_at(deadline):
-                if self._loop.time() >= deadline:
-                    raise TimeoutError
-                await self._lock.acquire()
-                acquired = True
-                if self._phase is not permitted:
-                    raise self._failure or PantographStateError(
-                        "Client closed while waiting for a transaction."
-                    )
-                if self._loop.time() >= deadline:
-                    raise TimeoutError
-                if prepare is not None:
-                    prepared = prepare()
-                    if prepared is None:
-                        return CommandAcknowledgement(command)
-                    body = deepcopy(dict(prepared))
-                    request = encode_request(command, body)
+            self._check_loop()
+            permitted = SessionPhase.STARTING if starting else SessionPhase.READY
+            if self._phase is not permitted:
+                if self._close_task is not None:
+                    await self.aclose()
+                raise self._failure or PantographStateError(
+                    "Client is closed or unavailable."
+                )
+            deadline = (
+                self._loop.time() + self.launch_spec.request_timeout_s
+                if deadline is None
+                else deadline
+            )
+            body = deepcopy(dict(payload))
+            request = encode_request(command, body) if prepare is None else None
+            acquired = False
+            wrote = False
+            self._request_sequence += 1
+            sequence = self._request_sequence
+            exchange["sequence"] = sequence
+            if request is not None:
+                exchange["request"] = request
+            try:
+                async with asyncio.timeout_at(deadline):
                     if self._loop.time() >= deadline:
                         raise TimeoutError
-                self._pending_command = command
-                self._reply = self._loop.create_future()
-                self._reply.add_done_callback(_observe)
-                process = self._owner.process
-                wrote = True
-                process.stdin.write(request)
-                await process.stdin.drain()
-                line = await asyncio.shield(self._reply)
-                if self._phase is not permitted:
-                    raise self._failure or PantographTransportError(
-                        "Client failed before response decoding."
-                    )
-                try:
-                    result = decode_response(command, decode_json_response(line))
-                except PantographProtocolError as exc:
-                    raise PantographProtocolError(
-                        f"{exc}; stdout={line[:512]!r}; {self._context()}",
-                        command=command,
-                        payload={"stdout": repr(line[:512])},
-                    ) from exc
-                if self._loop.time() >= deadline:
-                    raise TimeoutError
-                if isinstance(result, (CommandError, ResourceError, InternalError)):
-                    error = result.as_exception()
-                    error.add_note(self._context())
-                    raise error
-                if isinstance(result, (GoalStartResult, TacticSuccess)):
-                    state_id = (
-                        result.state_id
-                        if isinstance(result, GoalStartResult)
-                        else result.next_state_id
-                    )
-                    if state_id in self._allocated_ids:
-                        raise PantographProtocolError(
-                            "REPL reused a live allocation ID."
+                    await self._lock.acquire()
+                    acquired = True
+                    if self._phase is not permitted:
+                        raise self._failure or PantographStateError(
+                            "Client closed while waiting for a transaction."
                         )
-                    self._allocated_ids.add(state_id)
-                elif command == "goal.delete" and isinstance(
-                    result, CommandAcknowledgement
-                ):
-                    self._allocated_ids.difference_update(body["stateIds"])
-                if record is not None:
-                    record(result)
-                if self._loop.time() >= deadline:
-                    raise TimeoutError
-                return result
-        except TimeoutError as exc:
-            error = PantographRequestTimeout(
-                f"Deadline exceeded for {command}; {self._context()}", command=command
-            )
-            if wrote:
-                self._fail(error)
-                await self.aclose()
-            raise error from exc
-        except asyncio.CancelledError as exc:
-            if wrote:
-                self._fail(
-                    PantographTransportError(
-                        f"Transaction cancelled after possible write: {command}"
-                    )
+                    if self._loop.time() >= deadline:
+                        raise TimeoutError
+                    if prepare is not None:
+                        prepared = prepare()
+                        if prepared is None:
+                            return CommandAcknowledgement(command)
+                        body = deepcopy(dict(prepared))
+                        request = encode_request(command, body)
+                        if self._loop.time() >= deadline:
+                            raise TimeoutError
+                    exchange.update(stage="prepared", request=request, body=body)
+                    try:
+                        self._notify(event_for(
+                            session_id=self.session_id, pid=self.pid, sequence=sequence,
+                            operation=command, request=request, body=body, stage="prepared"))
+                    except Exception as exc:
+                        raise PantographCaptureError(
+                            f"Request observer failed before writing {command}: {exc}", command=command
+                        ) from exc
+                    self._pending_command = command
+                    self._reply = self._loop.create_future()
+                    self._reply.add_done_callback(_observe)
+                    process = self._owner.process
+                    wrote = True
+                    exchange["stage"] = "written"
+                    process.stdin.write(request)
+                    await process.stdin.drain()
+                    line = await asyncio.shield(self._reply)
+                    exchange["stage"] = "decoded"
+                    if self._phase is not permitted:
+                        raise self._failure or PantographTransportError(
+                            "Client failed before response decoding."
+                        )
+                    try:
+                        result = decode_response(command, decode_json_response(line))
+                    except PantographProtocolError as exc:
+                        raise PantographProtocolError(
+                            f"{exc}; stdout={line[:512]!r}; {self._context()}",
+                            command=command,
+                            payload={"stdout": repr(line[:512])},
+                        ) from exc
+                    if self._loop.time() >= deadline:
+                        raise TimeoutError
+                    if isinstance(result, (CommandError, ResourceError, InternalError)):
+                        error = result.as_exception()
+                        error.add_note(self._context())
+                        raise error
+                    if isinstance(result, (GoalStartResult, TacticSuccess)):
+                        state_id = (
+                            result.state_id
+                            if isinstance(result, GoalStartResult)
+                            else result.next_state_id
+                        )
+                        if state_id in self._allocated_ids:
+                            raise PantographProtocolError(
+                                "REPL reused a live allocation ID."
+                            )
+                        self._allocated_ids.add(state_id)
+                    elif command == "goal.delete" and isinstance(
+                        result, CommandAcknowledgement
+                    ):
+                        self._allocated_ids.difference_update(body["stateIds"])
+                    if record is not None:
+                        record(result)
+                    if self._loop.time() >= deadline:
+                        raise TimeoutError
+                    self._notify_after_write(event_for(
+                        session_id=self.session_id, pid=self.pid, sequence=sequence,
+                        operation=command, request=request, body=body, stage="completed",
+                        outcome=type(result).__name__, elapsed_s=self._loop.time() - started,
+                        allocated_state_id=(
+                            result.state_id if isinstance(result, GoalStartResult)
+                            else result.next_state_id if isinstance(result, TacticSuccess) else None)))
+                    return result
+            except TimeoutError as exc:
+                exchange["timeout_source"] = "request-deadline"
+                error = PantographRequestTimeout(
+                    f"Deadline exceeded for {command}; {self._context()}", command=command
                 )
-                await self._close_after_error(exc)
-            raise
-        except (PantographGoalRejected, PantographResourceError):
-            raise
-        except (
-            PantographProtocolError,
-            PantographStateError,
-            PantographTransportError,
-            OSError,
-        ) as exc:
-            if wrote:
-                error = (
-                    exc
-                    if not isinstance(exc, OSError)
-                    else PantographTransportError(
-                        f"REPL pipe failed: {exc}; {self._context()}"
-                    )
-                )
-                self._fail(error)
-                await self.aclose()
-                raise error
-            raise
-        except Exception as exc:
-            if wrote:
-                error = PantographProtocolError(
-                    f"Transaction bookkeeping failed: {exc}", command=command
-                )
-                self._fail(error)
-                await self.aclose()
+                if wrote:
+                    self._fail(error)
+                    await self.aclose()
                 raise error from exc
+            except asyncio.CancelledError as exc:
+                if wrote:
+                    self._fail(
+                        PantographTransportError(
+                            f"Transaction cancelled after possible write: {command}"
+                        )
+                    )
+                    await self._close_after_error(exc)
+                raise
+            except (PantographGoalRejected, PantographResourceError):
+                raise
+            except (
+                PantographProtocolError,
+                PantographStateError,
+                PantographTransportError,
+                OSError,
+            ) as exc:
+                if wrote:
+                    error = (
+                        exc
+                        if not isinstance(exc, OSError)
+                        else PantographTransportError(
+                            f"REPL pipe failed: {exc}; {self._context()}"
+                        )
+                    )
+                    self._fail(error)
+                    await self.aclose()
+                    raise error
+                raise
+            except Exception as exc:
+                if wrote:
+                    error = PantographProtocolError(
+                        f"Transaction bookkeeping failed: {exc}", command=command
+                    )
+                    self._fail(error)
+                    await self.aclose()
+                    raise error from exc
+                raise
+            finally:
+                if acquired:
+                    self._reply = None
+                    self._pending_command = None
+                    self._lock.release()
+        except PantographCaptureError:
             raise
-        finally:
-            if acquired:
-                self._reply = None
-                self._pending_command = None
-                self._lock.release()
+        except BaseException as exc:
+            if exchange["sequence"]:
+                self._record_failure(command, exchange, exc)
+            raise
+
+    def _record_failure(self, command: str, exchange: dict[str, Any], error: BaseException) -> None:
+        snapshot = snapshot_for(
+            session_id=self.session_id, pid=self.pid, sequence=exchange["sequence"],
+            operation=command, request=exchange["request"], body=exchange["body"],
+            stage=exchange["stage"], error=error, stderr_tail=self.stderr_tail,
+            timeout_source=exchange.get("timeout_source"), capture_errors=tuple(self._capture_errors),
+        )
+        written = exchange["stage"] in ("written", "decoded")
+        owner = self._last_failure
+        if not written and owner is not None and owner.exchange_stage in ("written", "decoded"):
+            # A caller that never wrote cannot claim a failure a written request owns,
+            # whether it inherited that failure, was cancelled or timed out waiting.
+            return
+        self._last_failure = snapshot.finalized(self.stderr_tail) if self._phase is SessionPhase.CLOSED else snapshot
+        if written:
+            self._notify_after_write(event_for(
+                session_id=self.session_id, pid=self.pid, sequence=exchange["sequence"],
+                operation=command, request=exchange["request"], body=exchange["body"],
+                stage="failed", error=error))
 
 
 class PantographStateScope:

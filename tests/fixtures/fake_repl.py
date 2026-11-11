@@ -244,6 +244,25 @@ def main():
                     result = fixtures[tactic]
                 elif tactic == "validation_error":
                     result = {"error": "validation", "desc": "inspection unavailable"}
+                elif tactic in ("repl_failure", "repl_failure_late_stderr"):
+                    # The REPL writes its fatal record, answers once and exits.
+                    record = {
+                        "kind": "pantograph-command-failure", "version": 1,
+                        "repl_command_sequence": 7, "operation": "goal.tactic",
+                        "state_id": args["stateId"], "goal_index": args.get("goalId"),
+                        "phase": "observe", "exception_category": "error",
+                        "internal_exception_id": None, "detail": "unknown constant 'Foo'",
+                        "detail_truncated": False, "render_status": "rendered",
+                    }
+                    if tactic == "repl_failure":
+                        print(json.dumps(record), file=sys.stderr, flush=True)
+                    send({"error": "internal", "desc": "Unexpected REPL command failure",
+                          "recovery": "session-unusable"})
+                    if tactic == "repl_failure_late_stderr":
+                        time.sleep(0.05)
+                        print("unrelated diagnostic line", file=sys.stderr, flush=True)
+                        print(json.dumps(record), file=sys.stderr, flush=True)
+                    sys.exit(1)
                 else:
                     key = {
                         "skip": "identity_intro",

@@ -328,6 +328,51 @@ def test_compiler_producing_tactics_keep_a_usable_state_and_certify(live_env):
 
 
 @pytest.mark.pantograph_live
+def test_an_unsynthesizable_placeholder_is_an_ordinary_rejection(live_env):
+    """Lean aborts after logging the error; the session and input state survive."""
+    from pantograph_async import PantographTacticRejected
+
+    async def run():
+        async with await PantographClient.create(live_env) as client:
+            async with client.state_scope() as scope:
+                root = await scope.start_goal("True")
+                for tactic in ("exact (fun (x : Nat) => True.intro) _", "refine (fun (x : Nat) => True.intro) _",
+                               "have h := (fun (x : Nat) => x) _"):
+                    with pytest.raises(PantographTacticRejected, match="don't know how to synthesize"):
+                        await scope.apply_tactic(root, tactic)
+                assert client.is_usable
+                done = await scope.apply_tactic(root, "trivial")
+                assert (await scope.certify(done)).is_certified
+
+    asyncio.run(run())
+
+
+@pytest.mark.pantograph_live
+def test_a_native_unexpected_failure_keeps_matched_repl_evidence(live_env):
+    from pantograph_async import PantographRemoteInternalError
+
+    async def run():
+        env = replace(live_env, imports=("Init", "Test.ContractFixtures"))
+        client = await PantographClient.create(env)
+        try:
+            async with client.state_scope() as scope:
+                root = await scope.start_goal("True")
+                with pytest.raises(PantographRemoteInternalError):
+                    await scope.apply_tactic(root, "contract_internal_failure")
+        finally:
+            await client.aclose()
+        snapshot = client.last_failure
+        assert snapshot.final and snapshot.association == "matched", snapshot
+        record = snapshot.repl_failure
+        assert (record.operation, record.state_id, record.goal_index) == ("goal.tactic", 0, 0)
+        assert record.phase == "execute" and record.exception_category == "internal"
+        assert record.internal_exception_id == "pantographCommandResource"
+        assert "contract_internal_failure" in snapshot.request
+
+    asyncio.run(run())
+
+
+@pytest.mark.pantograph_live
 def test_a_tactic_that_leaves_the_goal_open_keeps_the_session(live_env):
     async def run():
         async with await PantographClient.create(live_env) as client:

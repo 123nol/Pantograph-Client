@@ -2,7 +2,7 @@
 
 ## Versioning
 
-- The distribution version (`pantograph-async-client`, `0.5.0`) identifies a
+- The distribution version (`pantograph-async-client`, `0.6.0`) identifies a
   library release.
 - The descriptor's protocol, model-expression, transition-validation and message
   versions identify wire semantics.
@@ -15,10 +15,10 @@ patch releases.
 
 ## Current release gate
 
-Version 0.5.0 requires protocol version 3 and transition validation version 3. The bundled
-patch reproduces companion commit `fc740c26a1e832ecb571859af24a5c632a351bd9`;
-source/binary identities and native representation-aware evidence are recorded in
-`docs/evidence/compiler_aware_companion.provenance.json`. Complete the application's
+Version 0.6.0 requires protocol version 3 and transition validation version 3. The bundled
+patch reproduces companion commit `661df4e32bb487f52e4bf229a34b155f9e69c76b`;
+source/binary identities and native evidence are recorded in
+`docs/evidence/failure_diagnostics_companion.provenance.json`. Complete the application's
 validation-version migration and validate the matched deployment before rollout.
 
 ## Checklist

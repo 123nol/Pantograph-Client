@@ -1,0 +1,15 @@
+{
+  "kind": "failure-diagnostics-resource-capture-provenance",
+  "companion_commit": "661df4e32bb487f52e4bf229a34b155f9e69c76b",
+  "checkout_commit": "661df4e32bb487f52e4bf229a34b155f9e69c76b",
+  "repl_sha256": "670c9b058bc2cdb7e85fb81befdf1ee81e6a19ad7744a2d2594cea1262935745",
+  "toolchain": "leanprover/lean4:v4.10.0-rc1",
+  "captured_exchanges": 22,
+  "cumulative_requests": 3000,
+  "files_sha256": {
+    "schema.json": "97e00eb158ca69230a36a13d71f516fa4e1ad79e17dc74fbccf5d6f6df9bce71",
+    "fixtures.json": "394881fd33dd66f07a936fb70b8272806bc37b332f2e9eaa55085b00577386fd",
+    "capture.json": "5c126cc3c68d9186c2b2e09bdf383bf643738d33c164ed1ab31bd0d1f940371b"
+  },
+  "scope": "Fresh native transactional-resource exchanges against the failure-diagnostics executable; no historical captures rewritten."
+}

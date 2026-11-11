@@ -6,6 +6,16 @@ process; sessions begin with ``await PantographClient.create(env)``.
 
 from .client import PantographClient, PantographStateScope, SessionPhase, await_cleanup
 from .environment import PantographEnv
+from .evidence import (
+    EVIDENCE_VERSION,
+    REPL_FAILURE_KIND,
+    FailureSnapshot,
+    PantographCaptureError,
+    ReplFailureRecord,
+    RequestEvent,
+    RequestObserver,
+    parse_repl_failures,
+)
 from .launch import PantographLaunchSpec, build_launch_spec
 from .probes import probe_model_client
 from .protocol import (
@@ -57,6 +67,14 @@ from .protocol import (
 )
 
 __all__ = [
+    "EVIDENCE_VERSION",
+    "REPL_FAILURE_KIND",
+    "FailureSnapshot",
+    "PantographCaptureError",
+    "ReplFailureRecord",
+    "RequestEvent",
+    "RequestObserver",
+    "parse_repl_failures",
     "MODEL_SEXP_VERSION",
     "TRANSITION_VALIDATION_VERSION",
     "TRANSITION_VALIDATION_SCOPE",

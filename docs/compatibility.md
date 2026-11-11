@@ -9,15 +9,15 @@ that agreement before returning build pins.
 
 | Item | Value |
 | --- | --- |
-| Distribution | `pantograph-async-client` 0.5.0 |
+| Distribution | `pantograph-async-client` 0.6.0 |
 | Client contract revision | 6 |
 | Protocol version | 3 |
 | Transition validation | 3, `execution-closure-and-representation-aware-audit` |
 | Resource and command-transaction versions | 1 |
-| Companion commit | `fc740c26a1e832ecb571859af24a5c632a351bd9` |
+| Companion commit | `661df4e32bb487f52e4bf229a34b155f9e69c76b` |
 | Patch base | `0dd5d2225e2d093f66a4b6231c1aa35004f2c8f3` |
-| Patch SHA-256 | `0611ea2f9fe12c81bc788deda7f3300890bb9762d8df31cd6bf5db6b7306e0c6` |
-| Reference executable SHA-256 | `6cba4f74fdf2bc8ba7060603e7bc11feffb7229dd8c288ec7c3c0ba2e9c2ef29` |
+| Patch SHA-256 | `f53b57ee215b35fad7cae684e77eb5c771a246faaecba6eccfe77d96dce73f39` |
+| Reference executable SHA-256 | `670c9b058bc2cdb7e85fb81befdf1ee81e6a19ad7744a2d2594cea1262935745` |
 | Lean | `leanprover/lean4:v4.10.0-rc1` |
 | Native Mathlib source | `29dcec074de168ac2bf835a77ef68bbe069194c5` |
 | Platform | Linux, Python 3.11+, GNU coreutils `stdbuf` |
@@ -32,7 +32,7 @@ validation decoder or disabled-check option is provided.
 ```bash
 git clone https://github.com/123nol/Pantograph.git
 cd Pantograph
-git checkout --detach fc740c26a1e832ecb571859af24a5c632a351bd9
+git checkout --detach 661df4e32bb487f52e4bf229a34b155f9e69c76b
 python -c "from pantograph_async import compatibility as c; c.verify_companion_sources('.')"
 lake build repl test scope_diagnostic compiler_diagnostic
 lake test
@@ -41,7 +41,7 @@ lake env python3 scripts/test_scope_aware_validation.py --capture /tmp/scope-exc
 ```
 
 The CI live job checks out the recorded patch base, applies the bundled patch,
-and verifies all 45 changed source hashes before building. It runs the ordinary
+and verifies all 48 changed source hashes before building. It runs the ordinary
 Lean tests and both executable harnesses without requiring Mathlib.
 Native builds can differ between machines; the recorded binary hash identifies
 this tested build, while source verification and the live gate validate rebuilds.

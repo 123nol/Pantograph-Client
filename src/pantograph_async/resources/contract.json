@@ -122,7 +122,8 @@
     "snapshot_operations": "Revision-3 codec, typed inspect/certify scope operations, provenance linkage checks and reclaimable issued-state records implemented against the snapshot companion build.",
     "resource_recovery": "Client codec, transport, ownership and exact companion build validated against protocol version 3. Application migration and deployment pending.",
     "scope_aware_validation": "Stage 3: strict validation version 2, execution-closure-and-transition-audit, owned native tauto and fatal integrity lifecycle verified. Application stages 4-6 remain separate.",
-    "compiler_aware_validation": "Strict validation version 3, execution-closure-and-representation-aware-audit; compiler-producing tactics, continuation, inspection and certification verified against the native companion. Application migration remains separate."
+    "compiler_aware_validation": "Strict validation version 3, execution-closure-and-representation-aware-audit; compiler-producing tactics, continuation, inspection and certification verified against the native companion. Application migration remains separate.",
+    "failure_diagnostics": "Public request events and failure snapshots, with version-1 REPL stderr failure records; elaboration aborts are ordinary tactic rejections. The stdout contract is unchanged."
   },
   "upstream": {
     "branch": "gnn-sexpr-v410",
@@ -215,14 +216,14 @@
   "descriptor_revision_note": "Protocol version 3 with transitionValidationVersion 3 requires execution-closure-and-representation-aware-audit; validation versions 1 and 2 are rejected.",
   "companion_patch": {
     "file": "repository_client_contract.patch",
-    "sha256": "0611ea2f9fe12c81bc788deda7f3300890bb9762d8df31cd6bf5db6b7306e0c6",
-    "provenance": "../docs/evidence/compiler_aware_companion.provenance.json",
-    "repl_sha256": "6cba4f74fdf2bc8ba7060603e7bc11feffb7229dd8c288ec7c3c0ba2e9c2ef29",
-    "live_capture": "../tests/fixtures/compiler_aware_snapshot_companion/capture.json",
+    "sha256": "f53b57ee215b35fad7cae684e77eb5c771a246faaecba6eccfe77d96dce73f39",
+    "provenance": "../docs/evidence/failure_diagnostics_companion.provenance.json",
+    "repl_sha256": "670c9b058bc2cdb7e85fb81befdf1ee81e6a19ad7744a2d2594cea1262935745",
+    "live_capture": "../tests/fixtures/failure_diagnostics_snapshot_companion/capture.json",
     "previous": {
-      "sha256": "12572873c1c2ea24757da3c50365a30b4e585004cb5821ec8af76bcf6146a777",
-      "repl_sha256": "e3c11038b1d0fa463f6ef439788dd4d70ed425a9928b67d3942546614939dd78",
-      "live_capture": "../tests/fixtures/scope_aware_snapshot_companion/capture.json"
+      "sha256": "0611ea2f9fe12c81bc788deda7f3300890bb9762d8df31cd6bf5db6b7306e0c6",
+      "repl_sha256": "6cba4f74fdf2bc8ba7060603e7bc11feffb7229dd8c288ec7c3c0ba2e9c2ef29",
+      "live_capture": "../tests/fixtures/compiler_aware_snapshot_companion/capture.json"
     }
   },
   "transition_provenance": {

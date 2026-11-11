@@ -1,0 +1,26 @@
+{
+  "kind": "failure-diagnostics-validation-capture-provenance",
+  "companion_commit": "661df4e32bb487f52e4bf229a34b155f9e69c76b",
+  "checkout_commit": "661df4e32bb487f52e4bf229a34b155f9e69c76b",
+  "repl_sha256": "670c9b058bc2cdb7e85fb81befdf1ee81e6a19ad7744a2d2594cea1262935745",
+  "toolchain": "leanprover/lean4:v4.10.0-rc1",
+  "core_exchanges": 44,
+  "mathlib_exchanges": 40,
+  "mathlib_source_verification": {
+    "reference_commit": "29dcec074de168ac2bf835a77ef68bbe069194c5",
+    "checked_files": 4737,
+    "missing_or_different": [],
+    "local_extra_lean_files": []
+  },
+  "files_sha256": {
+    "schema.json": "1784d046264b9e66adf35f1855935d43535702220496bd2ae687247169b01975",
+    "fixtures.json": "94629dd054eb88acd142ef74bd30c6d2f8a9b213a2d7313f730af369cfb0c15b",
+    "capture.json": "5d8d7a0bb23686a92e17196eb3cc52f948b18d7fe60d7fd49e35521ea1f54248",
+    "client_capture.json": "d5ba03c22d453123dcbb70d22e597facde4d903adc6a7ff934c8d3598da6b711"
+  },
+  "scope": "Committed REPL schema and fixtures plus fresh executable exchanges against the failure-diagnostics executable; the client lifecycle checks are recorded separately.",
+  "client_configured_exchanges": {
+    "core": 52,
+    "mathlib": 42
+  }
+}

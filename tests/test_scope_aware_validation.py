@@ -18,7 +18,7 @@ from pantograph_async.protocol import decode_response
 from tests.support import run, records, assert_reaped
 
 FIXTURES = Path(__file__).parent / "fixtures"
-CURRENT = FIXTURES / "compiler_aware_validation"
+CURRENT = FIXTURES / "failure_diagnostics_validation"
 SHARED = json.loads((CURRENT / "fixtures.json").read_text())
 SUCCESS = json.loads((FIXTURES / "future_contract.json").read_text())["successes"][
     "valid_truth"

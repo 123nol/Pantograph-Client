@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.6.0 (unreleased)
+
+- Add `pantograph_async.evidence`: request events reported to an optional
+  observer before each write and after each outcome, and a bounded, immutable
+  `FailureSnapshot` for the last failed request (`client.last_failure`, final
+  after `aclose()`). An observer failure before the write sends nothing.
+- Recognize the REPL's version-1 `pantograph-command-failure` stderr records and
+  associate one with the failed request only when it is unambiguous.
+- Pin companion `661df4e`: elaboration aborts (`exact`/`refine`/`have` with a
+  placeholder Lean cannot synthesize) are ordinary tactic rejections, and
+  unexpected failures write the stderr record. Add current
+  `failure_diagnostics_*` captures; earlier captures stay historical.
+- The stdout contract, contract revision 6 and recovery classes are unchanged.
+
 ## 0.5.0 (unreleased)
 
 - Require transition validation version 3 and the exact
