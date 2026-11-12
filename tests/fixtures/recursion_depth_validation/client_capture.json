@@ -1,6 +1,6 @@
 {
-  "companion_commit": "91dbc0fb8b0af2d879abc51517693ec134343b33",
-  "repl_sha256": "997e5f20d2364d4394c2a2355a790cdb79cd7e6a03e6eaf7ce31f3cd9594d56b",
+  "companion_commit": "46a33e1c4e311cdc03ff1a2baa8eaeb36a69ff40",
+  "repl_sha256": "56cfdd7e4c967b3ae41a2d3730303a924933a7b61c885629fef8d0987b6f5950",
   "required_options": {
     "printExprPretty": true,
     "printExprAST": true,

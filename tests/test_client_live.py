@@ -450,6 +450,13 @@ def test_native_recursion_depth_rollback_then_certified_success(live_env):
                         "recursion-depth", "execute", "command-rolled-back")
                     assert error.limit > 0 and error.command == "goal.tactic"
                     assert client.is_usable and (await client.stat()).n_goals == 1
+                # A scoped limit is reported as the scope applied it.
+                for scoped in (30, 100):
+                    with pytest.raises(PantographResourceError) as caught:
+                        await scope.apply_tactic(
+                            original, f"set_option maxRecDepth {scoped} in contract_recursion")
+                    assert (caught.value.kind, caught.value.limit) == ("recursion-depth", scoped)
+                    assert client.is_usable and (await client.stat()).n_goals == 1
                 done = await scope.apply_tactic(original, "exact List.length_replicate 2000 0")
                 assert (await scope.certify(done)).is_certified
             assert (await client.stat()).n_goals == 0

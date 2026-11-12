@@ -25,7 +25,7 @@ in `docs/evidence/transactional_companion.provenance.json`. Historical captures
 are preserved unchanged.
 
 Current evidence uses the `recursion_depth_*` directories, captured from
-companion `91dbc0f` in the same way as the `compiler_aware_*` directories below.
+companion `46a33e1` in the same way as the `compiler_aware_*` directories below.
 They add native recursion-depth rollback exchanges and resource details version 2.
 The `failure_diagnostics_*` directories (companion `661df4e`,
 `docs/evidence/failure_diagnostics_companion.provenance.json`) and the

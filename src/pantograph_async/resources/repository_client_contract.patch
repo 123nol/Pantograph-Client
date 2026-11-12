@@ -1443,10 +1443,10 @@ index 781f4bf..c28487b 100644
    printContext: Bool := true
 diff --git a/Pantograph/Resources.lean b/Pantograph/Resources.lean
 new file mode 100644
-index 0000000..eb394a6
+index 0000000..3f94bb9
 --- /dev/null
 +++ b/Pantograph/Resources.lean
-@@ -0,0 +1,80 @@
+@@ -0,0 +1,123 @@
 +import Lean
 +
 +namespace Pantograph
@@ -1499,6 +1499,44 @@ index 0000000..eb394a6
 +  | some (phase, recorded) => return if sameException recorded ex then phase else "unknown"
 +  | none => return "unknown"
 +
++/-- The limit of the innermost `set_option … in` scope that a recursion-depth
++    exception left, with that exception. The scope's context has unwound by the
++    time the phase boundary sees the exception, so the scope records its own. -/
++builtin_initialize scopedRecursionLimit : IO.Ref (Option (Nat × Exception)) ← IO.mkRef none
++
++/-- The limit a `set_option maxRecDepth N in` scope applies; `none` for other options,
++    which leave the recursion limit unchanged. Lean requires a numeric literal here. -/
++private def scopeLimit (stx : Syntax) : Option Nat :=
++  if stx[1].getId.eraseMacroScopes == `maxRecDepth then stx[3].isNatLit? else none
++
++/-- Run a `set_option … in` scope; if a recursion-depth exception leaves a scope
++    that sets `maxRecDepth` and no inner scope recorded it, record this limit. -/
++private def recordingScopedLimit [Monad m] [MonadControlT CoreM m]
++    (stx : Syntax) (scope : m α) : m α :=
++  match scopeLimit stx with
++  | none => scope
++  | some limit => controlAt CoreM fun run => tryCatchRuntimeEx (run scope) fun ex => do
++    if ex.isMaxRecDepth then
++      let recorded := match ← scopedRecursionLimit.get with
++        | some (_, previous) => sameException previous ex
++        | none => false
++      unless recorded do scopedRecursionLimit.set (some (limit, ex))
++    throw ex
++
++/-- Wrap Lean's tactic and term `set_option … in` elaborators in place, so each
++    still has exactly one elaborator and ordinary failures are unchanged. -/
++builtin_initialize do
++  Elab.Tactic.tacticElabAttribute.tableRef.modify fun table =>
++    match table.find? ``Lean.Parser.Tactic.set_option with
++    | some entries => table.insert ``Lean.Parser.Tactic.set_option <| entries.map fun entry =>
++        { entry with value := fun stx => recordingScopedLimit stx (entry.value stx) }
++    | none => table
++  Elab.Term.termElabAttribute.tableRef.modify fun table =>
++    match table.find? ``Lean.Parser.Term.set_option with
++    | some entries => table.insert ``Lean.Parser.Term.set_option <| entries.map fun entry =>
++        { entry with value := fun stx expected? => recordingScopedLimit stx (entry.value stx expected?) }
++    | none => table
++
 +private def phaseCore (phase : String) (action : CoreM α) : CoreM α := do
 +  tryCatchRuntimeEx (do
 +    Core.checkMaxHeartbeats "pantograph"
@@ -1516,10 +1554,15 @@ index 0000000..eb394a6
 +      let used := (← IO.getNumHeartbeats) - ctx.initHeartbeats
 +      if ex.isMaxHeartbeat && ctx.maxHeartbeats > 0 && used > ctx.maxHeartbeats then
 +        throw <| resource "heartbeats" (ctx.maxHeartbeats / 1000)
-+      -- Lean's own predicate for `throwMaxRecDepthAt`; the limit is this command's
-+      -- configured `maxRecDepth`, in nesting levels.
-+      if ex.isMaxRecDepth && ctx.maxRecDepth > 0 then
-+        throw <| resource "recursion-depth" ctx.maxRecDepth
++      -- Lean's own predicate for `throwMaxRecDepthAt`. The limit is the innermost
++      -- `set_option … in` scope's, recorded for this exception, or else this
++      -- command's configured `maxRecDepth`, in nesting levels.
++      if ex.isMaxRecDepth then
++        let limit := match ← scopedRecursionLimit.get with
++          | some (inner, recorded) => if sameException recorded ex then inner else ctx.maxRecDepth
++          | none => ctx.maxRecDepth
++        if limit > 0 then
++          throw <| resource "recursion-depth" limit
 +      throw ex
 +
 +/-- Account for work before and after each protected phase without resetting its budget. -/
@@ -2101,7 +2144,7 @@ index 0000000..dfe181f
 +
 +end Pantograph
 diff --git a/Repl.lean b/Repl.lean
-index f031e47..93ae1c6 100644
+index f031e47..da456b7 100644
 --- a/Repl.lean
 +++ b/Repl.lean
 @@ -1,5 +1,8 @@
@@ -2278,7 +2321,7 @@ index f031e47..93ae1c6 100644
        return .ok {
          nextStateId,
          goals,
-@@ -254,63 +258,234 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+@@ -254,63 +258,235 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
      let goalStates := args.stateIds.foldl (λ map id => map.erase id) state.goalStates
      set { state with goalStates }
      return .ok {}
@@ -2465,6 +2508,7 @@ index f031e47..93ae1c6 100644
 +def runTransaction (command : Protocol.Command) (action : MainM Lean.Json) : MainM CommandResult := do
 +  modify fun s => { s with commandSequence := s.commandSequence + 1 }
 +  failedCommandPhase.set none
++  scopedRecursionLimit.set none
 +  let entry ← get
 +  let coreEntry ← getThe Lean.Core.State
 +  let ctx ← read
@@ -2839,10 +2883,10 @@ index 0000000..75334a9
 +end Pantograph.Test.CompilerValidation
 diff --git a/Test/ContractFixtures.lean b/Test/ContractFixtures.lean
 new file mode 100644
-index 0000000..6e71107
+index 0000000..853cee8
 --- /dev/null
 +++ b/Test/ContractFixtures.lean
-@@ -0,0 +1,179 @@
+@@ -0,0 +1,196 @@
 +import Pantograph
 +
 +open Lean Elab Tactic
@@ -2962,6 +3006,23 @@ index 0000000..6e71107
 +    | 0 => pure ()
 +    | n + 1 => withIncRecDepth (go n)
 +  go 100000
++
++/-- Recurse to a given depth through Lean's own guard, then close the goal. -/
++elab "contract_recursion_depth " depth:num : tactic => do
++  let rec go : Nat → Elab.Tactic.TacticM Unit
++    | 0 => pure ()
++    | n + 1 => withIncRecDepth (go n)
++  go depth.getNat
++  (← getMainGoal).assign (mkConst ``True.intro)
++  setGoals []
++
++/-- Exhaust the recursion depth while elaborating a term. -/
++elab "contract_recursion_term" : term => do
++  let rec go : Nat → Elab.Term.TermElabM Unit
++    | 0 => pure ()
++    | n + 1 => withIncRecDepth (go n)
++  go 100000
++  return mkConst ``True.intro
 +
 +/-- Change the goal state, then exhaust the recursion depth. -/
 +elab "contract_recursion_after_change" : tactic => do
@@ -3930,10 +3991,10 @@ index 132718a..b0b2323 100644
      addTest $ assertUnreachable $ other.toString
 diff --git a/Test/Transaction.lean b/Test/Transaction.lean
 new file mode 100644
-index 0000000..7164b10
+index 0000000..4136ae4
 --- /dev/null
 +++ b/Test/Transaction.lean
-@@ -0,0 +1,160 @@
+@@ -0,0 +1,189 @@
 +import Test.Common
 +import Test.ContractFixtures
 +import Repl
@@ -4073,6 +4134,35 @@ index 0000000..7164b10
 +        (result.response.getObjVal? "nextStateId").toOption.isNone
 +  tests := tests ++ LSpec.test "repeated recursion exhaustion leaks no allocations"
 +    (repeated && (← get).goalStates.size == entryStates && (← get).nextId == entryNext)
++  -- A scoped limit is reported as the innermost `set_option maxRecDepth` scope applied it.
++  let scopedCases : List (String × Nat) := [
++    ("set_option maxRecDepth 30 in contract_recursion", 30),
++    ("set_option maxRecDepth 100 in contract_recursion", 100),
++    ("set_option maxRecDepth 1000 in contract_recursion", 1000),
++    ("set_option maxRecDepth 30 in (set_option maxRecDepth 100 in contract_recursion)", 100),
++    ("set_option pp.all true in contract_recursion", 200),
++    ("exact (set_option maxRecDepth 50 in contract_recursion_term)", 50),
++    -- A `by` block is elaborated after the term scope has exited, under the outer limit.
++    ("exact (set_option maxRecDepth 50 in (by contract_recursion))", 200)]
++  for (tactic, expected) in scopedCases do
++    let statesBefore := (← get).goalStates.size
++    let nextBefore := (← get).nextId
++    let result ← executeCommand (command "goal.tactic" [("stateId", toJson input), ("tactic", .str tactic)])
++    let resource := result.response.getObjVal? "resource" |>.toOption |>.getD Json.null
++    tests := tests ++ LSpec.test s!"{tactic} reports limit {expected} and rolls back"
++      (!result.fatal && field resource "kind" == "recursion-depth" &&
++        (resource.getObjValAs? Nat "limit").toOption == some expected &&
++        field result.response "recovery" == "command-rolled-back" &&
++        (← get).goalStates.size == statesBefore && (← get).nextId == nextBefore)
++  let deep ← execute (command "goal.tactic"
++    [("stateId", toJson input), ("tactic", .str "exact (set_option maxRecDepth 50 in (by contract_recursion_depth 120))")])
++  tests := tests ++ LSpec.test "a postponed by block runs under the outer limit"
++    ((deep.getObjValAs? Nat "nextStateId").toOption.isSome)
++  let ordinary ← execute (command "goal.tactic"
++    [("stateId", toJson input), ("tactic", .str "set_option maxRecDepth 30 in fail \"ordinary\"")])
++  let ordinaryErrors := ordinary.getObjValAs? (Array String) "tacticErrors" |>.toOption |>.getD #[]
++  tests := tests ++ LSpec.test "an ordinary failure inside a scope is one ordinary rejection"
++    (ordinaryErrors.size == 1 && (ordinaryErrors.getD 0 "").startsWith "ordinary")
 +  let proof ← execute (command "goal.tactic" [("stateId", toJson input), ("tactic", .str "exact True.intro")])
 +  let proven := proof.getObjValAs? Nat "nextStateId" |>.toOption |>.getD 99999
 +  let receipt ← execute (command "goal.certify" [("stateId", toJson proven)])
@@ -5049,10 +5139,10 @@ index 0000000..4ff1b8e
 +]
 diff --git a/doc/transactional_resources.md b/doc/transactional_resources.md
 new file mode 100644
-index 0000000..3f638cd
+index 0000000..1dbd0b9
 --- /dev/null
 +++ b/doc/transactional_resources.md
-@@ -0,0 +1,131 @@
+@@ -0,0 +1,136 @@
 +# Transactional resource errors: protocol revision 3
 +
 +`protocol.describe` reports `protocolVersion: 3`, `resourceErrorVersion: 2`, and
@@ -5079,10 +5169,15 @@ index 0000000..3f638cd
 +- `heartbeats`: the limit uses Lean's `maxHeartbeats` option units; each unit
 +  counts one thousand underlying heartbeats. It does not measure elapsed seconds.
 +- `recursion-depth`: Lean's `maxRecDepth` was reached (`throwMaxRecDepthAt`,
-+  recognized with Lean's `Exception.isMaxRecDepth`). The limit is the command's
-+  configured `maxRecDepth`, in recursive nesting levels. Code that raises the
-+  depth locally inside the command (`set_option maxRecDepth … in`,
-+  `withAtLeastMaxRecDepth`) is not reflected in it.
++  recognized with Lean's `Exception.isMaxRecDepth`). The limit is in recursive
++  nesting levels: the bound of the innermost `set_option maxRecDepth N in` scope
++  (tactic or term) that the exception left, or else the command's configured
++  `maxRecDepth`. Each scope records its bound before its context unwinds, so
++  nested scopes report the inner one, and a raised bound is reported as raised.
++  A `by` block inside a term scope is elaborated after that scope exits, so the
++  outer bound is the one that applied to it. Limits changed programmatically by
++  tactic code (`withAtLeastMaxRecDepth`, Mathlib's `sudo set_option`) are not
++  captured.
 +
 +Version 2 replaces version 1; there is no version-1 negotiation. A known
 +resource cause does not by itself make the session reusable: recovery follows
@@ -5948,10 +6043,10 @@ index 0000000..8c5c109
 +    main()
 diff --git a/scripts/test_transactional_resources.py b/scripts/test_transactional_resources.py
 new file mode 100644
-index 0000000..ecbf7d3
+index 0000000..d042728
 --- /dev/null
 +++ b/scripts/test_transactional_resources.py
-@@ -0,0 +1,180 @@
+@@ -0,0 +1,188 @@
 +#!/usr/bin/env python3
 +"""Raw executable regression and revision-3 capture; no application client required."""
 +import argparse
@@ -6044,6 +6139,14 @@ index 0000000..ecbf7d3
 +        assert error == dict(error="resource", desc="Lean maximum recursion depth reached",
 +                             recovery="command-rolled-back", resource=dict(
 +                                 version=2, kind="recursion-depth", phase="execute", limit=200)), error
++        assert recursion.call("stat", {}) == {"nGoals": 1}
++    # Scoped limits are reported as the scope applied them, not as the outer launch limit.
++    for scoped in (30, 100):
++        error = recursion.call("goal.tactic", {"stateId": root["stateId"],
++                               "tactic": f"set_option maxRecDepth {scoped} in contract_recursion"})
++        assert error == dict(error="resource", desc="Lean maximum recursion depth reached",
++                             recovery="command-rolled-back", resource=dict(
++                                 version=2, kind="recursion-depth", phase="execute", limit=scoped)), error
 +        assert recursion.call("stat", {}) == {"nGoals": 1}
 +    counted = recursion.call("goal.start", {"expr": "(List.replicate 2000 0).length = 2000"})
 +    real = recursion.call("goal.tactic", {"stateId": counted["stateId"], "tactic": "decide"})

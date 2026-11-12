@@ -1,15 +1,15 @@
 {
   "kind": "recursion-depth-resource-capture-provenance",
-  "companion_commit": "91dbc0fb8b0af2d879abc51517693ec134343b33",
-  "checkout_commit": "c53879de5c3013fd8fdae36fb30f716bfdf10838",
-  "repl_sha256": "997e5f20d2364d4394c2a2355a790cdb79cd7e6a03e6eaf7ce31f3cd9594d56b",
+  "companion_commit": "46a33e1c4e311cdc03ff1a2baa8eaeb36a69ff40",
+  "checkout_commit": "6293e16f460d2f8ebe84677258d190ed2fe948b8",
+  "repl_sha256": "56cfdd7e4c967b3ae41a2d3730303a924933a7b61c885629fef8d0987b6f5950",
   "toolchain": "leanprover/lean4:v4.10.0-rc1",
-  "captured_exchanges": 36,
+  "captured_exchanges": 40,
   "cumulative_requests": 3000,
   "files_sha256": {
     "schema.json": "c8e4df72f3a5f37b0248f7c9a2954d6287103bced44decca69b9a7d58936e97f",
     "fixtures.json": "3e300aed899b066a8ba6a61d60ca9cb0992e6f1459f76cc3e07480e5749a1488",
-    "capture.json": "2cda61e7b09e759c9bbc96f6d48f5099e6ad6ca319af742262eab068feb7be44"
+    "capture.json": "1f43082bd8991a51875946c4f93645fa5a37d899bd30425f77551db2dc17fdf1"
   },
   "scope": "Fresh native transactional-resource exchanges against the recursion-depth executable, including recursion-depth rollback and same-session certification; no historical captures rewritten."
 }

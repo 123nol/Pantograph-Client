@@ -216,9 +216,9 @@
   "descriptor_revision_note": "Protocol version 3 with transitionValidationVersion 3 requires execution-closure-and-representation-aware-audit; validation versions 1 and 2 are rejected.",
   "companion_patch": {
     "file": "repository_client_contract.patch",
-    "sha256": "4f9d104eaf4d0a9a8bd392ff453632b004d3cb6b7db6449c8bcff28b4d4ae541",
+    "sha256": "9b6377e60647a15bd0d2e161fc89ae36b975fa2425b05023b317d2f5067e31c5",
     "provenance": "../docs/evidence/recursion_depth_companion.provenance.json",
-    "repl_sha256": "997e5f20d2364d4394c2a2355a790cdb79cd7e6a03e6eaf7ce31f3cd9594d56b",
+    "repl_sha256": "56cfdd7e4c967b3ae41a2d3730303a924933a7b61c885629fef8d0987b6f5950",
     "live_capture": "../tests/fixtures/recursion_depth_snapshot_companion/capture.json",
     "previous": {
       "sha256": "f53b57ee215b35fad7cae684e77eb5c771a246faaecba6eccfe77d96dce73f39",
