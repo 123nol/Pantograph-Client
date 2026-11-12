@@ -123,7 +123,7 @@ never overwritten.
 
 This development version requires protocol version 3 and transition validation
 version 3. The bundled patch reproduces
-companion commit `661df4e32bb487f52e4bf229a34b155f9e69c76b`.
+companion commit `46a33e1c4e311cdc03ff1a2baa8eaeb36a69ff40`.
 Native recovery and snapshot exchanges are verified against that build.
 Application migration and matched deployment remain delivery requirements. See
 [compatibility](docs/compatibility.md).
@@ -135,7 +135,7 @@ The client speaks one server contract:
 | --- | --- |
 | `protocol` | `maths-ai-pantograph` |
 | `protocolVersion` | 3 |
-| `resourceErrorVersion` | 1 |
+| `resourceErrorVersion` | 2 |
 | `commandTransactionVersion` | 1 |
 | `modelSexpVersion` | 1 (`pantograph_async.MODEL_SEXP_VERSION`) |
 | `transitionValidationVersion` | 3 |
@@ -201,10 +201,10 @@ wheel with `PANTOGRAPH_CLIENT_REQUIRE_INSTALLED=1`, so imports must come from
 the installed distribution. From a downloaded sdist alone:
 
 ```bash
-tar -xzf pantograph_async_client-0.6.0.tar.gz
-python -m build --wheel pantograph_async_client-0.6.0
-pip install pantograph_async_client-0.6.0/dist/*.whl pytest
-mkdir suite && cp -r pantograph_async_client-0.6.0/tests suite/ && cd suite
+tar -xzf pantograph_async_client-0.7.0.tar.gz
+python -m build --wheel pantograph_async_client-0.7.0
+pip install pantograph_async_client-0.7.0/dist/*.whl pytest
+mkdir suite && cp -r pantograph_async_client-0.7.0/tests suite/ && cd suite
 PANTOGRAPH_CLIENT_REQUIRE_INSTALLED=1 python -m pytest -q --rootdir . tests
 ```
 

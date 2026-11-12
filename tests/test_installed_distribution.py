@@ -172,7 +172,7 @@ def test_imports_resolve_to_the_installed_distribution():
     location = Path(pantograph_async.__file__).resolve()
     assert "site-packages" in location.parts
     assert not (location.parents[1] / "pyproject.toml").exists()
-    assert diagnostics.distribution_version() == "0.6.0"
+    assert diagnostics.distribution_version() == "0.7.0"
 
 
 @REQUIRE_INSTALLED

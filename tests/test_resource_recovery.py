@@ -35,9 +35,11 @@ INTERNAL = FIXTURES["internal"]
 @pytest.mark.parametrize("command", sorted(SUPPORTED_COMMANDS))
 @pytest.mark.parametrize("phase", ["execute", "validate", "observe", "serialize"])
 @pytest.mark.parametrize("recovery", ["command-rolled-back", "session-unusable"])
-def test_resource_codec(command, phase, recovery):
+@pytest.mark.parametrize("kind", ["heartbeats", "recursion-depth"])
+def test_resource_codec(command, phase, recovery, kind):
     wire = deepcopy(RESOURCE)
     wire["resource"]["phase"] = phase
+    wire["resource"]["kind"] = kind
     wire["recovery"] = recovery
     result = decode_response(command, wire)
     error = result.as_exception()
@@ -49,7 +51,7 @@ def test_resource_codec(command, phase, recovery):
     assert type(error) is expected
     assert error.command == command
     assert (error.kind, error.phase, error.limit, error.recovery) == (
-        "heartbeats",
+        kind,
         phase,
         200000,
         recovery,
@@ -97,12 +99,14 @@ def test_invalid_envelopes(wire):
     "command",
     sorted(SUPPORTED_COMMANDS - {"protocol.describe", "options.set", "options.print"}),
 )
+@pytest.mark.parametrize("kind", ["heartbeats", "recursion-depth"])
 def test_rollback_preserves_allocations_for_every_operation(
-    setup, monkeypatch, command
+    setup, monkeypatch, command, kind
 ):
     env, report = setup
     # Configure after startup for runtime commands; the child reads its launch environment.
     monkeypatch.setenv("PANTOGRAPH_FAKE_RESOURCE_COMMAND", command)
+    monkeypatch.setenv("PANTOGRAPH_FAKE_RESOURCE_KIND", kind)
 
     async def body():
         async with await PantographClient.create(env) as client:
@@ -129,6 +133,7 @@ def test_rollback_preserves_allocations_for_every_operation(
                     with pytest.raises(PantographResourceError) as caught:
                         await operations[command]()
                     assert caught.value.command == command
+                    assert caught.value.kind == kind
                     assert before == (
                         scope._allocations,
                         dict(scope._issued),
@@ -318,12 +323,14 @@ def test_interrupted_resource_response_remains_terminal(setup, monkeypatch, canc
         ("internal", PantographRemoteInternalError),
     ],
 )
+@pytest.mark.parametrize("kind", ["heartbeats", "recursion-depth"])
 def test_fatal_errors_on_all_operations_retire_owned_states(
-    setup, monkeypatch, command, mode, expected
+    setup, monkeypatch, command, mode, expected, kind
 ):
     env, report = setup
     monkeypatch.setenv("PANTOGRAPH_FAKE_RESOURCE_COMMAND", command)
     monkeypatch.setenv("PANTOGRAPH_FAKE_RESOURCE_MODE", mode)
+    monkeypatch.setenv("PANTOGRAPH_FAKE_RESOURCE_KIND", kind)
 
     async def body():
         async with await PantographClient.create(env) as client:
@@ -366,9 +373,11 @@ def test_repeated_rollback_does_not_retain_or_consume_states(setup):
         async with await PantographClient.create(env) as client:
             async with client.state_scope() as scope:
                 root = await scope.start_goal("True")
-                for _ in range(30):
-                    with pytest.raises(PantographResourceError):
-                        await scope.apply_tactic(root, "resource_rollback")
+                for index in range(30):
+                    kind = "recursion-depth" if index % 2 else "heartbeats"
+                    with pytest.raises(PantographResourceError) as caught:
+                        await scope.apply_tactic(root, f"resource_rollback@{kind}")
+                    assert caught.value.kind == kind
                 assert scope._allocations == 1 and len(scope._issued) == 1
                 assert (await client.stat()).n_goals == 1
                 alternative = await scope.apply_tactic(root, "trivial")

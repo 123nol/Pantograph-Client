@@ -1,10 +1,10 @@
 {
-  "evidence": "Authored revision-3 contract fixtures; native companion agreement pending.",
+  "evidence": "Authored revision-3 contract fixtures with resource details version 2.",
   "resource": {
     "error": "resource",
     "desc": "Lean command heartbeat budget exhausted",
     "resource": {
-      "version": 1,
+      "version": 2,
       "kind": "heartbeats",
       "phase": "execute",
       "limit": 200000
@@ -15,7 +15,7 @@
     "error": "resource",
     "desc": "Lean command heartbeat budget exhausted",
     "resource": {
-      "version": 1,
+      "version": 2,
       "kind": "heartbeats",
       "phase": "execute",
       "limit": 200000
@@ -31,7 +31,7 @@
     {
       "desc": "Lean command heartbeat budget exhausted",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": "heartbeats",
         "phase": "execute",
         "limit": 200000
@@ -41,7 +41,7 @@
     {
       "error": "resource",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": "heartbeats",
         "phase": "execute",
         "limit": 200000
@@ -57,7 +57,7 @@
       "error": "resource",
       "desc": "Lean command heartbeat budget exhausted",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": "heartbeats",
         "phase": "execute",
         "limit": 200000
@@ -89,7 +89,7 @@
       "error": "resource",
       "desc": "Lean command heartbeat budget exhausted",
       "resource": {
-        "version": 2,
+        "version": 1,
         "kind": "heartbeats",
         "phase": "execute",
         "limit": 200000
@@ -122,7 +122,7 @@
       "error": "resource",
       "desc": "Lean command heartbeat budget exhausted",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": "memory",
         "phase": "execute",
         "limit": 200000
@@ -133,7 +133,7 @@
       "error": "resource",
       "desc": "Lean command heartbeat budget exhausted",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": null,
         "phase": "execute",
         "limit": 200000
@@ -144,7 +144,7 @@
       "error": "resource",
       "desc": "Lean command heartbeat budget exhausted",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": 1,
         "phase": "execute",
         "limit": 200000
@@ -155,7 +155,7 @@
       "error": "resource",
       "desc": "Lean command heartbeat budget exhausted",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": "heartbeats",
         "phase": "startup",
         "limit": 200000
@@ -166,7 +166,7 @@
       "error": "resource",
       "desc": "Lean command heartbeat budget exhausted",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": "heartbeats",
         "phase": null,
         "limit": 200000
@@ -177,7 +177,7 @@
       "error": "resource",
       "desc": "Lean command heartbeat budget exhausted",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": "heartbeats",
         "phase": 1,
         "limit": 200000
@@ -188,7 +188,7 @@
       "error": "resource",
       "desc": "Lean command heartbeat budget exhausted",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": "heartbeats",
         "phase": "execute",
         "limit": true
@@ -199,7 +199,7 @@
       "error": "resource",
       "desc": "Lean command heartbeat budget exhausted",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": "heartbeats",
         "phase": "execute",
         "limit": false
@@ -210,7 +210,7 @@
       "error": "resource",
       "desc": "Lean command heartbeat budget exhausted",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": "heartbeats",
         "phase": "execute",
         "limit": 0
@@ -221,7 +221,7 @@
       "error": "resource",
       "desc": "Lean command heartbeat budget exhausted",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": "heartbeats",
         "phase": "execute",
         "limit": -1
@@ -232,7 +232,7 @@
       "error": "resource",
       "desc": "Lean command heartbeat budget exhausted",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": "heartbeats",
         "phase": "execute",
         "limit": 1.5
@@ -243,7 +243,7 @@
       "error": "resource",
       "desc": "Lean command heartbeat budget exhausted",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": "heartbeats",
         "phase": "execute",
         "limit": "1"
@@ -254,7 +254,7 @@
       "error": "resource",
       "desc": "Lean command heartbeat budget exhausted",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": "heartbeats",
         "phase": "execute",
         "limit": null
@@ -275,7 +275,7 @@
       "error": "resource",
       "desc": "Lean command heartbeat budget exhausted",
       "resource": {
-        "version": 1,
+        "version": 2,
         "phase": "execute",
         "limit": 200000
       },
@@ -285,7 +285,7 @@
       "error": "resource",
       "desc": "Lean command heartbeat budget exhausted",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": "heartbeats",
         "limit": 200000
       },
@@ -295,7 +295,7 @@
       "error": "resource",
       "desc": "Lean command heartbeat budget exhausted",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": "heartbeats",
         "phase": "execute"
       },
@@ -305,7 +305,7 @@
       "error": "resource",
       "desc": "Lean command heartbeat budget exhausted",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": "heartbeats",
         "phase": "execute",
         "limit": 200000
@@ -317,7 +317,7 @@
       "error": "resource",
       "desc": "Lean command heartbeat budget exhausted",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": "heartbeats",
         "phase": "execute",
         "limit": 200000
@@ -329,7 +329,7 @@
       "error": "resource",
       "desc": "Lean command heartbeat budget exhausted",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": "heartbeats",
         "phase": "execute",
         "limit": 200000
@@ -341,7 +341,7 @@
       "error": "resource",
       "desc": "Lean command heartbeat budget exhausted",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": "heartbeats",
         "phase": "execute",
         "limit": 200000
@@ -353,7 +353,7 @@
       "error": "resource",
       "desc": "Lean command heartbeat budget exhausted",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": "heartbeats",
         "phase": "execute",
         "limit": 200000
@@ -365,7 +365,7 @@
       "error": "resource",
       "desc": "Lean command heartbeat budget exhausted",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": "heartbeats",
         "phase": "execute",
         "limit": 200000
@@ -376,7 +376,7 @@
       "error": "resource",
       "desc": "",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": "heartbeats",
         "phase": "execute",
         "limit": 200000
@@ -387,7 +387,7 @@
       "error": "resource",
       "desc": "Lean command heartbeat budget exhausted",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": "heartbeats",
         "phase": "execute",
         "limit": 200000,
@@ -405,7 +405,7 @@
       "desc": "Unexpected REPL command failure",
       "recovery": "session-unusable",
       "resource": {
-        "version": 1,
+        "version": 2,
         "kind": "heartbeats",
         "phase": "execute",
         "limit": 200000
@@ -416,6 +416,28 @@
       "desc": "Unexpected REPL command failure",
       "recovery": "session-unusable",
       "stateId": 0
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 3,
+        "kind": "heartbeats",
+        "phase": "execute",
+        "limit": 200000
+      },
+      "recovery": "command-rolled-back"
+    },
+    {
+      "error": "resource",
+      "desc": "Lean command heartbeat budget exhausted",
+      "resource": {
+        "version": 2,
+        "kind": "recursion",
+        "phase": "execute",
+        "limit": 200000
+      },
+      "recovery": "command-rolled-back"
     }
   ]
 }

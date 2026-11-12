@@ -24,9 +24,13 @@ recovery exchanges. Artifact hashes and the source/binary identity are recorded
 in `docs/evidence/transactional_companion.provenance.json`. Historical captures
 are preserved unchanged.
 
-Current evidence uses the `failure_diagnostics_*` directories, captured from
-companion `661df4e` in the same way as the `compiler_aware_*` directories below,
-which are now history (`docs/evidence/compiler_aware_companion.provenance.json`).
+Current evidence uses the `recursion_depth_*` directories, captured from
+companion `46a33e1` in the same way as the `compiler_aware_*` directories below.
+They add native recursion-depth rollback exchanges and resource details version 2.
+The `failure_diagnostics_*` directories (companion `661df4e`,
+`docs/evidence/failure_diagnostics_companion.provenance.json`) and the
+`compiler_aware_*` ones (`docs/evidence/compiler_aware_companion.provenance.json`)
+are history.
 
 The `compiler_aware_*` layout:
 

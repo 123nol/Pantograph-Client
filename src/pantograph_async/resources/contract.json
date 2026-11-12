@@ -11,7 +11,7 @@
     "messageVersion": 1,
     "goalSelection": "explicit-focused-v1",
     "tacticErrorsFormat": "string-array-v1",
-    "resourceErrorVersion": 1,
+    "resourceErrorVersion": 2,
     "commandTransactionVersion": 1
   },
   "required_options": {
@@ -107,7 +107,7 @@
   },
   "baseline_provenance": "../tests/fixtures/pantograph/baseline/provenance.json",
   "complete_theorem_certification": true,
-  "contract_revision": 6,
+  "contract_revision": 7,
   "reconciled_on": "2026-11-05",
   "implementation_status": {
     "stage0": "Rebaselined on upstream PR #1; live unextended captures recorded.",
@@ -216,14 +216,14 @@
   "descriptor_revision_note": "Protocol version 3 with transitionValidationVersion 3 requires execution-closure-and-representation-aware-audit; validation versions 1 and 2 are rejected.",
   "companion_patch": {
     "file": "repository_client_contract.patch",
-    "sha256": "f53b57ee215b35fad7cae684e77eb5c771a246faaecba6eccfe77d96dce73f39",
-    "provenance": "../docs/evidence/failure_diagnostics_companion.provenance.json",
-    "repl_sha256": "670c9b058bc2cdb7e85fb81befdf1ee81e6a19ad7744a2d2594cea1262935745",
-    "live_capture": "../tests/fixtures/failure_diagnostics_snapshot_companion/capture.json",
+    "sha256": "9b6377e60647a15bd0d2e161fc89ae36b975fa2425b05023b317d2f5067e31c5",
+    "provenance": "../docs/evidence/recursion_depth_companion.provenance.json",
+    "repl_sha256": "56cfdd7e4c967b3ae41a2d3730303a924933a7b61c885629fef8d0987b6f5950",
+    "live_capture": "../tests/fixtures/recursion_depth_snapshot_companion/capture.json",
     "previous": {
-      "sha256": "0611ea2f9fe12c81bc788deda7f3300890bb9762d8df31cd6bf5db6b7306e0c6",
-      "repl_sha256": "6cba4f74fdf2bc8ba7060603e7bc11feffb7229dd8c288ec7c3c0ba2e9c2ef29",
-      "live_capture": "../tests/fixtures/compiler_aware_snapshot_companion/capture.json"
+      "sha256": "f53b57ee215b35fad7cae684e77eb5c771a246faaecba6eccfe77d96dce73f39",
+      "repl_sha256": "670c9b058bc2cdb7e85fb81befdf1ee81e6a19ad7744a2d2594cea1262935745",
+      "live_capture": "../tests/fixtures/failure_diagnostics_snapshot_companion/capture.json"
     }
   },
   "transition_provenance": {
@@ -324,9 +324,10 @@
   },
   "revision2_fixture": "../tests/fixtures/pantograph/historical_revision2/future_contract.json",
   "resource_errors": {
-    "version": 1,
+    "version": 2,
     "kinds": [
-      "heartbeats"
+      "heartbeats",
+      "recursion-depth"
     ],
     "phases": [
       "execute",
@@ -334,7 +335,7 @@
       "observe",
       "serialize"
     ],
-    "limit": "positive integer in maxHeartbeats option units; booleans rejected",
+    "limit": "positive integer in the kind's units (heartbeats: maxHeartbeats option units; recursion-depth: maxRecDepth nesting levels); booleans rejected",
     "recovery": [
       "command-rolled-back",
       "session-unusable"

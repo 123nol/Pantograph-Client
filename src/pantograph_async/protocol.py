@@ -17,6 +17,10 @@ from typing import Any, Literal, Mapping, cast
 # The client owns every wire version. Consumers compare their own expression
 # representation against these values instead of the codec importing theirs.
 MODEL_SEXP_VERSION = 1
+# Resource details: Lean limits a command can exhaust, each in its own units
+# (heartbeats in Lean option units, recursion depth in nesting levels).
+RESOURCE_DETAILS_VERSION = 2
+RESOURCE_KINDS = ("heartbeats", "recursion-depth")
 TRANSITION_VALIDATION_VERSION = 3
 TRANSITION_VALIDATION_SCOPE = "execution-closure-and-representation-aware-audit"
 
@@ -24,7 +28,7 @@ PROTOCOL_DESCRIPTION = MappingProxyType(
     {
         "protocol": "maths-ai-pantograph",
         "protocolVersion": 3,
-        "resourceErrorVersion": 1,
+        "resourceErrorVersion": RESOURCE_DETAILS_VERSION,
         "commandTransactionVersion": 1,
         "modelSexpVersion": MODEL_SEXP_VERSION,
         "transitionValidationVersion": TRANSITION_VALIDATION_VERSION,
@@ -148,7 +152,7 @@ class PantographTransportError(PantographError):
     pass
 
 
-ResourceKind = Literal["heartbeats"]
+ResourceKind = Literal["heartbeats", "recursion-depth"]
 ResourcePhase = Literal["execute", "validate", "observe", "serialize"]
 Recovery = Literal["command-rolled-back", "session-unusable"]
 
@@ -1064,7 +1068,7 @@ def decode_response(command: str, payload: Any) -> Response:
                 kind = _string(resource["kind"], "resource kind")
                 phase = _string(resource["phase"], "resource phase")
                 limit = _nat(resource["limit"], "resource limit")
-                if version != 1 or kind != "heartbeats":
+                if version != RESOURCE_DETAILS_VERSION or kind not in RESOURCE_KINDS:
                     raise PantographProtocolError(
                         "Unsupported resource version or kind."
                     )

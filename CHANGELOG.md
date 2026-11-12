@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.7.0 (unreleased)
+
+- Resource details version 2: `resourceErrorVersion` 2 is required, and a
+  resource error's `kind` is `heartbeats` or `recursion-depth`. Its `limit` is in
+  that kind's units (`maxHeartbeats` option units, or `maxRecDepth` nesting
+  levels). Both kinds raise `PantographResourceError` after a verified rollback
+  and `PantographSessionResourceError` otherwise. Version 1, unknown kinds and
+  malformed limits are protocol errors; there is no version-1 fallback.
+- Pin companion `46a33e1`: Lean's maximum recursion depth is a rolled-back
+  resource outcome instead of an unexpected internal error that ended the
+  session. Add current `recursion_depth_*` captures; earlier captures stay
+  historical.
+- Client contract revision 7. Recovery classes, allocation ownership and the
+  failure evidence are unchanged.
+
 ## 0.6.0 (unreleased)
 
 - Add `pantograph_async.evidence`: request events reported to an optional
