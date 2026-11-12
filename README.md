@@ -123,7 +123,7 @@ never overwritten.
 
 This development version requires protocol version 3 and transition validation
 version 3. The bundled patch reproduces
-companion commit `91dbc0fb8b0af2d879abc51517693ec134343b33`.
+companion commit `46a33e1c4e311cdc03ff1a2baa8eaeb36a69ff40`.
 Native recovery and snapshot exchanges are verified against that build.
 Application migration and matched deployment remain delivery requirements. See
 [compatibility](docs/compatibility.md).

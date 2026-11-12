@@ -8,7 +8,7 @@
   levels). Both kinds raise `PantographResourceError` after a verified rollback
   and `PantographSessionResourceError` otherwise. Version 1, unknown kinds and
   malformed limits are protocol errors; there is no version-1 fallback.
-- Pin companion `91dbc0f`: Lean's maximum recursion depth is a rolled-back
+- Pin companion `46a33e1`: Lean's maximum recursion depth is a rolled-back
   resource outcome instead of an unexpected internal error that ended the
   session. Add current `recursion_depth_*` captures; earlier captures stay
   historical.

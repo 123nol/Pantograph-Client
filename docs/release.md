@@ -17,7 +17,7 @@ patch releases.
 
 Version 0.7.0 requires protocol version 3, transition validation version 3 and
 resource details version 2. The bundled
-patch reproduces companion commit `91dbc0fb8b0af2d879abc51517693ec134343b33`;
+patch reproduces companion commit `46a33e1c4e311cdc03ff1a2baa8eaeb36a69ff40`;
 source/binary identities and native evidence are recorded in
 `docs/evidence/recursion_depth_companion.provenance.json`. Complete the application's
 validation-version migration and validate the matched deployment before rollout.

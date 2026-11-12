@@ -245,7 +245,7 @@ failures. `exact`, `refine` and `have` with a placeholder Lean cannot
 synthesize now give an ordinary `PantographTacticRejected` with Lean's message
 instead of ending the session.
 
-Companion `91dbc0f` reports Lean's maximum recursion depth as a resource error
+Companion `46a33e1` reports Lean's maximum recursion depth as a resource error
 with `kind: "recursion-depth"` instead of an unexpected internal failure. A
 tactic that exceeds it is rolled back: `PantographResourceError`, the input
 state stays usable, and another tactic can be applied to it in the same session.

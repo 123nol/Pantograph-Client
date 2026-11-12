@@ -15,10 +15,10 @@ that agreement before returning build pins.
 | Transition validation | 3, `execution-closure-and-representation-aware-audit` |
 | Resource version | 2 (`heartbeats`, `recursion-depth`) |
 | Command-transaction version | 1 |
-| Companion commit | `91dbc0fb8b0af2d879abc51517693ec134343b33` |
+| Companion commit | `46a33e1c4e311cdc03ff1a2baa8eaeb36a69ff40` |
 | Patch base | `0dd5d2225e2d093f66a4b6231c1aa35004f2c8f3` |
-| Patch SHA-256 | `4f9d104eaf4d0a9a8bd392ff453632b004d3cb6b7db6449c8bcff28b4d4ae541` |
-| Reference executable SHA-256 | `997e5f20d2364d4394c2a2355a790cdb79cd7e6a03e6eaf7ce31f3cd9594d56b` |
+| Patch SHA-256 | `9b6377e60647a15bd0d2e161fc89ae36b975fa2425b05023b317d2f5067e31c5` |
+| Reference executable SHA-256 | `56cfdd7e4c967b3ae41a2d3730303a924933a7b61c885629fef8d0987b6f5950` |
 | Lean | `leanprover/lean4:v4.10.0-rc1` |
 | Native Mathlib source | `29dcec074de168ac2bf835a77ef68bbe069194c5` |
 | Platform | Linux, Python 3.11+, GNU coreutils `stdbuf` |
@@ -35,7 +35,7 @@ validation decoder or disabled-check option is provided.
 ```bash
 git clone https://github.com/123nol/Pantograph.git
 cd Pantograph
-git checkout --detach 91dbc0fb8b0af2d879abc51517693ec134343b33
+git checkout --detach 46a33e1c4e311cdc03ff1a2baa8eaeb36a69ff40
 python -c "from pantograph_async import compatibility as c; c.verify_companion_sources('.')"
 lake build repl test scope_diagnostic compiler_diagnostic
 lake test
