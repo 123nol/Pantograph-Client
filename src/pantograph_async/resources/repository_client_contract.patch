@@ -1280,7 +1280,7 @@ index 23a2046..e00381b 100644
  
  end Pantograph
 diff --git a/Pantograph/Protocol.lean b/Pantograph/Protocol.lean
-index 781f4bf..7b1f0b7 100644
+index 781f4bf..c28487b 100644
 --- a/Pantograph/Protocol.lean
 +++ b/Pantograph/Protocol.lean
 @@ -11,9 +11,6 @@ namespace Pantograph.Protocol
@@ -1293,14 +1293,16 @@ index 781f4bf..7b1f0b7 100644
    -- When enabled, pretty print every expression
    printExprPretty: Bool    := true
    -- When enabled, print the raw AST of expressions
-@@ -99,6 +96,21 @@ structure InteractionError where
+@@ -99,6 +96,23 @@ structure InteractionError where
    desc: String
    deriving Lean.ToJson
  
-+/-- Resource limits use Lean option units, which count thousands of heartbeats. -/
++/-- A command that exhausted a Lean resource limit. `limit` is in the kind's own
++    units: `heartbeats` in Lean option units (thousands of heartbeats),
++    `recursion-depth` in recursive nesting levels (`maxRecDepth`). -/
 +structure ResourceDetails where
-+  version : Nat := 1
-+  kind : String := "heartbeats"
++  version : Nat := 2
++  kind : String
 +  phase : String
 +  limit : Nat
 +  deriving Lean.ToJson
@@ -1315,7 +1317,7 @@ index 781f4bf..7b1f0b7 100644
  def errorIndex (desc: String): InteractionError := { error := "index", desc }
  def errorExpr (desc: String): InteractionError := { error := "expr", desc }
  
-@@ -201,7 +213,6 @@ structure EnvAddResult where
+@@ -201,7 +215,6 @@ structure EnvAddResult where
  
  /-- Set options; See `Options` struct above for meanings -/
  structure OptionsSet where
@@ -1323,7 +1325,7 @@ index 781f4bf..7b1f0b7 100644
    printExprPretty?: Option Bool
    printExprAST?: Option Bool
    printExprModelAST?: Option Bool
-@@ -267,6 +278,53 @@ structure Message where
+@@ -267,6 +280,53 @@ structure Message where
  /-- Helper to create an error message from a plain string -/
  def Message.error (s : String) : Message := { severity := "error", data := s }
  
@@ -1332,7 +1334,7 @@ index 781f4bf..7b1f0b7 100644
 +structure ProtocolDescriptor where
 +  protocol: String := "maths-ai-pantograph"
 +  protocolVersion: Nat := 3
-+  resourceErrorVersion: Nat := 1
++  resourceErrorVersion: Nat := 2
 +  commandTransactionVersion: Nat := 1
 +  modelSexpVersion: Nat := 1
 +  transitionValidationVersion: Nat := 3
@@ -1377,7 +1379,7 @@ index 781f4bf..7b1f0b7 100644
  structure GoalTacticResult where
    -- The next goal state id. Existence of this field shows success
    nextStateId?: Option Nat          := .none
-@@ -282,6 +340,9 @@ structure GoalTacticResult where
+@@ -282,6 +342,9 @@ structure GoalTacticResult where
    -- Structured diagnostic / error messages from execution
    messages: Array Message := #[]
  
@@ -1387,7 +1389,7 @@ index 781f4bf..7b1f0b7 100644
    -- Soundness audit flags expected by modern clients
    hasSorry: Bool := false
    hasUnsafe: Bool := false
-@@ -319,6 +380,51 @@ structure GoalPrintResult where
+@@ -319,6 +382,51 @@ structure GoalPrintResult where
    parent?: Option Expression
    deriving Lean.ToJson
  
@@ -1441,10 +1443,10 @@ index 781f4bf..7b1f0b7 100644
    printContext: Bool := true
 diff --git a/Pantograph/Resources.lean b/Pantograph/Resources.lean
 new file mode 100644
-index 0000000..7c373ed
+index 0000000..eb394a6
 --- /dev/null
 +++ b/Pantograph/Resources.lean
-@@ -0,0 +1,73 @@
+@@ -0,0 +1,80 @@
 +import Lean
 +
 +namespace Pantograph
@@ -1455,7 +1457,8 @@ index 0000000..7c373ed
 +  descr := "write bounded REPL request and outcome traces to stderr"
 +}
 +
-+/-- The phase is attached before unwinding restored goal contexts. -/
++/-- A command exhausted a Lean resource limit (heartbeats or recursion depth).
++    The kind, phase and limit are attached before unwinding restores goal contexts. -/
 +builtin_initialize commandResourceExceptionId : InternalExceptionId ←
 +  registerInternalExceptionId `pantographCommandResource
 +
@@ -1507,10 +1510,16 @@ index 0000000..7c373ed
 +        | none => true
 +      if innermost then failedCommandPhase.set (some (phase, ex))
 +      let ctx ← read
++      let resource (kind : String) (limit : Nat) : Exception :=
++        .internal commandResourceExceptionId <|
++          ({} : KVMap).setString `kind kind |>.setString `phase phase |>.setNat `limit limit
 +      let used := (← IO.getNumHeartbeats) - ctx.initHeartbeats
 +      if ex.isMaxHeartbeat && ctx.maxHeartbeats > 0 && used > ctx.maxHeartbeats then
-+        throw <| .internal commandResourceExceptionId <|
-+          ({} : KVMap).setString `phase phase |>.setNat `limit (ctx.maxHeartbeats / 1000)
++        throw <| resource "heartbeats" (ctx.maxHeartbeats / 1000)
++      -- Lean's own predicate for `throwMaxRecDepthAt`; the limit is this command's
++      -- configured `maxRecDepth`, in nesting levels.
++      if ex.isMaxRecDepth && ctx.maxRecDepth > 0 then
++        throw <| resource "recursion-depth" ctx.maxRecDepth
 +      throw ex
 +
 +/-- Account for work before and after each protected phase without resetting its budget. -/
@@ -2092,7 +2101,7 @@ index 0000000..dfe181f
 +
 +end Pantograph
 diff --git a/Repl.lean b/Repl.lean
-index f031e47..c1f326b 100644
+index f031e47..93ae1c6 100644
 --- a/Repl.lean
 +++ b/Repl.lean
 @@ -1,5 +1,8 @@
@@ -2269,7 +2278,7 @@ index f031e47..c1f326b 100644
        return .ok {
          nextStateId,
          goals,
-@@ -254,63 +258,231 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
+@@ -254,63 +258,234 @@ def execute (command: Protocol.Command): MainM Lean.Json := do
      let goalStates := args.stateIds.foldl (λ map id => map.erase id) state.goalStates
      set { state with goalStates }
      return .ok {}
@@ -2496,11 +2505,14 @@ index f031e47..c1f326b 100644
 +          let response := Lean.toJson ({ error := "validation", desc := details.getString `desc } : Protocol.InteractionError)
 +          { response, bytes := response.compress, fatal := true }
 +        else if id == commandResourceExceptionId && details.getNat `limit > 0 &&
-+            ["execute", "validate", "observe", "serialize"].contains (details.getString `phase) then
++            ["execute", "validate", "observe", "serialize"].contains (details.getString `phase) &&
++            ["heartbeats", "recursion-depth"].contains (details.getString `kind) then
++          let kind := details.getString `kind
++          let desc := if kind == "heartbeats" then "Lean command heartbeat budget exhausted"
++            else "Lean maximum recursion depth reached"
 +          if command.cmd == "goal.certify" then
 +            let response := Lean.toJson ({
-+              status := "inconclusive",
-+              reason? := some "Lean command heartbeat budget exhausted" } : Protocol.GoalCertifyResult)
++              status := "inconclusive", reason? := some desc } : Protocol.GoalCertifyResult)
 +            { response, bytes := response.compress }
            else
 -            []
@@ -2531,9 +2543,9 @@ index f031e47..c1f326b 100644
 -    catch e =>
 -      return .error $ errorI "frontend" (← e.toMessageData.toString)
 +            -- Frontend imports and output files may have effects outside retained Lean state.
-+            fail "resource" "Lean command heartbeat budget exhausted"
++            fail "resource" desc
 +              (if command.cmd == "frontend.process" then "session-unusable" else "command-rolled-back")
-+              (some { phase := details.getString `phase, limit := details.getNat `limit })
++              (some { kind, phase := details.getString `phase, limit := details.getNat `limit })
 +        else fail "internal" "Unexpected REPL command failure" "session-unusable"
 +      | _ => fail "internal" "Unexpected REPL command failure" "session-unusable"
 +    if (Lean.Json.getObjValAs? result.response String "error").toOption == some "internal" then
@@ -2827,10 +2839,10 @@ index 0000000..75334a9
 +end Pantograph.Test.CompilerValidation
 diff --git a/Test/ContractFixtures.lean b/Test/ContractFixtures.lean
 new file mode 100644
-index 0000000..e0c62e4
+index 0000000..6e71107
 --- /dev/null
 +++ b/Test/ContractFixtures.lean
-@@ -0,0 +1,162 @@
+@@ -0,0 +1,179 @@
 +import Pantograph
 +
 +open Lean Elab Tactic
@@ -2943,6 +2955,23 @@ index 0000000..e0c62e4
 +  for _ in [:1000000] do
 +    expr := mkApp (mkConst ``Nat.succ) expr
 +    discard <| Meta.whnf expr
++
++/-- Exhaust the configured recursion depth through Lean's own guard. -/
++elab "contract_recursion" : tactic => do
++  let rec go : Nat → Elab.Tactic.TacticM Unit
++    | 0 => pure ()
++    | n + 1 => withIncRecDepth (go n)
++  go 100000
++
++/-- Change the goal state, then exhaust the recursion depth. -/
++elab "contract_recursion_after_change" : tactic => do
++  let goal ← getMainGoal
++  goal.assign (mkConst ``True.intro)
++  setGoals []
++  let rec go : Nat → Elab.Tactic.TacticM Unit
++    | 0 => pure ()
++    | n + 1 => withIncRecDepth (go n)
++  go 100000
 +
 +/-- Exercise a fatal exception at the executable transaction boundary. -/
 +elab "contract_internal_failure" : tactic => do
@@ -3901,10 +3930,10 @@ index 132718a..b0b2323 100644
      addTest $ assertUnreachable $ other.toString
 diff --git a/Test/Transaction.lean b/Test/Transaction.lean
 new file mode 100644
-index 0000000..50bf197
+index 0000000..7164b10
 --- /dev/null
 +++ b/Test/Transaction.lean
-@@ -0,0 +1,108 @@
+@@ -0,0 +1,160 @@
 +import Test.Common
 +import Test.ContractFixtures
 +import Repl
@@ -3922,6 +3951,16 @@ index 0000000..50bf197
 +  for _ in [:1000000] do
 +    discard <| Meta.whnf (mkApp (mkConst ``Nat.succ) (mkNatLit 0)) |>.run'
 +
++private def recurse : CoreM Unit := do
++  let rec go : Nat → CoreM Unit
++    | 0 => pure ()
++    | n + 1 => withIncRecDepth (go n)
++  go 100000
++
++/-- Exhaust one resource kind: heartbeats or recursion depth. -/
++private def exhaust (kind : String) : CoreM Unit :=
++  if kind == "heartbeats" then burn else recurse
++
 +private def tests : MainM LSpec.TestSeq := do
 +  let mut tests := LSpec.TestSeq.done
 +  let start ← execute (command "goal.start" [("expr", .str "True")])
@@ -3934,37 +3973,40 @@ index 0000000..50bf197
 +  let entry ← get
 +  let env ← getEnv
 +  let coreEntry ← getThe Core.State
-+  let mut limits := #[]
-+  for phase in ["execute", "validate", "observe", "serialize"] do
-+    let result ← runTransaction (command "goal.start") do
-+      -- Stage changes to all retained allocations, options, and the environment.
-+      modify fun s => { s with
-+        nextId := 99999, goalStates := {},
-+        options := { s.options with printExprAST := true } }
-+      let added ← Pantograph.Environment.addDecl {
-+        name := "Transaction.staged", type := "True", value := "True.intro", isTheorem := false }
-+      unless added.toOption.isSome && (← getEnv).contains `Transaction.staged do
-+        throwError "staged declaration was not installed"
-+      modifyEnv fun env => env.setMainModule `MustBeDiscarded
-+      modifyThe Core.State fun s => { s with nextMacroScope := 99999 }
-+      logInfo "discarded command message"
-+      withCommandPhase phase do
-+        burn
-+        return Json.null
-+    let resource := result.response.getObjVal? "resource" |>.toOption |>.getD Json.null
-+    limits := limits.push (resource.getObjValAs? Nat "limit" |>.toOption |>.getD 0)
-+    tests := tests ++ LSpec.test s!"{phase} has a single recoverable resource envelope"
-+      (!result.fatal && field result.response "error" == "resource" &&
-+        field result.response "recovery" == "command-rolled-back" && field resource "phase" == phase &&
-+        (Json.parse result.bytes).toOption == some result.response && !result.bytes.contains '\n' &&
-+        (result.response.getObjVal? "stateId").toOption.isNone)
-+    tests := tests ++ LSpec.test s!"{phase} discards all staged mutations"
-+      ((← get).nextId == entry.nextId && (← get).goalStates.size == entry.goalStates.size &&
-+        !(← get).options.printExprAST && (← getEnv).mainModule == env.mainModule &&
-+        !(← getEnv).contains `Transaction.staged && (← getEnv).contains `Transaction.kept &&
-+        (← getThe Core.State).nextMacroScope == coreEntry.nextMacroScope &&
-+        (← getThe Core.State).messages.toArray.size == coreEntry.messages.toArray.size)
-+  tests := tests ++ LSpec.test "reported limits use option units" (limits.all (· == 100))
++  let mut limits : Array (String × Nat) := #[]
++  for kind in ["heartbeats", "recursion-depth"] do
++    for phase in ["execute", "validate", "observe", "serialize"] do
++      let result ← runTransaction (command "goal.start") do
++        -- Stage changes to all retained allocations, options, and the environment.
++        modify fun s => { s with
++          nextId := 99999, goalStates := {},
++          options := { s.options with printExprAST := true } }
++        let added ← Pantograph.Environment.addDecl {
++          name := "Transaction.staged", type := "True", value := "True.intro", isTheorem := false }
++        unless added.toOption.isSome && (← getEnv).contains `Transaction.staged do
++          throwError "staged declaration was not installed"
++        modifyEnv fun env => env.setMainModule `MustBeDiscarded
++        modifyThe Core.State fun s => { s with nextMacroScope := 99999 }
++        logInfo "discarded command message"
++        withCommandPhase phase do
++          exhaust kind
++          return Json.null
++      let resource := result.response.getObjVal? "resource" |>.toOption |>.getD Json.null
++      limits := limits.push (kind, resource.getObjValAs? Nat "limit" |>.toOption |>.getD 0)
++      tests := tests ++ LSpec.test s!"{kind} in {phase} has a single recoverable resource envelope"
++        (!result.fatal && field result.response "error" == "resource" &&
++          field result.response "recovery" == "command-rolled-back" && field resource "phase" == phase &&
++          field resource "kind" == kind && (resource.getObjValAs? Nat "version").toOption == some 2 &&
++          (Json.parse result.bytes).toOption == some result.response && !result.bytes.contains '\n' &&
++          (result.response.getObjVal? "stateId").toOption.isNone)
++      tests := tests ++ LSpec.test s!"{kind} in {phase} discards all staged mutations"
++        ((← get).nextId == entry.nextId && (← get).goalStates.size == entry.goalStates.size &&
++          !(← get).options.printExprAST && (← getEnv).mainModule == env.mainModule &&
++          !(← getEnv).contains `Transaction.staged && (← getEnv).contains `Transaction.kept &&
++          (← getThe Core.State).nextMacroScope == coreEntry.nextMacroScope &&
++          (← getThe Core.State).messages.toArray.size == coreEntry.messages.toArray.size)
++  tests := tests ++ LSpec.test "reported limits use each kind's units"
++    (limits.all fun (kind, limit) => limit == if kind == "heartbeats" then 100 else 200)
 +  let deletion ← runTransaction (command "goal.delete") do
 +    modify fun s => { s with goalStates := s.goalStates.erase root }
 +    withCommandPhase "serialize" do
@@ -3992,12 +4034,50 @@ index 0000000..50bf197
 +  let certified ← execute (command "goal.certify" [("stateId", toJson done)])
 +  tests := tests ++ LSpec.test "the original retained state supports a certified proof after timeout"
 +    (field certified "status" == "certified")
-+  let exhausted ← runTransaction (command "goal.certify") do
-+    burn
-+    return Json.null
-+  tests := tests ++ LSpec.test "outer certification exhaustion is inconclusive without a receipt"
-+    (field exhausted.response "status" == "inconclusive" && !exhausted.fatal &&
-+      (exhausted.response.getObjVal? "receipt").toOption.isNone)
++  for kind in ["heartbeats", "recursion-depth"] do
++    let exhausted ← runTransaction (command "goal.certify") do
++      exhaust kind
++      return Json.null
++    tests := tests ++ LSpec.test s!"outer certification {kind} exhaustion is inconclusive without a receipt"
++      (field exhausted.response "status" == "inconclusive" && !exhausted.fatal &&
++        (exhausted.response.getObjVal? "receipt").toOption.isNone &&
++        (field exhausted.response "reason").length > 0)
++  -- Recursion depth: a real tactic, a native fixture and a state change before exhaustion.
++  let counted ← execute (command "goal.start" [("expr", .str "(List.replicate 2000 0).length = 2000")])
++  let counting := counted.getObjValAs? Nat "stateId" |>.toOption |>.getD 99999
++  let before ← get
++  let real ← executeCommand (command "goal.tactic"
++    [("stateId", toJson counting), ("tactic", .str "decide")])
++  let realResource := real.response.getObjVal? "resource" |>.toOption |>.getD Json.null
++  tests := tests ++ LSpec.test "a real tactic exhausting the recursion depth is a rolled-back resource"
++    (!real.fatal && field real.response "error" == "resource" &&
++      field realResource "kind" == "recursion-depth" && field realResource "phase" == "execute" &&
++      (realResource.getObjValAs? Nat "limit").toOption == some 200 &&
++      field real.response "recovery" == "command-rolled-back" &&
++      (← get).nextId == before.nextId && (← get).goalStates.size == before.goalStates.size)
++  let other ← execute (command "goal.tactic" [("stateId", toJson counting), ("tactic", .str "exact List.length_replicate 2000 0")])
++  let otherDone := other.getObjValAs? Nat "nextStateId" |>.toOption |>.getD 99999
++  let otherCertified ← execute (command "goal.certify" [("stateId", toJson otherDone)])
++  tests := tests ++ LSpec.test "another tactic on the retained input certifies in the same session"
++    (field otherCertified "status" == "certified")
++  let fresh ← execute (command "goal.start" [("expr", .str "True")])
++  let input := fresh.getObjValAs? Nat "stateId" |>.toOption |>.getD 99999
++  let entryStates := (← get).goalStates.size
++  let entryNext := (← get).nextId
++  let mut repeated := true
++  for tactic in ["contract_recursion", "contract_recursion_after_change"] do
++    for _ in [:25] do
++      let result ← executeCommand (command "goal.tactic" [("stateId", toJson input), ("tactic", .str tactic)])
++      let resource := result.response.getObjVal? "resource" |>.toOption |>.getD Json.null
++      repeated := repeated && !result.fatal && field resource "kind" == "recursion-depth" &&
++        (result.response.getObjVal? "nextStateId").toOption.isNone
++  tests := tests ++ LSpec.test "repeated recursion exhaustion leaks no allocations"
++    (repeated && (← get).goalStates.size == entryStates && (← get).nextId == entryNext)
++  let proof ← execute (command "goal.tactic" [("stateId", toJson input), ("tactic", .str "exact True.intro")])
++  let proven := proof.getObjValAs? Nat "nextStateId" |>.toOption |>.getD 99999
++  let receipt ← execute (command "goal.certify" [("stateId", toJson proven)])
++  tests := tests ++ LSpec.test "a state changed before exhaustion is restored and still certifies"
++    (field receipt "status" == "certified")
 +  let fatal ← runTransaction (command "stat") do
 +    throwError "unexpected failure"
 +  let after ← executeCommand (command "stat")
@@ -4009,7 +4089,8 @@ index 0000000..50bf197
 +def suite (_ : Environment) : List (String × IO LSpec.TestSeq) := [
 +  ("Command rollback and native budgets", do
 +    let env ← importModules #[{ module := `Test.ContractFixtures }] {} (trustLevel := 1)
-+    runCoreMSeq env (tests.run { imports := ["Test.ContractFixtures"] } |>.run' {}) #["maxHeartbeats=100"])
++    runCoreMSeq env (tests.run { imports := ["Test.ContractFixtures"] } |>.run' {})
++      #["maxHeartbeats=100", "maxRecDepth=200"])
 +]
 +
 +end Pantograph.Test.Transaction
@@ -4889,16 +4970,16 @@ index 0000000..1441d1e
 +Resource errors and complete command rollback follow [the revision-3 transaction contract](transactional_resources.md).
 diff --git a/doc/transactional_resources.fixtures.json b/doc/transactional_resources.fixtures.json
 new file mode 100644
-index 0000000..222b09b
+index 0000000..4ff1b8e
 --- /dev/null
 +++ b/doc/transactional_resources.fixtures.json
-@@ -0,0 +1,62 @@
+@@ -0,0 +1,73 @@
 +[
 +  {
 +    "error": "resource",
 +    "desc": "Lean command heartbeat budget exhausted",
 +    "resource": {
-+      "version": 1,
++      "version": 2,
 +      "kind": "heartbeats",
 +      "phase": "execute",
 +      "limit": 200000
@@ -4909,7 +4990,7 @@ index 0000000..222b09b
 +    "error": "resource",
 +    "desc": "Lean command heartbeat budget exhausted",
 +    "resource": {
-+      "version": 1,
++      "version": 2,
 +      "kind": "heartbeats",
 +      "phase": "validate",
 +      "limit": 200000
@@ -4920,7 +5001,7 @@ index 0000000..222b09b
 +    "error": "resource",
 +    "desc": "Lean command heartbeat budget exhausted",
 +    "resource": {
-+      "version": 1,
++      "version": 2,
 +      "kind": "heartbeats",
 +      "phase": "observe",
 +      "limit": 200000
@@ -4931,7 +5012,7 @@ index 0000000..222b09b
 +    "error": "resource",
 +    "desc": "Lean command heartbeat budget exhausted",
 +    "resource": {
-+      "version": 1,
++      "version": 2,
 +      "kind": "heartbeats",
 +      "phase": "serialize",
 +      "limit": 200000
@@ -4940,9 +5021,20 @@ index 0000000..222b09b
 +  },
 +  {
 +    "error": "resource",
++    "desc": "Lean maximum recursion depth reached",
++    "resource": {
++      "version": 2,
++      "kind": "recursion-depth",
++      "phase": "execute",
++      "limit": 512
++    },
++    "recovery": "command-rolled-back"
++  },
++  {
++    "error": "resource",
 +    "desc": "Lean command heartbeat budget exhausted",
 +    "resource": {
-+      "version": 1,
++      "version": 2,
 +      "kind": "heartbeats",
 +      "phase": "execute",
 +      "limit": 200000
@@ -4957,13 +5049,13 @@ index 0000000..222b09b
 +]
 diff --git a/doc/transactional_resources.md b/doc/transactional_resources.md
 new file mode 100644
-index 0000000..af39b7b
+index 0000000..3f638cd
 --- /dev/null
 +++ b/doc/transactional_resources.md
-@@ -0,0 +1,118 @@
+@@ -0,0 +1,131 @@
 +# Transactional resource errors: protocol revision 3
 +
-+`protocol.describe` reports `protocolVersion: 3`, `resourceErrorVersion: 1`, and
++`protocol.describe` reports `protocolVersion: 3`, `resourceErrorVersion: 2`, and
 +`commandTransactionVersion: 1`. Model expressions, transition provenance,
 +inspection, messages, and certification keep their version-1 representations.
 +Transition validation now uses [version 3](compiler_aware_validation.md). Startup still emits `ready.`.
@@ -4980,10 +5072,21 @@ index 0000000..af39b7b
 +tactic errors retain their representations. Human descriptions are bounded;
 +clients classify errors through fields rather than descriptions.
 +
-+A resource error includes `resource.version: 1`, `resource.kind: "heartbeats"`,
-+a phase (`execute`, `validate`, `observe`, or `serialize`), and a positive
-+`resource.limit`. The limit uses Lean's `maxHeartbeats` option units: each unit
-+counts one thousand underlying heartbeats. It does not measure elapsed seconds.
++A resource error includes `resource.version: 2`, a `resource.kind`, a phase
++(`execute`, `validate`, `observe`, or `serialize`), and a positive
++`resource.limit` in that kind's units:
++
++- `heartbeats`: the limit uses Lean's `maxHeartbeats` option units; each unit
++  counts one thousand underlying heartbeats. It does not measure elapsed seconds.
++- `recursion-depth`: Lean's `maxRecDepth` was reached (`throwMaxRecDepthAt`,
++  recognized with Lean's `Exception.isMaxRecDepth`). The limit is the command's
++  configured `maxRecDepth`, in recursive nesting levels. Code that raises the
++  depth locally inside the command (`set_option maxRecDepth … in`,
++  `withAtLeastMaxRecDepth`) is not reflected in it.
++
++Version 2 replaces version 1; there is no version-1 negotiation. A known
++resource cause does not by itself make the session reusable: recovery follows
++the rules below for both kinds.
 +Unexpected exceptions produce `error: "internal"` with
 +`recovery: "session-unusable"`.
 +
@@ -5005,7 +5108,7 @@ index 0000000..af39b7b
 +live allocation. Reset retains its established semantics of clearing all
 +allocations and restarting IDs.
 +
-+A classified heartbeat failure returns `recovery: "command-rolled-back"` only
++A classified resource failure returns `recovery: "command-rolled-back"` only
 +when discarding the staged state establishes recovery. Ordinary failures may
 +still return their established diagnostics. A validation integrity failure also
 +discards staged state, emits the existing validation envelope, and ends the session.
@@ -5015,7 +5118,9 @@ index 0000000..af39b7b
 +
 +`frontend.process` can execute module initializers and write an output file.
 +Its resource failures therefore use `session-unusable`, and unexpected frontend
-+IO failures are fatal. Successful frontend operations retain their existing
++IO failures are fatal. Lean's command elaborator reports a recursion-depth
++failure inside a processed file as that command's error message, as when
++compiling the file, so such a file returns its messages normally. Successful frontend operations retain their existing
 +results. Rollback never promises to reverse arbitrary external IO performed
 +by tactics. This protocol does not sandbox tactics.
 +
@@ -5081,10 +5186,10 @@ index 0000000..af39b7b
 +for identities, evidence limits, and remaining companion/deployment gates.
 diff --git a/doc/transactional_resources.schema.json b/doc/transactional_resources.schema.json
 new file mode 100644
-index 0000000..8380e7b
+index 0000000..b77823b
 --- /dev/null
 +++ b/doc/transactional_resources.schema.json
-@@ -0,0 +1,82 @@
+@@ -0,0 +1,85 @@
 +{
 +  "$schema": "https://json-schema.org/draft/2020-12/schema",
 +  "title": "Pantograph revision 3 command failure",
@@ -5123,10 +5228,13 @@ index 0000000..8380e7b
 +          ],
 +          "properties": {
 +            "version": {
-+              "const": 1
++              "const": 2
 +            },
 +            "kind": {
-+              "const": "heartbeats"
++              "enum": [
++                "heartbeats",
++                "recursion-depth"
++              ]
 +            },
 +            "phase": {
 +              "enum": [
@@ -5840,10 +5948,10 @@ index 0000000..8c5c109
 +    main()
 diff --git a/scripts/test_transactional_resources.py b/scripts/test_transactional_resources.py
 new file mode 100644
-index 0000000..76e5ef0
+index 0000000..ecbf7d3
 --- /dev/null
 +++ b/scripts/test_transactional_resources.py
-@@ -0,0 +1,152 @@
+@@ -0,0 +1,180 @@
 +#!/usr/bin/env python3
 +"""Raw executable regression and revision-3 capture; no application client required."""
 +import argparse
@@ -5902,7 +6010,7 @@ index 0000000..76e5ef0
 +    session = Session(entries, "--maxHeartbeats=100", "--pantograph.traceCommands=true")
 +    descriptor = session.call("protocol.describe", {})
 +    assert descriptor["protocolVersion"] == 3
-+    assert descriptor["resourceErrorVersion"] == descriptor["commandTransactionVersion"] == 1
++    assert descriptor["resourceErrorVersion"] == 2 and descriptor["commandTransactionVersion"] == 1
 +    root = session.call("goal.start", {"expr": "True"})
 +    for _ in range(3000):
 +        assert session.call("stat", {}, record=False) == {"nGoals": 1}
@@ -5911,7 +6019,7 @@ index 0000000..76e5ef0
 +        error = session.call("goal.tactic", {"stateId": root["stateId"], "tactic": tactic})
 +        assert error == dict(error="resource", desc="Lean command heartbeat budget exhausted",
 +                             recovery="command-rolled-back", resource=dict(
-+                                 version=1, kind="heartbeats", phase=phase, limit=100))
++                                 version=2, kind="heartbeats", phase=phase, limit=100))
 +        assert session.call("stat", {}) == {"nGoals": 1}
 +    failed = session.call("goal.start", {"expr": "by contract_heartbeat"})
 +    assert failed["error"] == "resource" and failed["recovery"] == "command-rolled-back"
@@ -5928,6 +6036,34 @@ index 0000000..76e5ef0
 +    traces = [json.loads(line) for line in session.close().splitlines()]
 +    assert any(trace["phase"] == "observe" for trace in traces)
 +    assert all(len(trace["tactic"]) <= 512 and trace["heartbeats"] > 0 for trace in traces)
++
++    recursion = Session(entries, "--maxHeartbeats=100", "--maxRecDepth=200")
++    root = recursion.call("goal.start", {"expr": "True"})
++    for tactic in ["contract_recursion", "contract_recursion_after_change"]:
++        error = recursion.call("goal.tactic", {"stateId": root["stateId"], "tactic": tactic})
++        assert error == dict(error="resource", desc="Lean maximum recursion depth reached",
++                             recovery="command-rolled-back", resource=dict(
++                                 version=2, kind="recursion-depth", phase="execute", limit=200)), error
++        assert recursion.call("stat", {}) == {"nGoals": 1}
++    counted = recursion.call("goal.start", {"expr": "(List.replicate 2000 0).length = 2000"})
++    real = recursion.call("goal.tactic", {"stateId": counted["stateId"], "tactic": "decide"})
++    assert real["error"] == "resource" and real["resource"]["kind"] == "recursion-depth", real
++    assert real["recovery"] == "command-rolled-back" and "nextStateId" not in real
++    assert recursion.call("stat", {}) == {"nGoals": 2}
++    other = recursion.call("goal.tactic", {"stateId": counted["stateId"],
++                                           "tactic": "exact List.length_replicate 2000 0"})
++    assert recursion.call("goal.certify", {"stateId": other["nextStateId"]})["status"] == "certified"
++    done = recursion.call("goal.tactic", {"stateId": root["stateId"], "tactic": "exact True.intro"})
++    assert recursion.call("goal.certify", {"stateId": done["nextStateId"]})["status"] == "certified"
++    recursion.close()
++
++    # Lean's command elaborator reports recursion exhaustion in a file as that
++    # command's error, as when compiling it; the session is unaffected.
++    frontend = Session(entries, "--maxHeartbeats=100", "--maxRecDepth=200")
++    response = frontend.call("frontend.process", {"file": "example : True := by contract_recursion", "invocations": False, "sorrys": False})
++    assert "maximum recursion depth" in response["units"][0]["messages"][0], response
++    assert frontend.call("stat", {}) == {"nGoals": 0}
++    frontend.close()
 +
 +    fatal = Session(entries, "--maxHeartbeats=100")
 +    root = fatal.call("goal.start", {"expr": "True"})
@@ -5991,7 +6127,7 @@ index 0000000..76e5ef0
 +            imports=["Init", "Test.ContractFixtures"], mathlib=None, exchanges=entries)
 +        args.capture.parent.mkdir(parents=True, exist_ok=True)
 +        args.capture.write_text(json.dumps(result, indent=2) + "\n")
-+    print(f"PASS: native recovery, certification, framing, fatal shutdown, tracing, and broken output ({len(entries)} captured exchanges)")
++    print(f"PASS: native recovery for heartbeats and recursion depth, certification, framing, fatal shutdown, tracing, and broken output ({len(entries)} captured exchanges)")
 +
 +
 +if __name__ == "__main__":

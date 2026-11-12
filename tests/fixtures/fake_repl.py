@@ -108,6 +108,9 @@ def main():
                 if resource_tactic
                 else os.environ.get("PANTOGRAPH_FAKE_RESOURCE_MODE", "rollback")
             )
+            # `resource_<mode>@<kind>` or PANTOGRAPH_FAKE_RESOURCE_KIND selects the kind.
+            mode, _, kind = mode.partition("@")
+            kind = kind or os.environ.get("PANTOGRAPH_FAKE_RESOURCE_KIND", "heartbeats")
             delay = float(os.environ.get("PANTOGRAPH_FAKE_RESOURCE_DELAY", "0"))
             time.sleep(delay)
             if mode == "text":
@@ -115,12 +118,16 @@ def main():
                 continue
             result = {
                 "error": "resource",
-                "desc": "Lean command heartbeat budget exhausted",
+                "desc": (
+                    "Lean command heartbeat budget exhausted"
+                    if kind == "heartbeats"
+                    else "Lean maximum recursion depth reached"
+                ),
                 "resource": {
-                    "version": 1,
-                    "kind": "heartbeats",
+                    "version": 2,
+                    "kind": kind,
                     "phase": "execute",
-                    "limit": 200000,
+                    "limit": 200000 if kind == "heartbeats" else 512,
                 },
                 "recovery": (
                     "session-unusable" if mode == "fatal" else "command-rolled-back"
@@ -142,7 +149,7 @@ def main():
             result = {
                 "protocol": "maths-ai-pantograph",
                 "protocolVersion": 3,
-                "resourceErrorVersion": 1,
+                "resourceErrorVersion": 2,
                 "commandTransactionVersion": 1,
                 "modelSexpVersion": 1,
                 "transitionValidationVersion": 3,

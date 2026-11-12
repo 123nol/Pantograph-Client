@@ -180,6 +180,27 @@ def test_ordinary_rejection_and_resource_rollback_keep_the_session(setup):
     assert_reaped(report)
 
 
+def test_a_recursion_depth_rollback_is_recorded_with_its_kind(setup):
+    env, report = setup
+
+    async def body():
+        async with await PantographClient.create(env) as client:
+            async with client.state_scope() as scope:
+                root = await scope.start_goal("True")
+                with pytest.raises(PantographResourceError):
+                    await scope.apply_tactic(root, "resource_rollback@recursion-depth")
+                snapshot = client.last_failure
+                assert snapshot.error_type == "PantographResourceError"
+                assert snapshot.payload["resource"]["kind"] == "recursion-depth"
+                assert snapshot.payload["recovery"] == "command-rolled-back"
+                assert client.is_usable
+                await scope.apply_tactic(root, "trivial")
+                json.dumps(snapshot.to_dict())
+
+    run(body)
+    assert_reaped(report)
+
+
 def test_snapshot_bounds_and_ambiguous_records():
     record = {
         "kind": "pantograph-command-failure", "version": 1, "repl_command_sequence": 2,

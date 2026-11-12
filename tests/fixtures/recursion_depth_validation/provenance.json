@@ -1,0 +1,26 @@
+{
+  "kind": "recursion-depth-validation-capture-provenance",
+  "companion_commit": "91dbc0fb8b0af2d879abc51517693ec134343b33",
+  "checkout_commit": "91dbc0fb8b0af2d879abc51517693ec134343b33",
+  "repl_sha256": "997e5f20d2364d4394c2a2355a790cdb79cd7e6a03e6eaf7ce31f3cd9594d56b",
+  "toolchain": "leanprover/lean4:v4.10.0-rc1",
+  "core_exchanges": 44,
+  "mathlib_exchanges": 40,
+  "mathlib_source_verification": {
+    "reference_commit": "29dcec074de168ac2bf835a77ef68bbe069194c5",
+    "checked_files": 4737,
+    "missing_or_different": [],
+    "local_extra_lean_files": []
+  },
+  "files_sha256": {
+    "schema.json": "1784d046264b9e66adf35f1855935d43535702220496bd2ae687247169b01975",
+    "fixtures.json": "94629dd054eb88acd142ef74bd30c6d2f8a9b213a2d7313f730af369cfb0c15b",
+    "capture.json": "9c96fa831fc1d9cbfec62a821763d806e8292a009cae00798ffd7c304c2c6581",
+    "client_capture.json": "36b7c2afb07bd5a287f616ea6dc4aa8850a5f056aac1957cd8eebd7c69db9db8"
+  },
+  "scope": "Committed REPL schema and fixtures plus fresh executable exchanges against the recursion-depth executable; the client lifecycle checks are recorded separately.",
+  "client_configured_exchanges": {
+    "core": 52,
+    "mathlib": 42
+  }
+}

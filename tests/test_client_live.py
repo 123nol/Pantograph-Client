@@ -278,6 +278,19 @@ def test_a_protocol_version_1_binary_is_rejected_at_startup(live_env):
 
 
 @pytest.mark.pantograph_live
+def test_a_resource_version_1_binary_is_rejected_at_startup(live_env):
+    old = os.environ.get("PANTOGRAPH_TEST_RESOURCE1_REPL")
+    if not old:
+        pytest.skip("PANTOGRAPH_TEST_RESOURCE1_REPL not configured.")
+
+    async def run():
+        with pytest.raises(PantographProtocolError, match="resourceErrorVersion"):
+            await PantographClient.create(replace(live_env, pantograph_repl=Path(old)))
+
+    asyncio.run(run())
+
+
+@pytest.mark.pantograph_live
 def test_a_validation_version_2_binary_is_rejected_at_startup(live_env):
     old = os.environ.get("PANTOGRAPH_TEST_VALIDATION2_REPL")
     if not old:
@@ -409,6 +422,35 @@ def test_native_heartbeat_rollback_keeps_original_state(live_env):
                     assert caught.value.command == "goal.tactic"
                     assert client.is_usable and (await client.stat()).n_goals == 1
                 done = await scope.apply_tactic(original, "trivial")
+                assert (await scope.certify(done)).is_certified
+            assert (await client.stat()).n_goals == 0
+        assert client.phase.value == "CLOSED"
+
+    asyncio.run(run())
+
+
+@pytest.mark.pantograph_live
+def test_native_recursion_depth_rollback_then_certified_success(live_env):
+    """A real recursion-depth limit leaves the retained input usable for another tactic."""
+    from pantograph_async import PantographResourceError
+
+    async def run():
+        fixture_env = replace(
+            live_env, imports=(*live_env.imports, "Test.ContractFixtures")
+        )
+        async with await PantographClient.create(fixture_env) as client:
+            async with client.state_scope() as scope:
+                original = await scope.start_goal("(List.replicate 2000 0).length = 2000")
+                # `decide` unfolds the list past Lean's maxRecDepth.
+                for tactic in ("decide", "contract_recursion", "decide"):
+                    with pytest.raises(PantographResourceError) as caught:
+                        await scope.apply_tactic(original, tactic)
+                    error = caught.value
+                    assert (error.kind, error.phase, error.recovery) == (
+                        "recursion-depth", "execute", "command-rolled-back")
+                    assert error.limit > 0 and error.command == "goal.tactic"
+                    assert client.is_usable and (await client.stat()).n_goals == 1
+                done = await scope.apply_tactic(original, "exact List.length_replicate 2000 0")
                 assert (await scope.certify(done)).is_certified
             assert (await client.stat()).n_goals == 0
         assert client.phase.value == "CLOSED"
