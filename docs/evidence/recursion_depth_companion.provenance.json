@@ -1,0 +1,131 @@
+{
+  "kind": "recursion-depth-companion-client-provenance",
+  "recorded_on": "2026-11-12",
+  "source_url": "https://github.com/123nol/Pantograph.git",
+  "source_commit": "91dbc0fb8b0af2d879abc51517693ec134343b33",
+  "source_branch": "Leul-Negash/Pantograph feat/recursion-depth-resource (proposed into client_centric_repo)",
+  "published_commit_verified": false,
+  "patch_base_commit": "0dd5d2225e2d093f66a4b6231c1aa35004f2c8f3",
+  "client_contract_revision": 7,
+  "client_distribution_version": "0.7.0",
+  "descriptor": {
+    "protocol": "maths-ai-pantograph",
+    "protocolVersion": 3,
+    "modelSexpVersion": 1,
+    "transitionValidationVersion": 3,
+    "transitionProvenanceVersion": 1,
+    "inspectionVersion": 1,
+    "certificationVersion": 1,
+    "messageVersion": 1,
+    "goalSelection": "explicit-focused-v1",
+    "tacticErrorsFormat": "string-array-v1",
+    "resourceErrorVersion": 2,
+    "commandTransactionVersion": 1
+  },
+  "patch_sha256": "4f9d104eaf4d0a9a8bd392ff453632b004d3cb6b7db6449c8bcff28b4d4ae541",
+  "patched_sources_sha256": {
+    "Main.lean": "858dd49d714da1e2e349fee8c151e5f2df76ae9e701e9a86a55e95d99bc12672",
+    "Pantograph.lean": "68e0f53f75a10feb52a9aa22d7d1e05f86ad9a1b0dcaf406c6e8949f01dbf802",
+    "Pantograph/Certify.lean": "8894c252e3e938778e91124dfe8f0eb8c445bc1a57a0e51329aabe7393d556f8",
+    "Pantograph/DeclarationAudit.lean": "87ab2f86defbef07f0b5f1610d6eeeb1efcbcf5a11e1696f5e1db9afcd71eccd",
+    "Pantograph/Diagnostics.lean": "3e56d216d05212a780c1054bee813ed1d14ab03ad7095e92bf9f3479ebd9bd40",
+    "Pantograph/Environment.lean": "4117530efdfd4b306eb9041f2116785067699ecc4021b2e50a12cf3032afd22c",
+    "Pantograph/Frontend/Basic.lean": "cc4c2b7b5f5b15181c76d09a1839d0caa00ad531441e78382a5bdd8fba18b23d",
+    "Pantograph/Frontend/Elab.lean": "1f1f38595f47e90130dd5cbac8aa7a78aeee59ebd104e6fd32e788e005370478",
+    "Pantograph/Goal.lean": "716811036ff1505590e70c668f87f4c8168d51510cce1ac44f02d60e088ba20c",
+    "Pantograph/Library.lean": "5fb1db123b9f5cf176fdf98b457cd5a00ada40b7aca070df5f22c37c8b55b5ad",
+    "Pantograph/Protocol.lean": "70da9efcc18f23bee86dd8c74842b646328da4c5af75bdb2ef8f341c4f10f532",
+    "Pantograph/Resources.lean": "9fa0c36788b66dad0691f7f5b6bab443df4be2acdd603c3623aacf6ed4061c3a",
+    "Pantograph/Serial.lean": "e650a3874e2094c0ed3b295393277e7e6481f4d12f26f326c3e9bf2d21f4aa87",
+    "Pantograph/Transition.lean": "a776f174d622c9e66bc7130455512232f0018de0e5001193aee39afbdd77bd2f",
+    "Pantograph/Validation.lean": "6b10fc8b445c08422009ff8b3adff222ffe88ae24a0c37d4c5f4496aed50a540",
+    "Repl.lean": "f295e02bb92a1eed181ee09193d2dcc6b57023e3ada6affd66ab9b0127645f05",
+    "Test/Common.lean": "eb42eb050f70fca876f8a419165741b9acfc339442e89f971aba5112dfbb0c10",
+    "Test/CompilerDiagnostic.lean": "58ea0a6b4603344c2aa9ff0d32ffdeda5e6402ac95178e934a1cb933b19ada8e",
+    "Test/CompilerValidation.lean": "2d0b77a6962b4ad3c9d398ee154e04e22f96cbdbd10d8e6253d930de78d5113f",
+    "Test/ContractFixtures.lean": "4c0a6c02c7555d4db05be884ece2029c1e71a47be51222c3e37d7cb05c9bd464",
+    "Test/FailureBoundary.lean": "6e5a1a7b6127b887b14223c0ab2ddb46b02c1b7f504fadcbf8a4203c2a6845a6",
+    "Test/Frontend.lean": "23a571fc55f6fa1d614e6bda468bc3b7daf6178c2ffe1649a483f6fe3715acc3",
+    "Test/Integration.lean": "ccf09b60d297e56f619b5a35653eb94b57d27a5467cb1d3d2652f9f3f70e8e03",
+    "Test/Main.lean": "3032f01c2d6b2bc70c719b155ae7cc45f5e3141d27c0dc4783b1e5e9be0b86f3",
+    "Test/Mathlib/ScopeControls.lean": "9b7d03abfe546361d952b977655b013efadf9d322cc39d47210224fd842bc4eb",
+    "Test/Proofs.lean": "3ba0d58a2399ab0e671cee54f0540543e1ce56aa2dee4b0fa269ed0ee464db71",
+    "Test/ScopeDiagnostic.lean": "19de460970b337fa5589ff62f83c4326e521340ba1e4e52a89b3e8248c257ff5",
+    "Test/ScopeValidation.lean": "82432de0076ea36fa23b504c38532a09aba8c92f3c46a6159d58652ca088e687",
+    "Test/Snapshot.lean": "b6adfde2bac25c91d9ee3b475e67d044b31a6fce8329852c138bcc6fb8a0c7ba",
+    "Test/Tactic/Prograde.lean": "11a08437a691602d75f34b84296107b8126cc1c2cb39597ae0d52df2b45a4562",
+    "Test/Transaction.lean": "4b1324b1b2e71da0a6417ca28fb465027d5004cecbc9be6a27571eff7b2e5fb3",
+    "Test/Validation.lean": "3b6ca0903503bb7d2760ddf9295c95f99f95e32ecb5bd9d28624d34007a1ec46",
+    "doc/compiler_aware_validation.md": "536018aac8e55cc9aa56073e2719f02cf7b327072e9d45096b7661ada741bac5",
+    "doc/failure_diagnostics.md": "8263c8d3cbdcb71443742b5e0067d772859e93c56b7733952fb00da6f4c34aed",
+    "doc/repository_client_contract.md": "38ab19fe9f397ff83dcfd84abdab32437b85fda1d3ec3e6c7aa5a35850e6d4ee",
+    "doc/scope_aware_ownership.md": "24c11f21b44abc54c44c73b164be91f5dc6856a2cd82bfbab4b39213e5bfffec",
+    "doc/scope_aware_validation.fixtures.json": "94629dd054eb88acd142ef74bd30c6d2f8a9b213a2d7313f730af369cfb0c15b",
+    "doc/scope_aware_validation.md": "5153311b3e6cae839c1911308f7045b9ce277a3749dcf0ad4648a8848a251b16",
+    "doc/scope_aware_validation.schema.json": "1784d046264b9e66adf35f1855935d43535702220496bd2ae687247169b01975",
+    "doc/snapshot_protocol.md": "a7d00918b66dd64984de67a98521ce9b31e5d0560c72661a4221c42c46dbb62b",
+    "doc/transactional_resources.fixtures.json": "3e300aed899b066a8ba6a61d60ca9cb0992e6f1459f76cc3e07480e5749a1488",
+    "doc/transactional_resources.md": "6706d87b9a806ccb0da6eae41ff36b7359a1c8b466e159c1fb9ab01fb4c8d796",
+    "doc/transactional_resources.schema.json": "c8e4df72f3a5f37b0248f7c9a2954d6287103bced44decca69b9a7d58936e97f",
+    "lakefile.lean": "118ef9cf0559e87a61641d0e68abd83468305bc340c8f53e1714b1020d59ff19",
+    "scripts/capture_repository_client_contract.py": "3135d2dd59655f4c5348a7cd13dd5a6fbdb09b6ce24748fbc6c5b9d636ac95b8",
+    "scripts/test_failure_diagnostics.py": "e45fc6b6a519b2af6cf3851336451b9ae8421273b58ca9f5701b9e845869619a",
+    "scripts/test_scope_aware_validation.py": "b679fe002e8db3e98bc977694ae8ac9c9ff5c12a0fb43c4af18660e27234af3f",
+    "scripts/test_transactional_resources.py": "1cd8a80df258a5fffc298b19f9a638221b490970129881926ac3fc06bfc9e307"
+  },
+  "repl_sha256": "997e5f20d2364d4394c2a2355a790cdb79cd7e6a03e6eaf7ce31f3cd9594d56b",
+  "toolchain": "leanprover/lean4:v4.10.0-rc1",
+  "previous_companion": {
+    "source_commit": "661df4e32bb487f52e4bf229a34b155f9e69c76b",
+    "repl_sha256": "670c9b058bc2cdb7e85fb81befdf1ee81e6a19ad7744a2d2594cea1262935745"
+  },
+  "build": {
+    "passed": true,
+    "method": "Build repl, test, scope_diagnostic, compiler_diagnostic and the native harnesses from a checkout of 91dbc0f; the bundled patch applied to the recorded base reproduces all 48 changed sources."
+  },
+  "tests": {
+    "native_lean_suite": {
+      "passed": true,
+      "assertions": 431,
+      "new_assertions": 13,
+      "log": "recursion_depth_companion.native-tests.log"
+    },
+    "native_resource_harness": {
+      "passed": true,
+      "captured_exchanges": 36
+    },
+    "native_failure_harness": {
+      "passed": true
+    },
+    "native_validation_harness": {
+      "passed": true,
+      "core_exchanges": 44,
+      "mathlib_exchanges": 40
+    },
+    "client_offline": {
+      "passed": 1020,
+      "skipped": 27
+    },
+    "client_live": {
+      "passed": 23,
+      "skipped": 1,
+      "skipped_reason": "no validation-version-2 executable configured"
+    }
+  },
+  "reproduction": "Merged companion 661df4e: decide past maxRecDepth 200 on (List.replicate 2000 0).length = 2000 returns an internal error with session-unusable and the process exits. Companion 91dbc0f: the same request returns kind recursion-depth with command-rolled-back, and exact List.length_replicate 2000 0 on the retained state certifies in the same session.",
+  "artifacts_sha256": {
+    "docs/evidence/recursion_depth_companion.native-tests.log": "c178f9faabd59dd67d59438e98ee318e9b2038c406e514625fa45f52baa6450d",
+    "tests/fixtures/recursion_depth_resources/capture.json": "2cda61e7b09e759c9bbc96f6d48f5099e6ad6ca319af742262eab068feb7be44",
+    "tests/fixtures/recursion_depth_resources/fixtures.json": "3e300aed899b066a8ba6a61d60ca9cb0992e6f1459f76cc3e07480e5749a1488",
+    "tests/fixtures/recursion_depth_resources/provenance.json": "1af3c0eef83f305a4232332b77b15aaac86e491b8dba2c68c2ae84716fc01171",
+    "tests/fixtures/recursion_depth_resources/schema.json": "c8e4df72f3a5f37b0248f7c9a2954d6287103bced44decca69b9a7d58936e97f",
+    "tests/fixtures/recursion_depth_snapshot_companion/capture.json": "6a9aba29d4d15492f9aab1d04d39b6fd75a8c5de6015144944353fdd9426487d",
+    "tests/fixtures/recursion_depth_snapshot_companion/provenance.json": "bad30297cee5271bc8a0310781292bc68be759d71a74bcb91fc5a1422b6185a7",
+    "tests/fixtures/recursion_depth_validation/capture.json": "9c96fa831fc1d9cbfec62a821763d806e8292a009cae00798ffd7c304c2c6581",
+    "tests/fixtures/recursion_depth_validation/client_capture.json": "36b7c2afb07bd5a287f616ea6dc4aa8850a5f056aac1957cd8eebd7c69db9db8",
+    "tests/fixtures/recursion_depth_validation/fixtures.json": "94629dd054eb88acd142ef74bd30c6d2f8a9b213a2d7313f730af369cfb0c15b",
+    "tests/fixtures/recursion_depth_validation/provenance.json": "0efb655dcf67c97ca4eb0151ed71060e11362236e685cad8a28cbce346526c91",
+    "tests/fixtures/recursion_depth_validation/schema.json": "1784d046264b9e66adf35f1855935d43535702220496bd2ae687247169b01975"
+  },
+  "scope": "Standalone client with native core and pinned Mathlib controls against the recursion-depth companion. The companion commit is on the author's fork until merged; re-pin if the merged commit differs."
+}
