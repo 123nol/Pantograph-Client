@@ -9,21 +9,24 @@ that agreement before returning build pins.
 
 | Item | Value |
 | --- | --- |
-| Distribution | `pantograph-async-client` 0.6.0 |
-| Client contract revision | 6 |
+| Distribution | `pantograph-async-client` 0.7.0 |
+| Client contract revision | 7 |
 | Protocol version | 3 |
 | Transition validation | 3, `execution-closure-and-representation-aware-audit` |
-| Resource and command-transaction versions | 1 |
-| Companion commit | `661df4e32bb487f52e4bf229a34b155f9e69c76b` |
+| Resource version | 2 (`heartbeats`, `recursion-depth`) |
+| Command-transaction version | 1 |
+| Companion commit | `91dbc0fb8b0af2d879abc51517693ec134343b33` |
 | Patch base | `0dd5d2225e2d093f66a4b6231c1aa35004f2c8f3` |
-| Patch SHA-256 | `f53b57ee215b35fad7cae684e77eb5c771a246faaecba6eccfe77d96dce73f39` |
-| Reference executable SHA-256 | `670c9b058bc2cdb7e85fb81befdf1ee81e6a19ad7744a2d2594cea1262935745` |
+| Patch SHA-256 | `4f9d104eaf4d0a9a8bd392ff453632b004d3cb6b7db6449c8bcff28b4d4ae541` |
+| Reference executable SHA-256 | `997e5f20d2364d4394c2a2355a790cdb79cd7e6a03e6eaf7ce31f3cd9594d56b` |
 | Lean | `leanprover/lean4:v4.10.0-rc1` |
 | Native Mathlib source | `29dcec074de168ac2bf835a77ef68bbe069194c5` |
 | Platform | Linux, Python 3.11+, GNU coreutils `stdbuf` |
 
-Model expressions, resource errors, command transactions, transition provenance,
-inspection and certification keep their previous versions. Protocol version 3
+Resource details move to version 2, which adds the `recursion-depth` kind; a
+companion that reports version 1 fails startup. Model expressions, command
+transactions, transition provenance, inspection and certification keep their
+previous versions. Protocol version 3
 with transition validation version 1 or 2 is incompatible and fails startup. No older
 validation decoder or disabled-check option is provided.
 
@@ -32,7 +35,7 @@ validation decoder or disabled-check option is provided.
 ```bash
 git clone https://github.com/123nol/Pantograph.git
 cd Pantograph
-git checkout --detach 661df4e32bb487f52e4bf229a34b155f9e69c76b
+git checkout --detach 91dbc0fb8b0af2d879abc51517693ec134343b33
 python -c "from pantograph_async import compatibility as c; c.verify_companion_sources('.')"
 lake build repl test scope_diagnostic compiler_diagnostic
 lake test

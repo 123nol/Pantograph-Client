@@ -18,7 +18,7 @@ Startup, under one deadline:
    | --- | --- |
    | `protocol` | `maths-ai-pantograph` |
    | `protocolVersion` | 3 |
-   | `resourceErrorVersion` | 1 |
+   | `resourceErrorVersion` | 2 |
    | `commandTransactionVersion` | 1 |
    | `modelSexpVersion` | 1 |
    | `transitionValidationVersion` | 3 |
@@ -137,12 +137,15 @@ them into an application model is the consumer's job, in its own adapter.
 Every command, including startup probes and deletion, can return:
 
 ```json
-{"error":"resource","desc":"Lean command heartbeat budget exhausted","resource":{"version":1,"kind":"heartbeats","phase":"execute","limit":200000},"recovery":"command-rolled-back"}
+{"error":"resource","desc":"Lean command heartbeat budget exhausted","resource":{"version":2,"kind":"heartbeats","phase":"execute","limit":200000},"recovery":"command-rolled-back"}
+{"error":"resource","desc":"Lean maximum recursion depth reached","resource":{"version":2,"kind":"recursion-depth","phase":"execute","limit":512},"recovery":"command-rolled-back"}
 ```
 
-`kind` currently accepts only `heartbeats`. `phase` is `execute`, `validate`,
-`observe`, or `serialize`. `limit` is a positive integer in Lean's
-`maxHeartbeats` option units; booleans are invalid. No extra fields are accepted.
+`version` is 2. `kind` is `heartbeats` or `recursion-depth`; any other kind or
+version is a protocol error. `phase` is `execute`, `validate`, `observe`, or
+`serialize`. `limit` is a positive integer in the kind's units: Lean's
+`maxHeartbeats` option units for `heartbeats`, and the command's configured
+`maxRecDepth` (nesting levels) for `recursion-depth`; booleans are invalid. No extra fields are accepted.
 The pending request supplies the command identity.
 
 `command-rolled-back` raises `PantographResourceError`, directly in the
@@ -241,3 +244,12 @@ Companion `661df4e` also stops treating Lean's elaboration aborts as unexpected
 failures. `exact`, `refine` and `have` with a placeholder Lean cannot
 synthesize now give an ordinary `PantographTacticRejected` with Lean's message
 instead of ending the session.
+
+Companion `91dbc0f` reports Lean's maximum recursion depth as a resource error
+with `kind: "recursion-depth"` instead of an unexpected internal failure. A
+tactic that exceeds it is rolled back: `PantographResourceError`, the input
+state stays usable, and another tactic can be applied to it in the same session.
+`frontend.process` keeps `session-unusable` for resource failures; inside a
+processed file, Lean's command elaborator reports recursion exhaustion as that
+command's error message. Certification that exhausts either limit is
+`inconclusive`.
